@@ -14,7 +14,6 @@ stats_bp = Blueprint('stats', __name__)
 
 @stats_bp.route('/statistieken')
 @login_required
-@admin_required
 def overzicht():
     jaar = request.args.get('jaar', None, type=int)
     if not jaar:

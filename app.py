@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from config import Config
 from extensions import db, migrate, login_manager, csrf
 import os
@@ -38,6 +38,15 @@ def create_app(config_class=Config):
     app.register_blueprint(admin_bp)
     app.register_blueprint(ie_bp)
     app.register_blueprint(stats_bp)
+
+    # Service worker moet op root-niveau staan (niet /static/sw.js) zodat
+    # zijn scope de volledige app dekt, wat vereist is voor PWA-installatie.
+    @app.route('/sw.js')
+    def service_worker():
+        response = send_from_directory(app.static_folder, 'sw.js')
+        response.headers['Content-Type'] = 'application/javascript'
+        response.headers['Service-Worker-Allowed'] = '/'
+        return response
 
     # CLI-commando: flask seed
     @app.cli.command('seed')

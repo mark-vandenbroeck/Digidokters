@@ -128,6 +128,22 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
     leeftijden = {l.naam.lower(): l for l in AgeCategory.query.filter_by(actief=True).all()}
     toestellen = {t.naam.lower(): t for t in Device.query.filter_by(actief=True).all()}
 
+    # Cacheer bestaande registraties (voor dubbele-detectie) en registratienummer-
+    # tellers per jaar in telkens 1 query, zodat we niet per rij naar de database
+    # moeten gaan. Dat is essentieel bij een externe database (Supabase/Render):
+    # elke round-trip kost netwerklatency, en bij honderden rijen loopt dat op
+    # tot een gunicorn worker timeout.
+    from sqlalchemy import extract, func
+    bestaande_registraties = set(
+        db.session.query(Registration.datum, Registration.client, Registration.digidokter_id).all()
+    )
+    tellers = {
+        int(jaar): aantal
+        for jaar, aantal in db.session.query(
+            extract('year', Registration.datum), func.count(Registration.id)
+        ).group_by(extract('year', Registration.datum)).all()
+    }
+
     resultaat['totaal'] = len(df)
 
     for idx, rij in df.iterrows():
@@ -166,7 +182,7 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
             max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).scalar() or 0
             digidokter = Digidokter(naam=dd_naam_original, actief=True, volgorde=max_volgorde + 1)
             db.session.add(digidokter)
-            db.session.commit()
+            db.session.flush()
             digidokters[dd_naam_lower] = digidokter
             logger.info(f'Nieuwe digidokter aangemaakt: {dd_naam_original}')
 
@@ -184,7 +200,7 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
             max_volgorde = db.session.query(db.func.max(AgeCategory.volgorde)).scalar() or 0
             leeftijdscategorie = AgeCategory(naam=lft_naam_original, actief=True, volgorde=max_volgorde + 1)
             db.session.add(leeftijdscategorie)
-            db.session.commit()
+            db.session.flush()
             leeftijden[lft_naam_lower] = leeftijdscategorie
             logger.info(f'Nieuwe leeftijdscategorie aangemaakt: {lft_naam_original}')
 
@@ -202,45 +218,56 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
             max_volgorde = db.session.query(db.func.max(Device.volgorde)).scalar() or 0
             toestel = Device(naam=tst_naam_original, actief=True, volgorde=max_volgorde + 1)
             db.session.add(toestel)
-            db.session.commit()
+            db.session.flush()
             toestellen[tst_naam_lower] = toestel
             logger.info(f'Nieuw toestel aangemaakt: {tst_naam_original}')
 
-        # Dubbele detectie
-        bestaande = Registration.query.filter_by(
-            datum=datum,
-            client=client,
-            digidokter_id=digidokter.id
-        ).first()
-        if bestaande:
+        # Dubbele detectie (in-memory, geen query per rij)
+        sleutel = (datum, client, digidokter.id)
+        if sleutel in bestaande_registraties:
             msg = f'Rij {rijnr}: Dubbele registratie overgeslagen ({datum} / {client} / {digidokter.naam})'
             logger.info(msg)
             resultaat['overgeslagen'] += 1
             continue
 
-        # Aanmaken
+        # Registratienummer via lokale teller (geen COUNT-query per rij)
+        jaar = datum.year
+        tellers[jaar] = tellers.get(jaar, 0) + 1
+        registratienummer = f"{jaar}-{tellers[jaar]:04d}"
+
+        # Aanmaken. We gebruiken een SAVEPOINT (begin_nested) zodat een fout in
+        # één rij enkel die rij terugdraait, en niet de volledige batch die al
+        # geflusht is sinds de laatste commit.
         try:
-            reg = Registration(
-                registratienummer=Registration.genereer_registratienummer(datum.year),
-                datum=datum,
-                client=client,
-                digidokter_id=digidokter.id,
-                nieuwe_klant=_parse_nieuwe_klant(rij.get('nieuwe_klant', False)),
-                herkomst=str(rij.get('herkomst', '') or '').strip(),
-                onderwerp=onderwerp,
-                leeftijdscategorie_id=leeftijdscategorie.id,
-                toestel_id=toestel.id,
-            )
-            db.session.add(reg)
-            db.session.commit()
+            with db.session.begin_nested():
+                reg = Registration(
+                    registratienummer=registratienummer,
+                    datum=datum,
+                    client=client,
+                    digidokter_id=digidokter.id,
+                    nieuwe_klant=_parse_nieuwe_klant(rij.get('nieuwe_klant', False)),
+                    herkomst=str(rij.get('herkomst', '') or '').strip(),
+                    onderwerp=onderwerp,
+                    leeftijdscategorie_id=leeftijdscategorie.id,
+                    toestel_id=toestel.id,
+                )
+                db.session.add(reg)
+            bestaande_registraties.add(sleutel)
             resultaat['toegevoegd'] += 1
-            logger.info(f'Rij {rijnr}: Toegevoegd als {reg.registratienummer}')
+            logger.info(f'Rij {rijnr}: Toegevoegd als {registratienummer}')
+
+            # Periodieke commit zodat de transactie niet onbeperkt groeit bij
+            # zeer grote bestanden.
+            if resultaat['toegevoegd'] % 100 == 0:
+                db.session.commit()
         except Exception as e:
-            db.session.rollback()
+            tellers[jaar] -= 1  # teller terugdraaien, deze rij telde niet mee
             msg = f'Rij {rijnr}: Databasefout – {e}'
             logger.error(msg)
             resultaat['fouten'].append(msg)
             resultaat['overgeslagen'] += 1
+
+    db.session.commit()
 
     logger.info(
         f'Import voltooid: {resultaat["totaal"]} totaal, '

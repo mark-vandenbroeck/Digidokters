@@ -1,0 +1,23 @@
+name: Keep Render app wakker
+
+on:
+  schedule:
+    # Draait elke 10 minuten, het hele jaar door (UTC). De check op het
+    # tijdvenster gebeurt hieronder in het script zelf, in lokale tijd.
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}  # laat toe om ook manueel te testen via GitHub
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping enkel tussen 8u en 22u (Brussel)
+        run: |
+          uur=$(TZ="Europe/Brussels" date +%H)
+          echo "Huidig uur in Brussel: $uur"
+          if [ "$uur" -ge 8 ] && [ "$uur" -lt 22 ]; then
+            echo "Binnen tijdvenster — app wordt gepingd."
+            curl -sf https://digidokters.onrender.com/ -o /dev/null
+          else
+            echo "Buiten tijdvenster (8u-22u) — geen ping, app mag slapen."
+          fi

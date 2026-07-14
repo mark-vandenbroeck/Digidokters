@@ -27,13 +27,13 @@ def login():
         return redirect(url_for('reg.lijst'))
 
     if request.method == 'POST':
-        gebruikersnaam = request.form.get('gebruikersnaam', '').strip().lower()
+        naam = request.form.get('naam', '').strip()
         wachtwoord = request.form.get('wachtwoord', '')
 
-        gebruiker = User.query.filter_by(gebruikersnaam=gebruikersnaam).first()
+        gebruiker = User.query.filter(db.func.lower(User.naam) == naam.lower()).first()
 
         if not gebruiker or not check_password_hash(gebruiker.wachtwoord_hash, wachtwoord):
-            flash('Ongeldige gebruikersnaam of wachtwoord.', 'danger')
+            flash('Ongeldige naam of wachtwoord.', 'danger')
             return render_template('auth/login.html')
 
         if not gebruiker.actief:

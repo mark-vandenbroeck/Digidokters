@@ -9,7 +9,7 @@ class User(UserMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     naam = db.Column(db.String(100), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(150), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(150), unique=True, nullable=True, index=True)
     wachtwoord_hash = db.Column(db.String(256), nullable=False)
     rol = db.Column(db.String(20), nullable=False, default='medewerker')  # 'medewerker' | 'beheerder'
     actief = db.Column(db.Boolean, default=True, nullable=False)

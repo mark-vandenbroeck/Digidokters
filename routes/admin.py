@@ -28,12 +28,12 @@ def gebruikers():
 def gebruiker_nieuw():
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
-        email = request.form.get('email', '').strip().lower()
+        email = request.form.get('email', '').strip().lower() or None
         rol = request.form.get('rol', 'medewerker')
         tijdelijk_ww = request.form.get('wachtwoord', '').strip()
 
-        if not naam or not email or not tijdelijk_ww:
-            flash('Alle velden zijn verplicht.', 'danger')
+        if not naam or not tijdelijk_ww:
+            flash('Naam en wachtwoord zijn verplicht.', 'danger')
             return render_template('admin/user_form.html', actie='Nieuw', user=None)
 
         if User.query.filter(db.func.lower(User.naam) == naam.lower()).first():
@@ -41,7 +41,7 @@ def gebruiker_nieuw():
             return render_template('admin/user_form.html', actie='Nieuw', user=None,
                                    form_data=request.form)
 
-        if User.query.filter_by(email=email).first():
+        if email and User.query.filter_by(email=email).first():
             flash('Dit e-mailadres is al in gebruik.', 'danger')
             return render_template('admin/user_form.html', actie='Nieuw', user=None,
                                    form_data=request.form)
@@ -70,7 +70,7 @@ def gebruiker_wijzigen(user_id):
 
     if request.method == 'POST':
         user.naam = request.form.get('naam', user.naam).strip()
-        user.email = request.form.get('email', user.email).strip().lower()
+        user.email = request.form.get('email', '').strip().lower() or None
         user.rol = request.form.get('rol', user.rol)
         if user.id != 1:  # Bescherm de eerste beheerder tegen zelf-deactivatie via het formulier
             user.actief = request.form.get('actief') == 'on'

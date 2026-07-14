@@ -1,5 +1,5 @@
 from datetime import datetime, date, timezone
-from app import db
+from extensions import db
 
 
 class Registration(db.Model):

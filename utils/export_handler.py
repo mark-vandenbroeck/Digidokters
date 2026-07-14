@@ -3,7 +3,7 @@ import io
 from datetime import date
 import pandas as pd
 from models.registration import Registration
-from app import db
+from extensions import db
 
 
 def _haal_registraties(

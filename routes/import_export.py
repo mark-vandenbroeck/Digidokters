@@ -5,7 +5,7 @@ from flask import (Blueprint, render_template, redirect, url_for, flash,
                    request, send_file, current_app, abort)
 from flask_login import login_required
 from werkzeug.utils import secure_filename
-from app import db
+from extensions import db
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device

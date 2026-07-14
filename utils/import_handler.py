@@ -3,7 +3,7 @@ import os
 import logging
 import pandas as pd
 from datetime import datetime, date, timezone
-from app import db
+from extensions import db
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device

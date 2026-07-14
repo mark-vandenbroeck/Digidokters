@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from flask_login import UserMixin
-from app import db, login_manager
+from extensions import db, login_manager
 
 
 class User(UserMixin, db.Model):

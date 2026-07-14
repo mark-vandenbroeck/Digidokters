@@ -74,11 +74,6 @@
                 <i class="bi bi-plus-circle"></i>
                 <span>Nieuw bezoek</span>
             </a>
-            <a href="{{ url_for('stats.overzicht') }}"
-               class="dd-nav-link {% if request.endpoint == 'stats.overzicht' %}active{% endif %}">
-                <i class="bi bi-graph-up"></i>
-                <span>Statistieken</span>
-            </a>
 
             {% if current_user.is_beheerder() %}
             <!-- Beheer -->
@@ -117,6 +112,11 @@
                 <span>Exporteren</span>
             </a>
             {% endif %}
+            <a href="{{ url_for('stats.overzicht') }}"
+               class="dd-nav-link {% if request.endpoint == 'stats.overzicht' %}active{% endif %}">
+                <i class="bi bi-graph-up"></i>
+                <span>Statistieken</span>
+            </a>
         </nav>
 
         <!-- Sidebar footer -->

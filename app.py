@@ -59,9 +59,11 @@ def create_app(config_class=Config):
         from werkzeug.security import generate_password_hash
 
         admin_email = 'mark.vandenbroeck@gmail.com'
+        admin_gebruikersnaam = 'mark'
         if not User.query.filter_by(email=admin_email).first():
             admin = User(
                 naam='Mark',
+                gebruikersnaam=admin_gebruikersnaam,
                 email=admin_email,
                 wachtwoord_hash=generate_password_hash('Digidokter2024!'),
                 rol='beheerder',
@@ -70,7 +72,7 @@ def create_app(config_class=Config):
             )
             db.session.add(admin)
             db.session.commit()
-            print(f'✓ Admin aangemaakt: {admin_email}')
+            print(f'✓ Admin aangemaakt: {admin_gebruikersnaam}')
             print('  Tijdelijk wachtwoord: Digidokter2024!')
             print('  Wijzig dit wachtwoord na de eerste login!')
         else:

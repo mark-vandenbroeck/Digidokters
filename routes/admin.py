@@ -28,13 +28,19 @@ def gebruikers():
 def gebruiker_nieuw():
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
+        gebruikersnaam = request.form.get('gebruikersnaam', '').strip().lower()
         email = request.form.get('email', '').strip().lower()
         rol = request.form.get('rol', 'medewerker')
         tijdelijk_ww = request.form.get('wachtwoord', '').strip()
 
-        if not naam or not email or not tijdelijk_ww:
+        if not naam or not gebruikersnaam or not email or not tijdelijk_ww:
             flash('Alle velden zijn verplicht.', 'danger')
             return render_template('admin/user_form.html', actie='Nieuw', user=None)
+
+        if User.query.filter_by(gebruikersnaam=gebruikersnaam).first():
+            flash('Deze gebruikersnaam is al in gebruik.', 'danger')
+            return render_template('admin/user_form.html', actie='Nieuw', user=None,
+                                   form_data=request.form)
 
         if User.query.filter_by(email=email).first():
             flash('Dit e-mailadres is al in gebruik.', 'danger')
@@ -43,10 +49,11 @@ def gebruiker_nieuw():
 
         user = User(
             naam=naam,
+            gebruikersnaam=gebruikersnaam,
             email=email,
             wachtwoord_hash=generate_password_hash(tijdelijk_ww),
             rol=rol,
-            actief=True,
+            actief=request.form.get('actief') == 'on',
             moet_wachtwoord_wijzigen=True,
         )
         db.session.add(user)
@@ -65,8 +72,11 @@ def gebruiker_wijzigen(user_id):
 
     if request.method == 'POST':
         user.naam = request.form.get('naam', user.naam).strip()
+        user.gebruikersnaam = request.form.get('gebruikersnaam', user.gebruikersnaam).strip().lower()
         user.email = request.form.get('email', user.email).strip().lower()
         user.rol = request.form.get('rol', user.rol)
+        if user.id != 1:  # Bescherm de eerste beheerder tegen zelf-deactivatie via het formulier
+            user.actief = request.form.get('actief') == 'on'
         nieuw_ww = request.form.get('wachtwoord', '').strip()
         if nieuw_ww:
             user.wachtwoord_hash = generate_password_hash(nieuw_ww)
@@ -156,7 +166,8 @@ def digidokter_nieuw():
             return render_template('admin/item_form.html', titel='Digidokter', actie='Nieuw',
                                    item=None, terug_url=url_for('admin.digidokters'))
         max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).scalar() or 0
-        db.session.add(Digidokter(naam=naam, volgorde=max_volgorde + 1))
+        db.session.add(Digidokter(naam=naam, volgorde=max_volgorde + 1,
+                                  actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
         db.session.commit()
         flash(f'Digidokter {naam} toegevoegd.', 'success')
         return redirect(url_for('admin.digidokters'))
@@ -171,6 +182,7 @@ def digidokter_wijzigen(item_id):
     item = db.get_or_404(Digidokter, item_id)
     if request.method == 'POST':
         item.naam = request.form.get('naam', item.naam).strip()
+        item.actief = request.form.get('actief') == 'on'
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.digidokters'))
@@ -213,7 +225,8 @@ def leeftijdscategorie_nieuw():
             return render_template('admin/item_form.html', titel='Leeftijdscategorie', actie='Nieuw',
                                    item=None, terug_url=url_for('admin.leeftijdscategorieën'))
         max_volgorde = db.session.query(db.func.max(AgeCategory.volgorde)).scalar() or 0
-        db.session.add(AgeCategory(naam=naam, volgorde=max_volgorde + 1))
+        db.session.add(AgeCategory(naam=naam, volgorde=max_volgorde + 1,
+                                   actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
         db.session.commit()
         flash(f'Leeftijdscategorie {naam} toegevoegd.', 'success')
         return redirect(url_for('admin.leeftijdscategorieën'))
@@ -228,6 +241,7 @@ def leeftijdscategorie_wijzigen(item_id):
     item = db.get_or_404(AgeCategory, item_id)
     if request.method == 'POST':
         item.naam = request.form.get('naam', item.naam).strip()
+        item.actief = request.form.get('actief') == 'on'
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.leeftijdscategorieën'))
@@ -270,7 +284,8 @@ def toestel_nieuw():
             return render_template('admin/item_form.html', titel='Toestel', actie='Nieuw',
                                    item=None, terug_url=url_for('admin.toestellen'))
         max_volgorde = db.session.query(db.func.max(Device.volgorde)).scalar() or 0
-        db.session.add(Device(naam=naam, volgorde=max_volgorde + 1))
+        db.session.add(Device(naam=naam, volgorde=max_volgorde + 1,
+                              actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
         db.session.commit()
         flash(f'Toestel {naam} toegevoegd.', 'success')
         return redirect(url_for('admin.toestellen'))
@@ -285,6 +300,7 @@ def toestel_wijzigen(item_id):
     item = db.get_or_404(Device, item_id)
     if request.method == 'POST':
         item.naam = request.form.get('naam', item.naam).strip()
+        item.actief = request.form.get('actief') == 'on'
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.toestellen'))

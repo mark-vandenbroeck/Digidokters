@@ -9,6 +9,7 @@ class User(UserMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     naam = db.Column(db.String(100), nullable=False)
+    gebruikersnaam = db.Column(db.String(50), unique=True, nullable=False, index=True)
     email = db.Column(db.String(150), unique=True, nullable=False, index=True)
     wachtwoord_hash = db.Column(db.String(256), nullable=False)
     rol = db.Column(db.String(20), nullable=False, default='medewerker')  # 'medewerker' | 'beheerder'
@@ -25,7 +26,7 @@ class User(UserMixin, db.Model):
         return self.rol == 'beheerder'
 
     def __repr__(self):
-        return f'<User {self.email}>'
+        return f'<User {self.gebruikersnaam}>'
 
 
 @login_manager.user_loader

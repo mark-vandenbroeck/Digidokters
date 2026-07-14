@@ -14,20 +14,28 @@ from models.registration import Registration
 KOLOM_MAP = {
     'datum': 'datum',
     'date': 'datum',
+    'tijdstempel': 'datum',
+    'timestamp': 'datum',
     'client': 'client',
     'cliënt': 'client',
     'klant': 'client',
+    'voornaam deelnemer': 'client',
+    'naam': 'client',
     'digidokter': 'digidokter',
     'vrijwilliger': 'digidokter',
+    'aantal bezoeken digidokter': 'nieuwe_klant',
     'nieuwe klant': 'nieuwe_klant',
-    'nieuwe_klant': 'nieuwe_klant',
+    'nieuwe_pad': 'nieuwe_klant',
     'nieuw': 'nieuwe_klant',
+    'van waar ken je de digidokter?': 'herkomst',
     'herkomst': 'herkomst',
     'onderwerp': 'onderwerp',
     'leeftijdscategorie': 'leeftijdscategorie',
     'leeftijd': 'leeftijdscategorie',
+    'leeftijd deelnemer': 'leeftijdscategorie',
     'age category': 'leeftijdscategorie',
     'toestel': 'toestel',
+    'toestel patiënt': 'toestel',
     'device': 'toestel',
     'apparaat': 'toestel',
 }
@@ -44,13 +52,11 @@ def _setup_logger(log_path: str) -> logging.Logger:
     return logger
 
 
-def _normalize_bool(waarde) -> bool:
-    if isinstance(waarde, bool):
-        return waarde
-    if isinstance(waarde, (int, float)):
-        return bool(waarde)
+def _parse_nieuwe_klant(waarde) -> bool:
+    if pd.isna(waarde) or waarde is None:
+        return False
     s = str(waarde).strip().lower()
-    return s in ('ja', 'yes', '1', 'true', 'waar', 'y', 'j')
+    return s in ('nieuwe klant', '1', 'ja', 'yes', 'true', 'j', 'waar')
 
 
 def _parse_date(waarde) -> date | None:
@@ -144,35 +150,59 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
 
         onderwerp = str(rij.get('onderwerp', '')).strip()
 
-        # Digidokter opzoeken
-        dd_naam = str(rij.get('digidokter', '')).strip().lower()
-        digidokter = digidokters.get(dd_naam)
+        # Digidokter opzoeken of aanmaken
+        dd_naam_original = str(rij.get('digidokter', '')).strip()
+        if not dd_naam_original:
+            msg = f'Rij {rijnr}: Digidokter ontbreekt'
+            logger.warning(msg)
+            resultaat['fouten'].append(msg)
+            resultaat['overgeslagen'] += 1
+            continue
+        dd_naam_lower = dd_naam_original.lower()
+        digidokter = digidokters.get(dd_naam_lower)
         if digidokter is None:
-            msg = f'Rij {rijnr}: Onbekende digidokter "{dd_naam}"'
+            max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).scalar() or 0
+            digidokter = Digidokter(naam=dd_naam_original, actief=True, volgorde=max_volgorde + 1)
+            db.session.add(digidokter)
+            db.session.commit()
+            digidokters[dd_naam_lower] = digidokter
+            logger.info(f'Nieuwe digidokter aangemaakt: {dd_naam_original}')
+
+        # Leeftijdscategorie opzoeken of aanmaken
+        lft_naam_original = str(rij.get('leeftijdscategorie', '')).strip()
+        if not lft_naam_original:
+            msg = f'Rij {rijnr}: Leeftijdscategorie ontbreekt'
             logger.warning(msg)
             resultaat['fouten'].append(msg)
             resultaat['overgeslagen'] += 1
             continue
-
-        # Leeftijdscategorie opzoeken
-        lft_naam = str(rij.get('leeftijdscategorie', '')).strip().lower()
-        leeftijdscategorie = leeftijden.get(lft_naam)
+        lft_naam_lower = lft_naam_original.lower()
+        leeftijdscategorie = leeftijden.get(lft_naam_lower)
         if leeftijdscategorie is None:
-            msg = f'Rij {rijnr}: Onbekende leeftijdscategorie "{lft_naam}"'
-            logger.warning(msg)
-            resultaat['fouten'].append(msg)
-            resultaat['overgeslagen'] += 1
-            continue
+            max_volgorde = db.session.query(db.func.max(AgeCategory.volgorde)).scalar() or 0
+            leeftijdscategorie = AgeCategory(naam=lft_naam_original, actief=True, volgorde=max_volgorde + 1)
+            db.session.add(leeftijdscategorie)
+            db.session.commit()
+            leeftijden[lft_naam_lower] = leeftijdscategorie
+            logger.info(f'Nieuwe leeftijdscategorie aangemaakt: {lft_naam_original}')
 
-        # Toestel opzoeken
-        tst_naam = str(rij.get('toestel', '')).strip().lower()
-        toestel = toestellen.get(tst_naam)
-        if toestel is None:
-            msg = f'Rij {rijnr}: Onbekend toestel "{tst_naam}"'
+        # Toestel opzoeken of aanmaken
+        tst_naam_original = str(rij.get('toestel', '')).strip()
+        if not tst_naam_original:
+            msg = f'Rij {rijnr}: Toestel ontbreekt'
             logger.warning(msg)
             resultaat['fouten'].append(msg)
             resultaat['overgeslagen'] += 1
             continue
+        tst_naam_lower = tst_naam_original.lower()
+        toestel = toestellen.get(tst_naam_lower)
+        if toestel is None:
+            max_volgorde = db.session.query(db.func.max(Device.volgorde)).scalar() or 0
+            toestel = Device(naam=tst_naam_original, actief=True, volgorde=max_volgorde + 1)
+            db.session.add(toestel)
+            db.session.commit()
+            toestellen[tst_naam_lower] = toestel
+            logger.info(f'Nieuw toestel aangemaakt: {tst_naam_original}')
 
         # Dubbele detectie
         bestaande = Registration.query.filter_by(
@@ -193,7 +223,7 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
                 datum=datum,
                 client=client,
                 digidokter_id=digidokter.id,
-                nieuwe_klant=_normalize_bool(rij.get('nieuwe_klant', False)),
+                nieuwe_klant=_parse_nieuwe_klant(rij.get('nieuwe_klant', False)),
                 herkomst=str(rij.get('herkomst', '') or '').strip(),
                 onderwerp=onderwerp,
                 leeftijdscategorie_id=leeftijdscategorie.id,

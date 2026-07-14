@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Gebruikersbeheer – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-people me-2 text-primary"></i>Gebruikersbeheer</h1>
+        <p class="dd-page-subtitle mb-0">Beheer medewerkers en beheerders</p>
+    </div>
+    <a href="{{ url_for('admin.gebruiker_nieuw') }}" class="btn btn-primary">
+        <i class="bi bi-person-plus me-1"></i>Nieuwe gebruiker
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-3">Naam</th>
+                        <th>E-mailadres</th>
+                        <th>Rol</th>
+                        <th>Status</th>
+                        <th>Laatste login</th>
+                        <th class="pe-3 text-end">Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td class="ps-3 fw-medium">{{ u.naam }}</td>
+                        <td>{{ u.email }}</td>
+                        <td>
+                            {% if u.rol == 'beheerder' %}
+                            <span class="badge bg-danger">Beheerder</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Medewerker</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.actief %}
+                            <span class="badge bg-success">Actief</span>
+                            {% else %}
+                            <span class="badge bg-dark">Gedeactiveerd</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ u.laatste_login.strftime('%d/%m/%Y %H:%M') if u.laatste_login else 'Nooit' }}
+                        </td>
+                        <td class="pe-3 text-end text-nowrap">
+                            <a href="{{ url_for('admin.gebruiker_wijzigen', user_id=u.id) }}"
+                               class="btn btn-sm btn-outline-primary" title="Wijzigen">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            {% if u.id != 1 %}
+                            <a href="{{ url_for('admin.gebruiker_toggle', user_id=u.id) }}"
+                               class="btn btn-sm {% if u.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
+                               title="{% if u.actief %}Deactiveren{% else %}Activeren{% endif %}">
+                                <i class="bi {% if u.actief %}bi-person-x{% else %}bi-person-check{% endif %}"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

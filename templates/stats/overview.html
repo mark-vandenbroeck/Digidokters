@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% block title %}Statistieken – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-graph-up me-2 text-primary"></i>Statistieken</h1>
+        <p class="dd-page-subtitle mb-0">Rapportering en bezoekenanalyse</p>
+    </div>
+    <!-- Jaar filter selector -->
+    <form method="GET" action="{{ url_for('stats.overzicht') }}" class="d-flex align-items-center gap-2">
+        <label class="text-nowrap small text-muted">Jaar selecteren:</label>
+        <select class="form-select form-select-sm" name="jaar" onchange="this.form.submit()">
+            {% for j in jaren %}
+            <option value="{{ j }}" {{ 'selected' if j == jaar }}>{{ j }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<!-- Samenvatting KPI's -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-4">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-blue-soft text-blue">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ totaal_jaar }}</div>
+                <div class="dd-stat-label">Bezoeken in {{ jaar }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-4">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-teal-soft text-teal">
+                <i class="bi bi-person-plus-fill"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ nieuwe_klanten }}</div>
+                <div class="dd-stat-label">Nieuwe klanten</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-4">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-purple-soft text-purple">
+                <i class="bi bi-person-check-fill"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ terugkerende_klanten }}</div>
+                <div class="dd-stat-label">Terugkerende klanten</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Per maand -->
+    <div class="col-12 col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Bezoeken per maand</div>
+            <div class="card-body">
+                {% if per_maand %}
+                {% for maand, aantal in per_maand %}
+                <div class="dd-progress-row">
+                    <div class="dd-progress-label">{{ maand }}</div>
+                    <div class="dd-progress-bar-wrap">
+                        <div class="dd-progress-fill" style="width: {{ (aantal / totaal_jaar * 100)|round if totaal_jaar > 0 else 0 }}%"></div>
+                    </div>
+                    <div class="dd-progress-count">{{ aantal }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">Geen data beschikbaar voor dit jaar.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Per digidokter -->
+    <div class="col-12 col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Bezoeken per Digidokter</div>
+            <div class="card-body">
+                {% if per_digidokter %}
+                {% for dd, aantal in per_digidokter %}
+                <div class="dd-progress-row">
+                    <div class="dd-progress-label">{{ dd }}</div>
+                    <div class="dd-progress-bar-wrap">
+                        <div class="dd-progress-fill bg-teal" style="width: {{ (aantal / totaal_jaar * 100)|round if totaal_jaar > 0 else 0 }}%"></div>
+                    </div>
+                    <div class="dd-progress-count">{{ aantal }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">Geen data beschikbaar voor dit jaar.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Per leeftijdscategorie -->
+    <div class="col-12 col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Leeftijdscategorieën</div>
+            <div class="card-body">
+                {% if per_leeftijd %}
+                {% for lft, aantal in per_leeftijd %}
+                <div class="dd-progress-row">
+                    <div class="dd-progress-label">{{ lft }}</div>
+                    <div class="dd-progress-bar-wrap">
+                        <div class="dd-progress-fill bg-purple" style="width: {{ (aantal / totaal_jaar * 100)|round if totaal_jaar > 0 else 0 }}%"></div>
+                    </div>
+                    <div class="dd-progress-count">{{ aantal }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">Geen data beschikbaar voor dit jaar.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Per toestel -->
+    <div class="col-12 col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Toestellen</div>
+            <div class="card-body">
+                {% if per_toestel %}
+                {% for tst, aantal in per_toestel %}
+                <div class="dd-progress-row">
+                    <div class="dd-progress-label">{{ tst }}</div>
+                    <div class="dd-progress-bar-wrap">
+                        <div class="dd-progress-fill bg-orange" style="width: {{ (aantal / totaal_jaar * 100)|round if totaal_jaar > 0 else 0 }}%"></div>
+                    </div>
+                    <div class="dd-progress-count">{{ aantal }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">Geen data beschikbaar voor dit jaar.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Drukste dagen -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">Drukste dagen (Top 10)</div>
+            <div class="card-body p-0">
+                {% if per_dag %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Datum</th>
+                                <th class="pe-3 text-end">Aantal bezoeken</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for datum, aantal in per_dag %}
+                            <tr>
+                                <td class="ps-3 fw-medium">{{ datum.strftime('%d/%m/%Y') }}</td>
+                                <td class="pe-3 text-end">{{ aantal }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">Geen data beschikbaar.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

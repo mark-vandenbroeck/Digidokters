@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}{{ actie }} {{ titel }} – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-12 col-md-8 col-lg-6">
+
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <a href="{{ terug_url }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="dd-page-title mb-0">
+            <i class="bi bi-tag me-2 text-primary"></i>{{ actie }} {{ titel }}
+        </h1>
+    </div>
+    <p class="dd-page-subtitle mb-3">Voeg een nieuw item toe of pas de naam van het geselecteerde item aan.</p>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form method="POST" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="mb-4">
+                    <label for="naam" class="form-label">Naam <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="naam" name="naam"
+                           value="{{ item.naam if item else '' }}" placeholder="Voer naam in" required autofocus>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Opslaan
+                    </button>
+                    <a href="{{ terug_url }}" class="btn btn-outline-secondary">Annuleren</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}

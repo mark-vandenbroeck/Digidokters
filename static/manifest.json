@@ -1,0 +1,22 @@
+{
+  "name": "Digidokters Bezoekersregistratie",
+  "short_name": "Digidokters",
+  "description": "Registratieapplicatie voor de Digidokter-werking.",
+  "start_url": "/registraties",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1d4ed8",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Gegevens exporteren – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-12 col-lg-8">
+
+    <h1 class="dd-page-title"><i class="bi bi-cloud-download me-2 text-primary"></i>Gegevens exporteren</h1>
+    <p class="dd-page-subtitle">Exporteer registraties met filters naar Excel of CSV.</p>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form method="POST" action="{{ url_for('ie.exporteer') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="row g-3">
+                    <!-- Formaat -->
+                    <div class="col-12">
+                        <label class="form-label">Exportformaat</label>
+                        <div class="d-flex gap-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="formaat" id="fmt_excel" value="xlsx" checked>
+                                <label class="form-check-label" for="fmt_excel">
+                                    <i class="bi bi-file-earmark-excel text-success me-1"></i>Excel-werkmap (.xlsx)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="formaat" id="fmt_csv" value="csv">
+                                <label class="form-check-label" for="fmt_csv">
+                                    <i class="bi bi-filetype-csv text-primary me-1"></i>CSV (Komma-gescheiden)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- Filters -->
+                    <h6 class="fw-semibold text-muted mb-0">Filters (optioneel)</h6>
+
+                    <div class="col-12 col-sm-6">
+                        <label for="datum_van" class="form-label">Datum vanaf</label>
+                        <input type="date" class="form-control" id="datum_van" name="datum_van">
+                    </div>
+
+                    <div class="col-12 col-sm-6">
+                        <label for="datum_tot" class="form-label">Datum tot en met</label>
+                        <input type="date" class="form-control" id="datum_tot" name="datum_tot">
+                    </div>
+
+                    <div class="col-12 col-sm-4">
+                        <label for="digidokter_id" class="form-label">Digidokter</label>
+                        <select class="form-select" id="digidokter_id" name="digidokter_id">
+                            <option value="0">— Alle digidokters —</option>
+                            {% for d in digidokters %}
+                            <option value="{{ d.id }}">{{ d.naam }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-sm-4">
+                        <label for="leeftijdscategorie_id" class="form-label">Leeftijdscategorie</label>
+                        <select class="form-select" id="leeftijdscategorie_id" name="leeftijdscategorie_id">
+                            <option value="0">— Alle categorieën —</option>
+                            {% for l in leeftijdscategorieën %}
+                            <option value="{{ l.id }}">{{ l.naam }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-sm-4">
+                        <label for="toestel_id" class="form-label">Toestel</label>
+                        <select class="form-select" id="toestel_id" name="toestel_id">
+                            <option value="0">— Alle toestellen —</option>
+                            {% for t in toestellen %}
+                            <option value="{{ t.id }}">{{ t.naam }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <button type="submit" class="btn btn-primary px-4 py-2">
+                    <i class="bi bi-download me-1"></i>Exporteren downloaden
+                </button>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% block title %}Nieuw bezoek – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-12 col-lg-8 col-xl-7">
+
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <a href="{{ url_for('reg.lijst') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-plus-circle me-2 text-primary"></i>Nieuw bezoek registreren</h1>
+    </div>
+    <p class="dd-page-subtitle mb-3">Vul alle velden in en klik op Opslaan.</p>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form method="POST" action="{{ url_for('reg.nieuw') }}" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="row g-3">
+                    <!-- Datum -->
+                    <div class="col-12 col-sm-6">
+                        <label for="datum" class="form-label">Datum <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="datum" name="datum"
+                               value="{{ form_data.datum if form_data else datum_vandaag }}" required>
+                    </div>
+
+                    <!-- Digidokter -->
+                    <div class="col-12 col-sm-6">
+                        <label for="digidokter_id" class="form-label">Digidokter <span class="text-danger">*</span></label>
+                        <select class="form-select" id="digidokter_id" name="digidokter_id" required>
+                            <option value="">— Kies een digidokter —</option>
+                            {% for d in digidokters %}
+                            <option value="{{ d.id }}"
+                                {{ 'selected' if form_data and form_data.digidokter_id == d.id|string }}>
+                                {{ d.naam }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Cliënt -->
+                    <div class="col-12">
+                        <label for="client" class="form-label">Cliënt (naam of initialen) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="client" name="client"
+                               value="{{ form_data.client if form_data else '' }}"
+                               placeholder="Bijv. J.V.D." maxlength="150" required>
+                    </div>
+
+                    <!-- Nieuwe klant -->
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label">Nieuwe klant <span class="text-danger">*</span></label>
+                        <div class="d-flex gap-3 mt-1">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="nieuwe_klant"
+                                       id="nieuw_ja" value="ja"
+                                       {{ 'checked' if form_data and form_data.nieuwe_klant == 'ja' }}>
+                                <label class="form-check-label" for="nieuw_ja">Ja</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="nieuwe_klant"
+                                       id="nieuw_nee" value="nee"
+                                       {{ 'checked' if not form_data or form_data.nieuwe_klant != 'ja' }}>
+                                <label class="form-check-label" for="nieuw_nee">Nee</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Herkomst -->
+                    <div class="col-12 col-sm-6">
+                        <label for="herkomst" class="form-label">Herkomst</label>
+                        <input type="text" class="form-control" id="herkomst" name="herkomst"
+                               value="{{ form_data.herkomst if form_data else '' }}"
+                               placeholder="Bijv. doorverwijzing, zelf gekomen…" maxlength="200">
+                    </div>
+
+                    <!-- Onderwerp -->
+                    <div class="col-12">
+                        <label for="onderwerp" class="form-label">Onderwerp <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="onderwerp" name="onderwerp"
+                               value="{{ form_data.onderwerp if form_data else '' }}"
+                               placeholder="Bijv. e-mail instellen, wifi-problemen…" maxlength="500" required>
+                    </div>
+
+                    <!-- Leeftijdscategorie -->
+                    <div class="col-12 col-sm-6">
+                        <label for="leeftijdscategorie_id" class="form-label">Leeftijdscategorie <span class="text-danger">*</span></label>
+                        <select class="form-select" id="leeftijdscategorie_id" name="leeftijdscategorie_id" required>
+                            <option value="">— Kies een categorie —</option>
+                            {% for l in leeftijdscategorieën %}
+                            <option value="{{ l.id }}"
+                                {{ 'selected' if form_data and form_data.leeftijdscategorie_id == l.id|string }}>
+                                {{ l.naam }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Toestel -->
+                    <div class="col-12 col-sm-6">
+                        <label for="toestel_id" class="form-label">Toestel <span class="text-danger">*</span></label>
+                        <select class="form-select" id="toestel_id" name="toestel_id" required>
+                            <option value="">— Kies een toestel —</option>
+                            {% for t in toestellen %}
+                            <option value="{{ t.id }}"
+                                {{ 'selected' if form_data and form_data.toestel_id == t.id|string }}>
+                                {{ t.naam }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Opslaan
+                    </button>
+                    <a href="{{ url_for('reg.lijst') }}" class="btn btn-outline-secondary">Annuleren</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}

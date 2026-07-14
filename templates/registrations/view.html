@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Registratie {{ reg.registratienummer }} – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-12 col-lg-8 col-xl-7">
+
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <a href="{{ url_for('reg.lijst') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="dd-page-title mb-0">
+            <i class="bi bi-clipboard2-check me-2 text-primary"></i>{{ reg.registratienummer }}
+        </h1>
+        <a href="{{ url_for('reg.wijzigen', reg_id=reg.id) }}" class="btn btn-sm btn-outline-primary ms-auto">
+            <i class="bi bi-pencil me-1"></i>Wijzigen
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <dl class="row mb-0">
+                <dt class="col-sm-4 text-muted fw-normal small">Registratienummer</dt>
+                <dd class="col-sm-8">
+                    <span class="badge bg-light text-dark border fw-normal">{{ reg.registratienummer }}</span>
+                </dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Datum</dt>
+                <dd class="col-sm-8 fw-semibold">{{ reg.datum.strftime('%d %B %Y') }}</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Cliënt</dt>
+                <dd class="col-sm-8">{{ reg.client }}</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Digidokter</dt>
+                <dd class="col-sm-8">{{ reg.digidokter.naam if reg.digidokter else '–' }}</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Nieuwe klant</dt>
+                <dd class="col-sm-8">
+                    {% if reg.nieuwe_klant %}
+                    <span class="badge-new">Ja – nieuwe klant</span>
+                    {% else %}
+                    <span class="text-muted">Nee</span>
+                    {% endif %}
+                </dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Herkomst</dt>
+                <dd class="col-sm-8">{{ reg.herkomst or '–' }}</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Onderwerp</dt>
+                <dd class="col-sm-8">{{ reg.onderwerp }}</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Leeftijdscategorie</dt>
+                <dd class="col-sm-8">{{ reg.leeftijdscategorie.naam if reg.leeftijdscategorie else '–' }}</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Toestel</dt>
+                <dd class="col-sm-8">{{ reg.toestel.naam if reg.toestel else '–' }}</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Aangemaakt op</dt>
+                <dd class="col-sm-8 text-muted small">
+                    {{ reg.aangemaakt_op.strftime('%d/%m/%Y %H:%M') if reg.aangemaakt_op else '–' }}
+                    {% if reg.aangemaakt_door_user %}
+                    door {{ reg.aangemaakt_door_user.naam }}
+                    {% endif %}
+                </dd>
+
+                <dt class="col-sm-4 text-muted fw-normal small">Gewijzigd op</dt>
+                <dd class="col-sm-8 text-muted small">
+                    {{ reg.gewijzigd_op.strftime('%d/%m/%Y %H:%M') if reg.gewijzigd_op else '–' }}
+                </dd>
+            </dl>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}

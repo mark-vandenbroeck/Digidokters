@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}Registraties – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-clipboard2-pulse me-2 text-primary"></i>Registraties</h1>
+        <p class="dd-page-subtitle mb-0">Overzicht van alle bezoeken</p>
+    </div>
+    <a href="{{ url_for('reg.nieuw') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Nieuw bezoek
+    </a>
+</div>
+
+<!-- Zoekbalk & filters -->
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <form method="GET" action="{{ url_for('reg.lijst') }}" id="zoekForm">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label mb-1">Zoeken</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" name="zoek"
+                               value="{{ zoek }}" placeholder="Cliënt, onderwerp…">
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <label class="form-label mb-1">Digidokter</label>
+                    <select class="form-select form-select-sm" name="digidokter">
+                        <option value="0">Alle</option>
+                        {% for d in digidokters %}
+                        <option value="{{ d.id }}" {{ 'selected' if d.id == filter_digidokter }}>{{ d.naam }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label mb-1">Datum van</label>
+                    <input type="date" class="form-control form-control-sm"
+                           name="datum_van" value="{{ filter_datum_van }}">
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label mb-1">Datum tot</label>
+                    <input type="date" class="form-control form-control-sm"
+                           name="datum_tot" value="{{ filter_datum_tot }}">
+                </div>
+                <div class="col-12 col-lg-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-funnel me-1"></i>Filteren
+                    </button>
+                    <a href="{{ url_for('reg.lijst') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabel -->
+<div class="card">
+    <div class="card-body p-0">
+        {% if registraties %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-3">Nr.</th>
+                        <th>Datum</th>
+                        <th>Cliënt</th>
+                        <th class="d-none d-md-table-cell">Digidokter</th>
+                        <th class="d-none d-lg-table-cell">Leeftijd</th>
+                        <th class="d-none d-lg-table-cell">Toestel</th>
+                        <th class="d-none d-md-table-cell">Nieuw</th>
+                        <th class="pe-3 text-end">Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in registraties %}
+                    <tr>
+                        <td class="ps-3">
+                            <span class="badge bg-light text-dark border fw-normal">{{ r.registratienummer }}</span>
+                        </td>
+                        <td class="text-nowrap">{{ r.datum.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            <div class="fw-medium">{{ r.client }}</div>
+                            <div class="text-muted small d-md-none">{{ r.digidokter.naam if r.digidokter }}</div>
+                        </td>
+                        <td class="d-none d-md-table-cell">{{ r.digidokter.naam if r.digidokter else '–' }}</td>
+                        <td class="d-none d-lg-table-cell">{{ r.leeftijdscategorie.naam if r.leeftijdscategorie else '–' }}</td>
+                        <td class="d-none d-lg-table-cell">{{ r.toestel.naam if r.toestel else '–' }}</td>
+                        <td class="d-none d-md-table-cell">
+                            {% if r.nieuwe_klant %}
+                            <span class="badge-new">Nieuw</span>
+                            {% else %}
+                            <span class="text-muted small">–</span>
+                            {% endif %}
+                        </td>
+                        <td class="pe-3 text-end text-nowrap">
+                            <a href="{{ url_for('reg.bekijken', reg_id=r.id) }}"
+                               class="btn btn-sm btn-outline-secondary" title="Bekijken">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{{ url_for('reg.wijzigen', reg_id=r.id) }}"
+                               class="btn btn-sm btn-outline-primary ms-1" title="Wijzigen">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginatie -->
+        {% if paginatie.pages > 1 %}
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+            <small class="text-muted">
+                {{ paginatie.total }} registraties · pagina {{ paginatie.page }} van {{ paginatie.pages }}
+            </small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if paginatie.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.prev_num, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% for p in paginatie.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if p %}
+                        <li class="page-item {{ 'active' if p == paginatie.page }}">
+                            <a class="page-link" href="{{ url_for('reg.lijst', pagina=p, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}">{{ p }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if paginatie.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.next_num, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% else %}
+        <div class="px-3 py-2 border-top">
+            <small class="text-muted">{{ paginatie.total }} registratie{{ 's' if paginatie.total != 1 }}</small>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-clipboard2-x fs-1 text-muted mb-3 d-block"></i>
+            <p class="text-muted mb-2">Geen registraties gevonden.</p>
+            {% if zoek or filter_digidokter or filter_datum_van or filter_datum_tot %}
+            <a href="{{ url_for('reg.lijst') }}" class="btn btn-sm btn-outline-secondary">Filters wissen</a>
+            {% else %}
+            <a href="{{ url_for('reg.nieuw') }}" class="btn btn-sm btn-primary">Eerste bezoek registreren</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -7,7 +7,6 @@ from models.registration import Registration
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
-from utils.decorators import admin_required
 
 stats_bp = Blueprint('stats', __name__)
 

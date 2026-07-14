@@ -66,9 +66,11 @@ def _parse_date(waarde) -> date | None:
         return waarde.date()
     if pd.isna(waarde):
         return None
+    # Strip eventuele tijdstempels (bijv. "13-6-2026 07:05:29" -> "13-6-2026")
+    datum_deel = str(waarde).strip().split(' ')[0]
     for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d.%m.%Y'):
         try:
-            return datetime.strptime(str(waarde).strip(), fmt).date()
+            return datetime.strptime(datum_deel, fmt).date()
         except ValueError:
             continue
     return None

@@ -1,6 +1,6 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, render_template, flash
 from config import Config
-from extensions import db, migrate, login_manager, csrf
+from extensions import db, migrate, login_manager, csrf, limiter
 import os
 
 
@@ -13,6 +13,7 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
+    limiter.init_app(app)
 
     # Flask-Login configuratie
     login_manager.login_view = 'auth.login'
@@ -47,6 +48,12 @@ def create_app(config_class=Config):
         response.headers['Content-Type'] = 'application/javascript'
         response.headers['Service-Worker-Allowed'] = '/'
         return response
+
+    # Nette foutmelding bij te veel loginpogingen (rate limiting)
+    @app.errorhandler(429)
+    def te_veel_pogingen(e):
+        flash('Te veel loginpogingen. Probeer het over enkele minuten opnieuw.', 'danger')
+        return render_template('auth/login.html'), 429
 
     # CLI-commando: flask seed
     @app.cli.command('seed')

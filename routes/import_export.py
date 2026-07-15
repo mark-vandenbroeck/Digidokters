@@ -77,7 +77,6 @@ def import_log(bestandsnaam):
 
 @ie_bp.route('/exporteer', methods=['GET', 'POST'])
 @login_required
-@admin_required
 def exporteer():
     digidokters = Digidokter.query.order_by(Digidokter.naam).all()
     leeftijdscategorieën = AgeCategory.query.order_by(AgeCategory.naam).all()

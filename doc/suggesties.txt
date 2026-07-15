@@ -1,0 +1,25 @@
+Beveiliging
+
+Geen bescherming tegen herhaalde login-pogingen. Met inloggen op naam (bv. "Mark") is de gebruikersnaam makkelijk te raden — een rate limiter (bv. Flask-Limiter, max 5 pogingen per minuut per IP) zou brute-force pogingen tegengaan.
+"Eerste beheerder kan niet gedeactiveerd worden" is nu hardcoded op user.id == 1. Robuuster: controleer dynamisch of dit de laatste actieve beheerder is, zodat je nooit per ongeluk iedereen buitensluit, ongeacht wie ID 1 heeft.
+Sessie-cookies: controleer in config.py of SESSION_COOKIE_SECURE, SESSION_COOKIE_HTTPONLY en SESSION_COOKIE_SAMESITE='Lax' expliciet ingesteld staan voor productie.
+
+Betrouwbaarheid & data
+
+Geen automatische back-ups. Supabase's gratis tier heeft beperkte retentie. Zeker met echte bezoekersdata zou ik een periodieke export instellen (bv. een wekelijkse pg_dump via een GitHub Action, of Supabase's ingebouwde back-up-optie als je ooit upgradet).
+Geüploade bestanden zijn niet persistent. Render's gratis webservices hebben een tijdelijke schijf die bij elke herstart/deploy leegloopt — geïmporteerde CSV's en importlogs verdwijnen dus. Als je die historiek wil bewaren, moet dat naar de database of externe opslag (bv. Supabase Storage) in plaats van naar het lokale bestandssysteem.
+Cold starts blijven een structureel ongemak op het gratis Render-plan, ook met de keep-alive workflow (die zelf ook eens kan missen). Op termijn, als het budget het toelaat, is het betaalde Starter-plan ($7/maand) de "echte" oplossing — geen slaapstand, geen workarounds nodig.
+
+Privacy (AVG/GDPR)
+
+De app bewaart namen en persoonlijke hulpvragen van bezoekers. Het is de moeite waard om even af te toetsen: is er een bewaartermijn/verwijderbeleid? Weten bezoekers dat hun gegevens genoteerd worden? Dit is meer een organisatorische dan een technische vraag, maar wel relevant bij een vrijwilligerswerking met persoonsgegevens.
+
+Gebruikservaring
+
+Paginering op de registraties-lijst: nu nog geen probleem, maar naarmate de historiek groeit (jaren van data) wordt een ongefilterde lijst traag om te laden.
+Wachtwoord vergeten-flow ontbreekt — momenteel moet een beheerder waarschijnlijk manueel een nieuw tijdelijk wachtwoord instellen voor wie het vergeet.
+
+Op de langere termijn
+
+Geen geautomatiseerde tests. Voor een klein intern project is dat oké, maar een paar basistests (login, CRUD, import) zouden toekomstige wijzigingen veiliger maken.
+Foutopvolging: Render's logs zijn moeilijk doorzoekbaar en niet blijvend. Een gratis tier van Sentry zou fouten in productie centraliseren en je automatisch verwittigen, in plaats van te moeten wachten tot iemand een screenshot stuurt.

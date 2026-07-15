@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from extensions import db
+from extensions import db, limiter
 from models.user import User
 
 auth_bp = Blueprint('auth', __name__)
@@ -22,6 +22,7 @@ def _valideer_wachtwoord(wachtwoord: str) -> list[str]:
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute; 20 per hour", methods=["POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('reg.lijst'))

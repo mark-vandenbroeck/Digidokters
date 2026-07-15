@@ -1,4 +1,5 @@
 """Authenticatie routes: login, logout, wachtwoord wijzigen."""
+import re
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
@@ -64,6 +65,9 @@ def logout():
     return redirect(url_for('auth.login'))
 
 
+_EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
 @auth_bp.route('/wachtwoord', methods=['GET', 'POST'])
 @login_required
 def wachtwoord_wijzigen():
@@ -71,27 +75,50 @@ def wachtwoord_wijzigen():
         huidig = request.form.get('huidig_wachtwoord', '')
         nieuw = request.form.get('nieuw_wachtwoord', '')
         bevestig = request.form.get('bevestig_wachtwoord', '')
+        email = request.form.get('email', '').strip().lower() or None
 
-        # Controleer huidig wachtwoord (tenzij verplichte reset)
-        if not current_user.moet_wachtwoord_wijzigen:
+        wachtwoord_verplicht = current_user.moet_wachtwoord_wijzigen
+        wachtwoord_gewijzigd = wachtwoord_verplicht or nieuw or bevestig
+
+        # Controleer huidig wachtwoord (tenzij verplichte reset). Nodig zodra
+        # er iets wijzigt (wachtwoord én/of e-mailadres), als beveiliging tegen
+        # account-overname via een losstaande sessie.
+        if not wachtwoord_verplicht:
             if not check_password_hash(current_user.wachtwoord_hash, huidig):
                 flash('Huidig wachtwoord is onjuist.', 'danger')
-                return render_template('auth/change_password.html')
+                return render_template('auth/change_password.html', form_data=request.form)
 
-        if nieuw != bevestig:
-            flash('De nieuwe wachtwoorden komen niet overeen.', 'danger')
-            return render_template('auth/change_password.html')
+        # E-mailadres valideren
+        if email and not _EMAIL_REGEX.match(email):
+            flash('Voer een geldig e-mailadres in.', 'danger')
+            return render_template('auth/change_password.html', form_data=request.form)
 
-        fouten = _valideer_wachtwoord(nieuw)
-        if fouten:
-            for f in fouten:
-                flash(f, 'danger')
-            return render_template('auth/change_password.html')
+        if email and User.query.filter(User.email == email, User.id != current_user.id).first():
+            flash('Dit e-mailadres is al in gebruik door een andere gebruiker.', 'danger')
+            return render_template('auth/change_password.html', form_data=request.form)
 
-        current_user.wachtwoord_hash = generate_password_hash(nieuw)
-        current_user.moet_wachtwoord_wijzigen = False
+        # Wachtwoord valideren (alleen als er effectief een nieuw wachtwoord is opgegeven)
+        if wachtwoord_gewijzigd:
+            if nieuw != bevestig:
+                flash('De nieuwe wachtwoorden komen niet overeen.', 'danger')
+                return render_template('auth/change_password.html', form_data=request.form)
+
+            fouten = _valideer_wachtwoord(nieuw)
+            if fouten:
+                for f in fouten:
+                    flash(f, 'danger')
+                return render_template('auth/change_password.html', form_data=request.form)
+
+            current_user.wachtwoord_hash = generate_password_hash(nieuw)
+            current_user.moet_wachtwoord_wijzigen = False
+
+        current_user.email = email
         db.session.commit()
-        flash('Wachtwoord succesvol gewijzigd.', 'success')
+
+        if wachtwoord_gewijzigd:
+            flash('Wachtwoord succesvol gewijzigd.', 'success')
+        else:
+            flash('Gegevens succesvol bijgewerkt.', 'success')
         return redirect(url_for('reg.lijst'))
 
     return render_template('auth/change_password.html')

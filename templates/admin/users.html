@@ -30,7 +30,13 @@
                     {% for u in users %}
                     <tr>
                         <td class="ps-3 fw-medium">{{ u.naam }}</td>
-                        <td>{{ u.email }}</td>
+                        <td>
+                            {% if u.email %}
+                            {{ u.email }}
+                            {% else %}
+                            <span class="text-muted fst-italic">Niet ingevuld</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if u.rol == 'beheerder' %}
                             <span class="badge bg-danger">Beheerder</span>

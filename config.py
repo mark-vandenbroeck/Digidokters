@@ -1,12 +1,24 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
+
+_IS_PRODUCTION = os.environ.get('FLASK_ENV') == 'production'
 
 
 class Config:
     # Security
     SECRET_KEY = os.environ.get('SECRET_KEY', 'digidokters-dev-key-change-in-production-2024')
+
+    # Session cookies (Secure alleen in productie, zodat lokaal HTTP blijft werken)
+    SESSION_COOKIE_SECURE = _IS_PRODUCTION
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    REMEMBER_COOKIE_SECURE = _IS_PRODUCTION
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
 
     # Database: supports both SQLite (local) and PostgreSQL (Supabase/Render)
     _db_url = os.environ.get('DATABASE_URL', 'sqlite:///digidokters.db')

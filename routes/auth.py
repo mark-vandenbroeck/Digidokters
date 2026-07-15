@@ -1,13 +1,27 @@
 """Authenticatie routes: login, logout, wachtwoord wijzigen."""
 import re
 from datetime import datetime, timezone
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from urllib.parse import urlparse
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db, limiter
 from models.user import User
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def _is_veilige_redirect(url: str) -> bool:
+    """Controleer of url een relatief pad binnen deze app is (geen open redirect)."""
+    if not url:
+        return False
+    parsed = urlparse(url)
+    return (
+        parsed.scheme == ''
+        and parsed.netloc == ''
+        and url.startswith('/')
+        and not url.startswith('//')
+    )
 
 
 def _valideer_wachtwoord(wachtwoord: str) -> list[str]:
@@ -52,7 +66,9 @@ def login():
             return redirect(url_for('auth.wachtwoord_wijzigen'))
 
         next_page = request.args.get('next')
-        return redirect(next_page or url_for('reg.lijst'))
+        if _is_veilige_redirect(next_page):
+            return redirect(next_page)
+        return redirect(url_for('reg.lijst'))
 
     return render_template('auth/login.html')
 

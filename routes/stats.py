@@ -1,4 +1,5 @@
 """Statistieken routes."""
+from datetime import date
 from flask import Blueprint, render_template, request
 from flask_login import login_required
 from sqlalchemy import func, extract
@@ -11,12 +12,36 @@ from models.device import Device
 stats_bp = Blueprint('stats', __name__)
 
 
+def _weekelijkse_telling(jaar):
+    """Aantal registraties per ISO-weeknummer voor het gegeven jaar.
+
+    Registraties gebeuren enkel op zaterdag, dus 'per week' komt overeen met
+    'per zaterdag'. Weken zonder registraties krijgen 0 (i.p.v. ontbreken),
+    zodat trends en gemiste weken (feestdagen, vakantie, ...) zichtbaar
+    blijven in een tijdlijngrafiek.
+
+    Geeft (laatste_weeknummer, {weeknummer: aantal}) terug.
+    """
+    datums = [r[0] for r in
+              db.session.query(Registration.datum)
+              .filter(extract('year', Registration.datum) == jaar)
+              .all()]
+    tellingen = {}
+    for d in datums:
+        # Let op: een datum vlak bij een jaargrens kan tot het ISO-weeknummer
+        # van het aangrenzende jaar behoren. Voor deze visualisatie (trends
+        # zien) is dat kleine randgeval verwaarloosbaar.
+        week = d.isocalendar()[1]
+        tellingen[week] = tellingen.get(week, 0) + 1
+    laatste_week = date(jaar, 12, 28).isocalendar()[1]
+    return laatste_week, tellingen
+
+
 @stats_bp.route('/statistieken')
 @login_required
 def overzicht():
     jaar = request.args.get('jaar', None, type=int)
     if not jaar:
-        from datetime import date
         jaar = date.today().year
 
     # Filter op jaar
@@ -107,8 +132,17 @@ def overzicht():
              .group_by('jaar').order_by('jaar').all()
              if r[0] is not None]
     if not jaren:
-        from datetime import date
         jaren = [date.today().year]
+
+    # Tijdlijn per week: dit jaar vs vorig jaar, uitgelijnd op weeknummer
+    laatste_week_huidig, tellingen_huidig = _weekelijkse_telling(jaar)
+    laatste_week_vorig, tellingen_vorig = _weekelijkse_telling(jaar - 1)
+    max_weken = max(laatste_week_huidig, laatste_week_vorig)
+    week_labels = [f'W{w}' for w in range(1, max_weken + 1)]
+    per_week = [tellingen_huidig.get(w, 0) if w <= laatste_week_huidig else None
+                for w in range(1, max_weken + 1)]
+    per_week_vorig_jaar = [tellingen_vorig.get(w, 0) if w <= laatste_week_vorig else None
+                            for w in range(1, max_weken + 1)]
 
     return render_template(
         'stats/overview.html',
@@ -122,4 +156,8 @@ def overzicht():
         nieuwe_klanten=nieuwe_klanten,
         terugkerende_klanten=totaal_jaar - nieuwe_klanten,
         per_dag=per_dag,
+        week_labels=week_labels,
+        per_week=per_week,
+        per_week_vorig_jaar=per_week_vorig_jaar,
+        vorig_jaar=jaar - 1,
     )

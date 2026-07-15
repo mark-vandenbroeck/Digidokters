@@ -30,7 +30,7 @@ def upgrade():
         batch_op.create_index(batch_op.f('ix_organisaties_slug'), ['slug'], unique=True)
 
     # Voeg default organisatie toe
-    op.execute("INSERT INTO organisaties (id, naam, slug, actief, aangemaakt_op) VALUES (1, 'Digidokters', 'digidokters', 1, CURRENT_TIMESTAMP)")
+    op.execute("INSERT INTO organisaties (id, naam, slug, actief, aangemaakt_op) VALUES (1, 'Digidokters', 'digidokters', TRUE, CURRENT_TIMESTAMP)")
 
     op.create_table('user_organisaties',
     sa.Column('id', sa.Integer(), nullable=False),

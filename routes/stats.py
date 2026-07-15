@@ -117,6 +117,28 @@ def overzicht():
         db.session.query(func.count(Registration.id)).filter(Registration.nieuwe_klant == True)
     ).scalar() or 0
 
+    # Per geslacht
+    per_geslacht_raw = (
+        jaar_filter(
+            db.session.query(
+                Registration.geslacht,
+                func.count(Registration.id).label('aantal')
+            )
+        )
+        .group_by(Registration.geslacht)
+        .all()
+    )
+    per_geslacht = []
+    for r in per_geslacht_raw:
+        if r.geslacht == 'man':
+            label = 'Man'
+        elif r.geslacht == 'vrouw':
+            label = 'Vrouw'
+        else:
+            label = 'Niet gespecificeerd'
+        per_geslacht.append((label, r.aantal))
+    per_geslacht = sorted(per_geslacht, key=lambda x: x[1], reverse=True)
+
     # Recente 10 dagen met meeste bezoeken
     per_dag = (
         jaar_filter(
@@ -159,6 +181,7 @@ def overzicht():
         per_digidokter=per_digidokter,
         per_leeftijd=per_leeftijd,
         per_toestel=per_toestel,
+        per_geslacht=per_geslacht,
         nieuwe_klanten=nieuwe_klanten,
         terugkerende_klanten=totaal_jaar - nieuwe_klanten,
         per_dag=per_dag,

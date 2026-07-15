@@ -95,6 +95,7 @@ def nieuw():
         digidokter_id = request.form.get('digidokter_id', 0, type=int)
         nieuwe_klant = request.form.get('nieuwe_klant') == 'ja'
         herkomst = request.form.get('herkomst', '').strip()
+        geslacht = request.form.get('geslacht', '').strip() or None
         onderwerp = request.form.get('onderwerp', '').strip()
         leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', 0, type=int)
         toestel_id = request.form.get('toestel_id', 0, type=int)
@@ -114,6 +115,9 @@ def nieuw():
             if not dd or dd.organisatie_id != org_id:
                 fouten.append('Ongeldige digidokter geselecteerd.')
                 
+        if geslacht and geslacht not in ('man', 'vrouw'):
+            fouten.append('Ongeldig geslacht geselecteerd.')
+
         if not onderwerp:
             fouten.append('Onderwerp is verplicht.')
             
@@ -144,6 +148,7 @@ def nieuw():
             digidokter_id=digidokter_id,
             nieuwe_klant=nieuwe_klant,
             herkomst=herkomst,
+            geslacht=geslacht,
             onderwerp=onderwerp,
             leeftijdscategorie_id=leeftijdscategorie_id,
             toestel_id=toestel_id,
@@ -194,6 +199,7 @@ def wijzigen(reg_id):
         digidokter_id = request.form.get('digidokter_id', 0, type=int)
         nieuwe_klant = request.form.get('nieuwe_klant') == 'ja'
         herkomst = request.form.get('herkomst', '').strip()
+        geslacht = request.form.get('geslacht', '').strip() or None
         onderwerp = request.form.get('onderwerp', '').strip()
         leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', 0, type=int)
         toestel_id = request.form.get('toestel_id', 0, type=int)
@@ -210,6 +216,9 @@ def wijzigen(reg_id):
             if not dd or dd.organisatie_id != org_id:
                 fouten.append('Ongeldige digidokter geselecteerd.')
                 
+        if geslacht and geslacht not in ('man', 'vrouw'):
+            fouten.append('Ongeldig geslacht geselecteerd.')
+
         if not onderwerp:
             fouten.append('Onderwerp is verplicht.')
             
@@ -237,6 +246,7 @@ def wijzigen(reg_id):
         reg.digidokter_id = digidokter_id
         reg.nieuwe_klant = nieuwe_klant
         reg.herkomst = herkomst
+        reg.geslacht = geslacht
         reg.onderwerp = onderwerp
         reg.leeftijdscategorie_id = leeftijdscategorie_id
         reg.toestel_id = toestel_id

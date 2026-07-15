@@ -29,6 +29,9 @@ KOLOM_MAP = {
     'nieuw': 'nieuwe_klant',
     'van waar ken je de digidokter?': 'herkomst',
     'herkomst': 'herkomst',
+    'geslacht': 'geslacht',
+    'gender': 'geslacht',
+    'sex': 'geslacht',
     'onderwerp': 'onderwerp',
     'leeftijdscategorie': 'leeftijdscategorie',
     'leeftijd': 'leeftijdscategorie',
@@ -57,6 +60,17 @@ def _parse_nieuwe_klant(waarde) -> bool:
         return False
     s = str(waarde).strip().lower()
     return s in ('nieuwe klant', '1', 'ja', 'yes', 'true', 'j', 'waar')
+
+
+def _parse_geslacht(waarde) -> str | None:
+    if pd.isna(waarde) or waarde is None:
+        return None
+    s = str(waarde).strip().lower()
+    if s in ('man', 'm', 'male', 'he', 'him'):
+        return 'man'
+    if s in ('vrouw', 'v', 'f', 'female', 'she', 'her'):
+        return 'vrouw'
+    return None
 
 
 def _parse_date(waarde) -> date | None:
@@ -251,6 +265,7 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
                     digidokter_id=digidokter.id,
                     nieuwe_klant=_parse_nieuwe_klant(rij.get('nieuwe_klant', False)),
                     herkomst=str(rij.get('herkomst', '') or '').strip(),
+                    geslacht=_parse_geslacht(rij.get('geslacht')),
                     onderwerp=onderwerp,
                     leeftijdscategorie_id=leeftijdscategorie.id,
                     toestel_id=toestel.id,

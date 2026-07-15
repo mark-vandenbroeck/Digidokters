@@ -46,6 +46,17 @@
                 <dt class="col-sm-4 text-muted fw-normal small">Herkomst</dt>
                 <dd class="col-sm-8">{{ reg.herkomst or '–' }}</dd>
 
+                <dt class="col-sm-4 text-muted fw-normal small">Geslacht</dt>
+                <dd class="col-sm-8">
+                    {% if reg.geslacht == 'man' %}
+                    Man
+                    {% elif reg.geslacht == 'vrouw' %}
+                    Vrouw
+                    {% else %}
+                    Niet gespecificeerd
+                    {% endif %}
+                </dd>
+
                 <dt class="col-sm-4 text-muted fw-normal small">Onderwerp</dt>
                 <dd class="col-sm-8">{{ reg.onderwerp }}</dd>
 

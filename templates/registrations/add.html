@@ -75,6 +75,16 @@
                                placeholder="Bijv. doorverwijzing, zelf gekomen…" maxlength="200">
                     </div>
 
+                    <!-- Geslacht -->
+                    <div class="col-12 col-sm-6">
+                        <label for="geslacht" class="form-label">Geslacht</label>
+                        <select class="form-select" id="geslacht" name="geslacht">
+                            <option value="" {{ 'selected' if not form_data or not form_data.geslacht }}>Niet gespecificeerd</option>
+                            <option value="man" {{ 'selected' if form_data and form_data.geslacht == 'man' }}>Man</option>
+                            <option value="vrouw" {{ 'selected' if form_data and form_data.geslacht == 'vrouw' }}>Vrouw</option>
+                        </select>
+                    </div>
+
                     <!-- Onderwerp -->
                     <div class="col-12">
                         <label for="onderwerp" class="form-label">Onderwerp <span class="text-danger">*</span></label>

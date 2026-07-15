@@ -22,9 +22,11 @@ def _weekelijkse_telling(jaar):
 
     Geeft (laatste_weeknummer, {weeknummer: aantal}) terug.
     """
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
     datums = [r[0] for r in
               db.session.query(Registration.datum)
-              .filter(extract('year', Registration.datum) == jaar)
+              .filter(Registration.organisatie_id == org_id, extract('year', Registration.datum) == jaar)
               .all()]
     tellingen = {}
     for d in datums:
@@ -44,9 +46,12 @@ def overzicht():
     if not jaar:
         jaar = date.today().year
 
-    # Filter op jaar
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
+    # Filter op jaar en organisatie
     def jaar_filter(q):
-        return q.filter(extract('year', Registration.datum) == jaar)
+        return q.filter(Registration.organisatie_id == org_id, extract('year', Registration.datum) == jaar)
 
     # Totaal dit jaar
     totaal_jaar = jaar_filter(db.session.query(func.count(Registration.id))).scalar() or 0
@@ -129,6 +134,7 @@ def overzicht():
     # Beschikbare jaren voor de selector
     jaren = [r[0] for r in
              db.session.query(extract('year', Registration.datum).label('jaar'))
+             .filter(Registration.organisatie_id == org_id)
              .group_by('jaar').order_by('jaar').all()
              if r[0] is not None]
     if not jaren:

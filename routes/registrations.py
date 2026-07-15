@@ -15,10 +15,11 @@ PAGINA_GROOTTE = 20
 
 def _keuzelijsten():
     """Haal actieve keuzelijsten op voor formulieren."""
+    from utils.tenant import filter_op_organisatie
     return {
-        'digidokters': Digidokter.query.filter_by(actief=True).order_by(Digidokter.volgorde, Digidokter.naam).all(),
-        'leeftijdscategorieën': AgeCategory.query.filter_by(actief=True).order_by(AgeCategory.volgorde, AgeCategory.naam).all(),
-        'toestellen': Device.query.filter_by(actief=True).order_by(Device.volgorde, Device.naam).all(),
+        'digidokters': filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.volgorde, Digidokter.naam).all(),
+        'leeftijdscategorieën': filter_op_organisatie(AgeCategory.query.filter_by(actief=True), AgeCategory).order_by(AgeCategory.volgorde, AgeCategory.naam).all(),
+        'toestellen': filter_op_organisatie(Device.query.filter_by(actief=True), Device).order_by(Device.volgorde, Device.naam).all(),
     }
 
 
@@ -37,7 +38,8 @@ def lijst():
     filter_datum_van = request.args.get('datum_van', '')
     filter_datum_tot = request.args.get('datum_tot', '')
 
-    query = Registration.query.order_by(Registration.datum.desc(), Registration.id.desc())
+    from utils.tenant import filter_op_organisatie
+    query = filter_op_organisatie(Registration.query, Registration).order_by(Registration.datum.desc(), Registration.id.desc())
 
     if zoek:
         query = query.filter(
@@ -62,7 +64,7 @@ def lijst():
             pass
 
     paginatie = query.paginate(page=pagina, per_page=PAGINA_GROOTTE, error_out=False)
-    digidokters = Digidokter.query.filter_by(actief=True).order_by(Digidokter.naam).all()
+    digidokters = filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.naam).all()
 
     return render_template(
         'registrations/list.html',
@@ -97,18 +99,37 @@ def nieuw():
         leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', 0, type=int)
         toestel_id = request.form.get('toestel_id', 0, type=int)
 
-        # Verplichte velden
+        # Verplichte velden en cross-tenant validatie
+        from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model
+        org_id = get_huidige_organisatie_id()
+
         fouten = []
         if not client:
             fouten.append('Cliëntnaam is verplicht.')
+        
         if not digidokter_id:
             fouten.append('Digidokter is verplicht.')
+        else:
+            dd = db.session.get(Digidokter, digidokter_id)
+            if not dd or dd.organisatie_id != org_id:
+                fouten.append('Ongeldige digidokter geselecteerd.')
+                
         if not onderwerp:
             fouten.append('Onderwerp is verplicht.')
+            
         if not leeftijdscategorie_id:
             fouten.append('Leeftijdscategorie is verplicht.')
+        else:
+            ac = db.session.get(AgeCategory, leeftijdscategorie_id)
+            if not ac or ac.organisatie_id != org_id:
+                fouten.append('Ongeldige leeftijdscategorie geselecteerd.')
+                
         if not toestel_id:
             fouten.append('Toestel is verplicht.')
+        else:
+            dev = db.session.get(Device, toestel_id)
+            if not dev or dev.organisatie_id != org_id:
+                fouten.append('Ongeldig toestel geselecteerd.')
 
         if fouten:
             for f in fouten:
@@ -117,7 +138,7 @@ def nieuw():
                                    form_data=request.form)
 
         reg = Registration(
-            registratienummer=Registration.genereer_registratienummer(datum.year),
+            registratienummer=Registration.genereer_registratienummer(org_id, datum.year),
             datum=datum,
             client=client,
             digidokter_id=digidokter_id,
@@ -128,6 +149,7 @@ def nieuw():
             toestel_id=toestel_id,
             aangemaakt_door_id=current_user.id,
         )
+        set_organisatie_id_op_model(reg)
         db.session.add(reg)
         db.session.commit()
         flash(f'Registratie {reg.registratienummer} succesvol toegevoegd.', 'success')
@@ -139,14 +161,25 @@ def nieuw():
 @reg_bp.route('/registraties/<int:reg_id>')
 @login_required
 def bekijken(reg_id):
+    from utils.tenant import get_huidige_organisatie_id
     reg = db.get_or_404(Registration, reg_id)
+    if reg.organisatie_id != get_huidige_organisatie_id():
+        from flask import abort
+        abort(403)
     return render_template('registrations/view.html', reg=reg)
 
 
 @reg_bp.route('/registraties/<int:reg_id>/wijzig', methods=['GET', 'POST'])
 @login_required
 def wijzigen(reg_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
     reg = db.get_or_404(Registration, reg_id)
+    
+    if reg.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+        
     keuzes = _keuzelijsten()
 
     if request.method == 'POST':
@@ -165,17 +198,34 @@ def wijzigen(reg_id):
         leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', 0, type=int)
         toestel_id = request.form.get('toestel_id', 0, type=int)
 
+        # Verplichte velden en cross-tenant validatie
         fouten = []
         if not client:
             fouten.append('Cliëntnaam is verplicht.')
+        
         if not digidokter_id:
             fouten.append('Digidokter is verplicht.')
+        else:
+            dd = db.session.get(Digidokter, digidokter_id)
+            if not dd or dd.organisatie_id != org_id:
+                fouten.append('Ongeldige digidokter geselecteerd.')
+                
         if not onderwerp:
             fouten.append('Onderwerp is verplicht.')
+            
         if not leeftijdscategorie_id:
             fouten.append('Leeftijdscategorie is verplicht.')
+        else:
+            ac = db.session.get(AgeCategory, leeftijdscategorie_id)
+            if not ac or ac.organisatie_id != org_id:
+                fouten.append('Ongeldige leeftijdscategorie geselecteerd.')
+                
         if not toestel_id:
             fouten.append('Toestel is verplicht.')
+        else:
+            dev = db.session.get(Device, toestel_id)
+            if not dev or dev.organisatie_id != org_id:
+                fouten.append('Ongeldig toestel geselecteerd.')
 
         if fouten:
             for f in fouten:

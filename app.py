@@ -25,7 +25,7 @@ def create_app(config_class=Config):
     os.makedirs(app.config['IMPORT_LOG_FOLDER'], exist_ok=True)
 
     # Importeer modellen zodat Flask-Migrate ze detecteert
-    from models import user, digidokter, age_category, device, registration  # noqa: F401
+    from models import user, digidokter, age_category, device, registration, organisatie  # noqa: F401
 
     # Registreer blueprints
     from routes.auth import auth_bp
@@ -39,6 +39,37 @@ def create_app(config_class=Config):
     app.register_blueprint(admin_bp)
     app.register_blueprint(ie_bp)
     app.register_blueprint(stats_bp)
+
+    # Controleer de organisatie-context voor authenticated requests
+    from flask import session, redirect, url_for, request, flash
+    from flask_login import current_user
+
+    @app.before_request
+    def check_organisatie_context():
+        if request.endpoint:
+            # Exclude statics, service worker and auth endpoints
+            exempt_endpoints = [
+                'static',
+                'service_worker',
+                'auth.login',
+                'auth.logout',
+                'auth.select_org',
+                'auth.switch_organisatie',
+            ]
+            if request.endpoint in exempt_endpoints or request.endpoint.startswith('auth.'):
+                return
+
+        if current_user.is_authenticated:
+            org_id = session.get('organisatie_id')
+            if not org_id:
+                return redirect(url_for('auth.select_org', next=request.full_path))
+            
+            # Controleer of de gebruiker nog een actief lidmaatschap heeft
+            membership = next((uo for uo in current_user.user_organisaties if uo.organisatie_id == org_id and uo.actief and uo.organisatie.actief), None)
+            if not membership:
+                session.pop('organisatie_id', None)
+                flash('Uw toegang tot deze organisatie is niet langer geldig.', 'warning')
+                return redirect(url_for('auth.select_org'))
 
     # Service worker moet op root-niveau staan (niet /static/sw.js) zodat
     # zijn scope de volledige app dekt, wat vereist is voor PWA-installatie.
@@ -59,19 +90,32 @@ def create_app(config_class=Config):
     @app.cli.command('seed')
     def seed():
         """Maak de standaard beheerder en initiële lijsten aan."""
+        from models.organisatie import Organisatie, UserOrganisatie
         from models.user import User
         from models.digidokter import Digidokter
         from models.age_category import AgeCategory
         from models.device import Device
         from werkzeug.security import generate_password_hash
 
+        # 1. Seed Organisatie
+        default_org = Organisatie.query.filter_by(slug='digidokters').first()
+        if not default_org:
+            default_org = Organisatie(naam='Digidokters', slug='digidokters', actief=True)
+            db.session.add(default_org)
+            db.session.commit()
+            print('✓ Standaard organisatie aangemaakt: Digidokters')
+        else:
+            print('Standaard organisatie bestaat al.')
+
+        # 2. Seed Admin User
         admin_email = 'mark.vandenbroeck@gmail.com'
-        if not User.query.filter_by(email=admin_email).first():
+        admin = User.query.filter_by(email=admin_email).first()
+        if not admin:
             admin = User(
                 naam='Mark',
                 email=admin_email,
                 wachtwoord_hash=generate_password_hash('Digidokter2024!'),
-                rol='beheerder',
+                rol='beheerder',  # fallback
                 actief=True,
                 moet_wachtwoord_wijzigen=True
             )
@@ -83,22 +127,29 @@ def create_app(config_class=Config):
         else:
             print(f'Admin {admin_email} bestaat al.')
 
-        # Seed Digidokters
-        if not Digidokter.query.first():
+        # 3. Koppel Admin aan default org
+        if not UserOrganisatie.query.filter_by(user_id=admin.id, organisatie_id=default_org.id).first():
+            uo = UserOrganisatie(user_id=admin.id, organisatie_id=default_org.id, rol='beheerder', actief=True)
+            db.session.add(uo)
+            db.session.commit()
+            print('✓ Admin gekoppeld aan standaard organisatie')
+
+        # 4. Seed Digidokters
+        if not Digidokter.query.filter_by(organisatie_id=default_org.id).first():
             for i, name in enumerate(['Mark', 'Jan', 'Els']):
-                db.session.add(Digidokter(naam=name, actief=True, volgorde=i))
+                db.session.add(Digidokter(naam=name, actief=True, volgorde=i, organisatie_id=default_org.id))
             db.session.commit()
-            print("✓ Digidokters geïnitialiseerd")
+            print("✓ Digidokters geïnitialiseerd voor standaard organisatie")
 
-        # Seed Leeftijdscategorieën
-        if not AgeCategory.query.first():
+        # 5. Seed Leeftijdscategorieën
+        if not AgeCategory.query.filter_by(organisatie_id=default_org.id).first():
             for i, name in enumerate(['Jonger dan 18', '18 - 30', '31 - 60', '60+']):
-                db.session.add(AgeCategory(naam=name, actief=True, volgorde=i))
+                db.session.add(AgeCategory(naam=name, actief=True, volgorde=i, organisatie_id=default_org.id))
             db.session.commit()
-            print("✓ Leeftijdscategorieën geïnitialiseerd")
+            print("✓ Leeftijdscategorieën geïnitialiseerd voor standaard organisatie")
 
-        # Seed Toestellen
-        if not Device.query.first():
+        # 6. Seed Toestellen
+        if not Device.query.filter_by(organisatie_id=default_org.id).first():
             for i, name in enumerate([
                 'Smartphone Android',
                 'Smartphone iPhone',
@@ -108,9 +159,25 @@ def create_app(config_class=Config):
                 'MacBook',
                 'Ander toestel'
             ]):
-                db.session.add(Device(naam=name, actief=True, volgorde=i))
+                db.session.add(Device(naam=name, actief=True, volgorde=i, organisatie_id=default_org.id))
             db.session.commit()
-            print("✓ Toestellen geïnitialiseerd")
+            print("✓ Toestellen geïnitialiseerd voor standaard organisatie")
+
+    # CLI-commando: flask create-org <naam> <slug>
+    import click
+    @app.cli.command('create-org')
+    @click.argument('naam')
+    @click.argument('slug')
+    def create_org_cli(naam, slug):
+        """Maak een nieuwe organisatie aan."""
+        from models.organisatie import Organisatie
+        if Organisatie.query.filter_by(slug=slug).first():
+            print(f'Fout: Organisatie met slug "{slug}" bestaat al.')
+            return
+        org = Organisatie(naam=naam, slug=slug, actief=True)
+        db.session.add(org)
+        db.session.commit()
+        print(f'✓ Organisatie "{naam}" aangemaakt met slug "{slug}"')
 
     return app
 

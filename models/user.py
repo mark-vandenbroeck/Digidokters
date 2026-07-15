@@ -20,8 +20,17 @@ class User(UserMixin, db.Model):
     # Relatie: registraties aangemaakt door deze gebruiker
     registraties = db.relationship('Registration', backref='aangemaakt_door_user', lazy=True,
                                    foreign_keys='Registration.aangemaakt_door_id')
+    user_organisaties = db.relationship('UserOrganisatie', back_populates='user', cascade='all, delete-orphan')
 
     def is_beheerder(self):
+        from flask import session, has_request_context
+        if has_request_context():
+            org_id = session.get('organisatie_id')
+            if org_id:
+                for uo in self.user_organisaties:
+                    if uo.organisatie_id == org_id and uo.rol == 'beheerder' and uo.actief:
+                        return True
+                return False
         return self.rol == 'beheerder'
 
     def __repr__(self):

@@ -27,7 +27,7 @@
 </head>
 <body>
 
-{% if current_user.is_authenticated %}
+{% if current_user.is_authenticated and session.get('organisatie_id') %}
 <!-- ═══════════════════════════════════════════════════════════ SIDEBAR LAYOUT -->
 
 <!-- Mobile topbar -->
@@ -60,6 +60,31 @@
                 </div>
             </a>
         </div>
+
+        {% if current_user.user_organisaties|length > 1 %}
+        <div class="px-3 pb-3 border-bottom border-secondary border-opacity-25">
+            <form action="{{ url_for('auth.switch_organisatie') }}" method="POST" class="m-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark text-white border-secondary"><i class="bi bi-building"></i></span>
+                    <select name="organisatie_id" onchange="this.form.submit()" class="form-select form-select-sm bg-dark text-white border-secondary">
+                        {% for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief %}
+                        <option value="{{ uo.organisatie_id }}" {% if uo.organisatie_id == session.get('organisatie_id') %}selected{% endif %}>
+                            {{ uo.organisatie.naam }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        {% set active_uo = current_user.user_organisaties[0] if current_user.user_organisaties else None %}
+        {% if active_uo %}
+        <div class="px-3 pb-3 border-bottom border-secondary border-opacity-25 text-white-50 small text-truncate">
+            <i class="bi bi-building me-1"></i>{{ active_uo.organisatie.naam }}
+        </div>
+        {% endif %}
+        {% endif %}
 
         <nav class="dd-sidebar-nav">
             <!-- Registraties -->

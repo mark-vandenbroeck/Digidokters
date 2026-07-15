@@ -2,7 +2,7 @@
 import re
 from datetime import datetime, timezone
 from urllib.parse import urlparse
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db, limiter
@@ -65,10 +65,23 @@ def login():
             flash('Welkom! Gelieve uw tijdelijk wachtwoord te wijzigen.', 'info')
             return redirect(url_for('auth.wachtwoord_wijzigen'))
 
-        next_page = request.args.get('next')
-        if _is_veilige_redirect(next_page):
-            return redirect(next_page)
-        return redirect(url_for('reg.lijst'))
+        # Organisatie context instellen
+        active_memberships = [uo for uo in gebruiker.user_organisaties if uo.actief and uo.organisatie.actief]
+        if not active_memberships:
+            logout_user()
+            flash('Uw account is niet gekoppeld aan een actieve organisatie. Contacteer de beheerder.', 'danger')
+            return redirect(url_for('auth.login'))
+
+        if len(active_memberships) == 1:
+            session['organisatie_id'] = active_memberships[0].organisatie_id
+            flash(f'Welkom! Ingelogd bij {active_memberships[0].organisatie.naam}.', 'success')
+            next_page = request.args.get('next')
+            if _is_veilige_redirect(next_page):
+                return redirect(next_page)
+            return redirect(url_for('reg.lijst'))
+        else:
+            next_page = request.args.get('next')
+            return redirect(url_for('auth.select_org', next=next_page))
 
     return render_template('auth/login.html')
 
@@ -138,3 +151,45 @@ def wachtwoord_wijzigen():
         return redirect(url_for('reg.lijst'))
 
     return render_template('auth/change_password.html')
+
+
+@auth_bp.route('/select-organisatie', methods=['GET', 'POST'])
+@login_required
+def select_org():
+    active_memberships = [uo for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief]
+    
+    if not active_memberships:
+        logout_user()
+        flash('Uw account is niet gekoppeld aan een actieve organisatie.', 'danger')
+        return redirect(url_for('auth.login'))
+        
+    if request.method == 'POST':
+        org_id = request.form.get('organisatie_id', type=int)
+        membership = next((uo for uo in active_memberships if uo.organisatie_id == org_id), None)
+        if membership:
+            session['organisatie_id'] = org_id
+            flash(f'Ingelogd bij organisatie: {membership.organisatie.naam}', 'success')
+            next_page = request.args.get('next')
+            if _is_veilige_redirect(next_page):
+                return redirect(next_page)
+            return redirect(url_for('reg.lijst'))
+        else:
+            flash('Ongeldige organisatie selectie.', 'danger')
+            
+    return render_template('auth/select_org.html', memberships=active_memberships)
+
+
+@auth_bp.route('/switch-organisatie', methods=['POST'])
+@login_required
+def switch_organisatie():
+    org_id = request.form.get('organisatie_id', type=int)
+    active_memberships = [uo for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief]
+    membership = next((uo for uo in active_memberships if uo.organisatie_id == org_id), None)
+    
+    if membership:
+        session['organisatie_id'] = org_id
+        flash(f'Gewisseld naar organisatie: {membership.organisatie.naam}', 'success')
+    else:
+        flash('U heeft geen toegang tot deze organisatie.', 'danger')
+        
+    return redirect(url_for('reg.lijst'))

@@ -27,7 +27,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for u in users %}
+                    {% for m in memberships %}
+                    {% set u = m.user %}
                     <tr>
                         <td class="ps-3 fw-medium">{{ u.naam }}</td>
                         <td>
@@ -38,14 +39,14 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if u.rol == 'beheerder' %}
+                            {% if m.rol == 'beheerder' %}
                             <span class="badge bg-danger">Beheerder</span>
                             {% else %}
                             <span class="badge bg-secondary">Medewerker</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if u.actief %}
+                            {% if m.actief %}
                             <span class="badge bg-success">Actief</span>
                             {% else %}
                             <span class="badge bg-dark">Gedeactiveerd</span>
@@ -61,9 +62,9 @@
                             </a>
                             {% if u.id != 1 %}
                             <a href="{{ url_for('admin.gebruiker_toggle', user_id=u.id) }}"
-                               class="btn btn-sm {% if u.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
-                               title="{% if u.actief %}Deactiveren{% else %}Activeren{% endif %}">
-                                <i class="bi {% if u.actief %}bi-person-x{% else %}bi-person-check{% endif %}"></i>
+                               class="btn btn-sm {% if m.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
+                               title="{% if m.actief %}Deactiveren{% else %}Activeren{% endif %}">
+                                <i class="bi {% if m.actief %}bi-person-x{% else %}bi-person-check{% endif %}"></i>
                             </a>
                             {% endif %}
                         </td>

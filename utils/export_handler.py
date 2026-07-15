@@ -14,7 +14,9 @@ def _haal_registraties(
     toestel_id: int | None = None,
 ) -> list:
     """Haal gefilterde registraties op als lijst van dicts."""
-    query = db.session.query(Registration).order_by(
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    query = db.session.query(Registration).filter(Registration.organisatie_id == org_id).order_by(
         Registration.datum.desc(), Registration.registratienummer.desc()
     )
 

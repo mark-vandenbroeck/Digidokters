@@ -78,9 +78,10 @@ def import_log(bestandsnaam):
 @ie_bp.route('/exporteer', methods=['GET', 'POST'])
 @login_required
 def exporteer():
-    digidokters = Digidokter.query.order_by(Digidokter.naam).all()
-    leeftijdscategorieën = AgeCategory.query.order_by(AgeCategory.naam).all()
-    toestellen = Device.query.order_by(Device.naam).all()
+    from utils.tenant import filter_op_organisatie
+    digidokters = filter_op_organisatie(Digidokter.query, Digidokter).order_by(Digidokter.naam).all()
+    leeftijdscategorieën = filter_op_organisatie(AgeCategory.query, AgeCategory).order_by(AgeCategory.naam).all()
+    toestellen = filter_op_organisatie(Device.query, Device).order_by(Device.naam).all()
 
     if request.method == 'POST':
         formaat = request.form.get('formaat', 'csv')

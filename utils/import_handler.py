@@ -124,9 +124,12 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
         return resultaat
 
     # Cacheer lookup-tabellen
-    digidokters = {d.naam.lower(): d for d in Digidokter.query.filter_by(actief=True).all()}
-    leeftijden = {l.naam.lower(): l for l in AgeCategory.query.filter_by(actief=True).all()}
-    toestellen = {t.naam.lower(): t for t in Device.query.filter_by(actief=True).all()}
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
+    digidokters = {d.naam.lower(): d for d in Digidokter.query.filter_by(actief=True, organisatie_id=org_id).all()}
+    leeftijden = {l.naam.lower(): l for l in AgeCategory.query.filter_by(actief=True, organisatie_id=org_id).all()}
+    toestellen = {t.naam.lower(): t for t in Device.query.filter_by(actief=True, organisatie_id=org_id).all()}
 
     # Cacheer bestaande registraties (voor dubbele-detectie) en registratienummer-
     # tellers per jaar in telkens 1 query, zodat we niet per rij naar de database
@@ -135,13 +138,14 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
     # tot een gunicorn worker timeout.
     from sqlalchemy import extract, func
     bestaande_registraties = set(
-        db.session.query(Registration.datum, Registration.client, Registration.digidokter_id).all()
+        db.session.query(Registration.datum, Registration.client, Registration.digidokter_id)
+        .filter(Registration.organisatie_id == org_id).all()
     )
     tellers = {
         int(jaar): aantal
         for jaar, aantal in db.session.query(
             extract('year', Registration.datum), func.count(Registration.id)
-        ).group_by(extract('year', Registration.datum)).all()
+        ).filter(Registration.organisatie_id == org_id).group_by(extract('year', Registration.datum)).all()
     }
 
     resultaat['totaal'] = len(df)
@@ -179,8 +183,8 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
         dd_naam_lower = dd_naam_original.lower()
         digidokter = digidokters.get(dd_naam_lower)
         if digidokter is None:
-            max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).scalar() or 0
-            digidokter = Digidokter(naam=dd_naam_original, actief=True, volgorde=max_volgorde + 1)
+            max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).filter(Digidokter.organisatie_id == org_id).scalar() or 0
+            digidokter = Digidokter(naam=dd_naam_original, actief=True, volgorde=max_volgorde + 1, organisatie_id=org_id)
             db.session.add(digidokter)
             db.session.flush()
             digidokters[dd_naam_lower] = digidokter
@@ -197,8 +201,8 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
         lft_naam_lower = lft_naam_original.lower()
         leeftijdscategorie = leeftijden.get(lft_naam_lower)
         if leeftijdscategorie is None:
-            max_volgorde = db.session.query(db.func.max(AgeCategory.volgorde)).scalar() or 0
-            leeftijdscategorie = AgeCategory(naam=lft_naam_original, actief=True, volgorde=max_volgorde + 1)
+            max_volgorde = db.session.query(db.func.max(AgeCategory.volgorde)).filter(AgeCategory.organisatie_id == org_id).scalar() or 0
+            leeftijdscategorie = AgeCategory(naam=lft_naam_original, actief=True, volgorde=max_volgorde + 1, organisatie_id=org_id)
             db.session.add(leeftijdscategorie)
             db.session.flush()
             leeftijden[lft_naam_lower] = leeftijdscategorie
@@ -215,8 +219,8 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
         tst_naam_lower = tst_naam_original.lower()
         toestel = toestellen.get(tst_naam_lower)
         if toestel is None:
-            max_volgorde = db.session.query(db.func.max(Device.volgorde)).scalar() or 0
-            toestel = Device(naam=tst_naam_original, actief=True, volgorde=max_volgorde + 1)
+            max_volgorde = db.session.query(db.func.max(Device.volgorde)).filter(Device.organisatie_id == org_id).scalar() or 0
+            toestel = Device(naam=tst_naam_original, actief=True, volgorde=max_volgorde + 1, organisatie_id=org_id)
             db.session.add(toestel)
             db.session.flush()
             toestellen[tst_naam_lower] = toestel
@@ -250,6 +254,7 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
                     onderwerp=onderwerp,
                     leeftijdscategorie_id=leeftijdscategorie.id,
                     toestel_id=toestel.id,
+                    organisatie_id=org_id,
                 )
                 db.session.add(reg)
             bestaande_registraties.add(sleutel)

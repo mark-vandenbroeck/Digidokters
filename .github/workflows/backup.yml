@@ -1,0 +1,31 @@
+name: Wekelijkse database-backup
+
+on:
+  schedule:
+    # Elke zondag om 03:00 UTC (04:00/05:00 Brusselse tijd, afhankelijk van zomer-/wintertijd)
+    - cron: '0 3 * * 0'
+  workflow_dispatch: {}  # laat toe om ook manueel een backup te maken via GitHub
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: PostgreSQL client installeren
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Bestandsnaam met datum bepalen
+        id: datum
+        run: echo "stamp=$(date -u +%Y-%m-%d_%H%M)" >> "$GITHUB_OUTPUT"
+
+      - name: Database dumpen
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          pg_dump "$DATABASE_URL" -F c -f "digidokters_${{ steps.datum.outputs.stamp }}.dump"
+
+      - name: Dump als artifact bewaren
+        uses: actions/upload-artifact@v4
+        with:
+          name: digidokters-backup-${{ steps.datum.outputs.stamp }}
+          path: digidokters_${{ steps.datum.outputs.stamp }}.dump
+          retention-days: 90

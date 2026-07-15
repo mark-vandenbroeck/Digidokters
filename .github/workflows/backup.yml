@@ -10,8 +10,12 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: PostgreSQL client installeren
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: PostgreSQL 17 client installeren (PGDG-repo)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
 
       - name: Bestandsnaam met datum bepalen
         id: datum
@@ -21,7 +25,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          pg_dump "$DATABASE_URL" -F c -f "digidokters_${{ steps.datum.outputs.stamp }}.dump"
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" -F c -f "digidokters_${{ steps.datum.outputs.stamp }}.dump"
 
       - name: Dump als artifact bewaren
         uses: actions/upload-artifact@v4

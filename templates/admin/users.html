@@ -39,7 +39,9 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if m.rol == 'beheerder' %}
+                            {% if u.rol == 'platformbeheerder' %}
+                            <span class="badge bg-purple">Platformbeheerder</span>
+                            {% elif m.rol == 'beheerder' %}
                             <span class="badge bg-danger">Beheerder</span>
                             {% else %}
                             <span class="badge bg-secondary">Medewerker</span>

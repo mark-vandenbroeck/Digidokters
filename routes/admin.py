@@ -411,3 +411,284 @@ def toestel_toggle(item_id):
 @admin_required
 def toestel_volgorde(item_id, richting):
     return _beheer_volgorde(Device, item_id, richting, 'admin.toestellen')
+
+
+@admin_bp.route('/backup')
+@login_required
+@admin_required
+def backup():
+    import json
+    from datetime import datetime
+    from flask import Response
+    from models.organisatie import Organisatie, UserOrganisatie
+    from models.user import User
+    from models.digidokter import Digidokter
+    from models.age_category import AgeCategory
+    from models.device import Device
+    from models.registration import Registration
+    from utils.tenant import get_huidige_organisatie_id
+    
+    org_id = get_huidige_organisatie_id()
+    org = db.session.get(Organisatie, org_id)
+    
+    # 1. Fetch data
+    users_data = []
+    memberships = UserOrganisatie.query.filter_by(organisatie_id=org_id).all()
+    for m in memberships:
+        users_data.append({
+            'naam': m.user.naam,
+            'email': m.user.email,
+            'wachtwoord_hash': m.user.wachtwoord_hash,
+            'rol': m.user.rol,
+            'actief': m.user.actief,
+            'membership_rol': m.rol,
+            'membership_actief': m.actief
+        })
+        
+    digidokters_data = []
+    for d in Digidokter.query.filter_by(organisatie_id=org_id).all():
+        digidokters_data.append({
+            'naam': d.naam,
+            'actief': d.actief,
+            'volgorde': d.volgorde
+        })
+        
+    age_cats_data = []
+    for c in AgeCategory.query.filter_by(organisatie_id=org_id).all():
+        age_cats_data.append({
+            'naam': c.naam,
+            'actief': c.actief,
+            'volgorde': c.volgorde
+        })
+        
+    devices_data = []
+    for t in Device.query.filter_by(organisatie_id=org_id).all():
+        devices_data.append({
+            'naam': t.naam,
+            'actief': t.actief,
+            'volgorde': t.volgorde
+        })
+        
+    registrations_data = []
+    for r in Registration.query.filter_by(organisatie_id=org_id).all():
+        registrations_data.append({
+            'registratienummer': r.registratienummer,
+            'datum': r.datum.isoformat() if r.datum else None,
+            'client': r.client,
+            'nieuwe_klant': r.nieuwe_klant,
+            'herkomst': r.herkomst,
+            'geslacht': r.geslacht,
+            'onderwerp': r.onderwerp,
+            'digidokter_naam': r.digidokter.naam if r.digidokter else '',
+            'leeftijdscategorie_naam': r.leeftijdscategorie.naam if r.leeftijdscategorie else '',
+            'toestel_naam': r.toestel.naam if r.toestel else '',
+            'aangemaakt_door_naam': r.aangemaakt_door_user.naam if r.aangemaakt_door_user else '',
+            'aangemaakt_op': r.aangemaakt_op.isoformat() if r.aangemaakt_op else None,
+            'gewijzigd_op': r.gewijzigd_op.isoformat() if r.gewijzigd_op else None
+        })
+        
+    backup_dict = {
+        'organisatie': {
+            'naam': org.naam,
+            'slug': org.slug
+        },
+        'users': users_data,
+        'digidokters': digidokters_data,
+        'age_categories': age_cats_data,
+        'devices': devices_data,
+        'registrations': registrations_data
+    }
+    
+    json_bytes = json.dumps(backup_dict, indent=2, ensure_ascii=False).encode('utf-8')
+    date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"backup_{org.slug}_{date_str}.json"
+    
+    return Response(
+        json_bytes,
+        mimetype="application/json",
+        headers={"Content-disposition": f"attachment; filename={filename}"}
+    )
+
+
+@admin_bp.route('/restore', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def restore():
+    from utils.tenant import get_huidige_organisatie_id
+    from models.organisatie import Organisatie, UserOrganisatie
+    from models.user import User
+    from models.digidokter import Digidokter
+    from models.age_category import AgeCategory
+    from models.device import Device
+    from models.registration import Registration
+    import json
+    from datetime import datetime, timezone
+    
+    org_id = get_huidige_organisatie_id()
+    
+    if request.method == 'POST':
+        file = request.files.get('backup_file')
+        if not file or file.filename == '':
+            flash('Gelieve een geldig JSON-bestand te selecteren.', 'danger')
+            return redirect(url_for('admin.restore'))
+            
+        try:
+            data = json.load(file)
+        except Exception as e:
+            flash(f'Fout bij het lezen van het JSON-bestand: {str(e)}', 'danger')
+            return redirect(url_for('admin.restore'))
+            
+        # Validatie van structuur
+        required_keys = ['organisatie', 'users', 'digidokters', 'age_categories', 'devices', 'registrations']
+        if not all(k in data for k in required_keys):
+            flash('Ongeldig backup-bestand. Het bestand mist vereiste datablokken.', 'danger')
+            return redirect(url_for('admin.restore'))
+            
+        try:
+            with db.session.begin_nested():
+                # 1. Verwijder bestaande organisatiegegevens
+                Registration.query.filter_by(organisatie_id=org_id).delete()
+                Digidokter.query.filter_by(organisatie_id=org_id).delete()
+                AgeCategory.query.filter_by(organisatie_id=org_id).delete()
+                Device.query.filter_by(organisatie_id=org_id).delete()
+                
+                # 2. Bewaar de huidige ingelogde user
+                huidige_user_id = current_user.id
+                
+                # Verwijder alle lidmaatschappen behalve de actieve hersteller
+                UserOrganisatie.query.filter(
+                    UserOrganisatie.organisatie_id == org_id,
+                    UserOrganisatie.user_id != huidige_user_id
+                ).delete()
+                
+                # 3. Herstel digidokters
+                digidokters_map = {}
+                for d_data in data['digidokters']:
+                    d = Digidokter(
+                        naam=d_data['naam'],
+                        actief=d_data['actief'],
+                        volgorde=d_data['volgorde'],
+                        organisatie_id=org_id
+                    )
+                    db.session.add(d)
+                    db.session.flush()
+                    digidokters_map[d.naam] = d.id
+                    
+                # 4. Herstel leeftijdscategorieën
+                age_cats_map = {}
+                for c_data in data['age_categories']:
+                    c = AgeCategory(
+                        naam=c_data['naam'],
+                        actief=c_data['actief'],
+                        volgorde=c_data['volgorde'],
+                        organisatie_id=org_id
+                    )
+                    db.session.add(c)
+                    db.session.flush()
+                    age_cats_map[c.naam] = c.id
+                    
+                # 5. Herstel toestellen
+                devices_map = {}
+                for t_data in data['devices']:
+                    t = Device(
+                        naam=t_data['naam'],
+                        actief=t_data['actief'],
+                        volgorde=t_data['volgorde'],
+                        organisatie_id=org_id
+                    )
+                    db.session.add(t)
+                    db.session.flush()
+                    devices_map[t.naam] = t.id
+                    
+                # 6. Herstel gebruikers & lidmaatschappen
+                users_map = {}
+                for u_data in data['users']:
+                    u = User.query.filter(db.func.lower(User.naam) == u_data['naam'].lower()).first()
+                    if not u:
+                        u = User(
+                            naam=u_data['naam'],
+                            email=u_data['email'],
+                            wachtwoord_hash=u_data['wachtwoord_hash'],
+                            rol=u_data['rol'],
+                            actief=u_data['actief'],
+                            moet_wachtwoord_wijzigen=False
+                        )
+                        db.session.add(u)
+                        db.session.flush()
+                    
+                    users_map[u.naam] = u.id
+                    
+                    uo = UserOrganisatie.query.filter_by(user_id=u.id, organisatie_id=org_id).first()
+                    if not uo:
+                        uo = UserOrganisatie(
+                            user_id=u.id,
+                            organisatie_id=org_id,
+                            rol=u_data['membership_rol'],
+                            actief=u_data['membership_actief']
+                        )
+                        db.session.add(uo)
+                    else:
+                        uo.rol = u_data['membership_rol']
+                        uo.actief = u_data['membership_actief']
+                
+                # Zorg dat de actieve hersteller nog lid blijft
+                uo_hersteller = UserOrganisatie.query.filter_by(user_id=huidige_user_id, organisatie_id=org_id).first()
+                if not uo_hersteller:
+                    uo_hersteller = UserOrganisatie(
+                        user_id=huidige_user_id,
+                        organisatie_id=org_id,
+                        rol='beheerder',
+                        actief=True
+                    )
+                    db.session.add(uo_hersteller)
+                else:
+                    uo_hersteller.rol = 'beheerder'
+                    uo_hersteller.actief = True
+                
+                # 7. Herstel registraties
+                for r_data in data['registrations']:
+                    d_id = digidokters_map.get(r_data['digidokter_naam'])
+                    c_id = age_cats_map.get(r_data['leeftijdscategorie_naam'])
+                    t_id = devices_map.get(r_data['toestel_naam'])
+                    creator_id = users_map.get(r_data['aangemaakt_door_naam'], huidige_user_id)
+                    
+                    if not d_id:
+                        d_id = list(digidokters_map.values())[0] if digidokters_map else None
+                    if not c_id:
+                        c_id = list(age_cats_map.values())[0] if age_cats_map else None
+                    if not t_id:
+                        t_id = list(devices_map.values())[0] if devices_map else None
+                        
+                    from datetime import datetime as dt
+                    reg_datum = dt.fromisoformat(r_data['datum']).date() if r_data.get('datum') else None
+                    created_at = dt.fromisoformat(r_data['aangemaakt_op']) if r_data.get('aangemaakt_op') else datetime.now(timezone.utc)
+                    modified_at = dt.fromisoformat(r_data['gewijzigd_op']) if r_data.get('gewijzigd_op') else datetime.now(timezone.utc)
+                    
+                    r = Registration(
+                        registratienummer=r_data['registratienummer'],
+                        datum=reg_datum,
+                        client=r_data['client'],
+                        nieuwe_klant=r_data['nieuwe_klant'],
+                        herkomst=r_data.get('herkomst'),
+                        geslacht=r_data.get('geslacht'),
+                        onderwerp=r_data['onderwerp'],
+                        digidokter_id=d_id,
+                        leeftijdscategorie_id=c_id,
+                        toestel_id=t_id,
+                        aangemaakt_door_id=creator_id,
+                        aangemaakt_op=created_at,
+                        gewijzigd_op=modified_at,
+                        organisatie_id=org_id
+                    )
+                    db.session.add(r)
+            
+            db.session.commit()
+            flash('De organisatie-data is succesvol hersteld.', 'success')
+            return redirect(url_for('admin.gebruikers'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fout tijdens het herstellen van de data: {str(e)}', 'danger')
+            return redirect(url_for('admin.restore'))
+            
+    return render_template('admin/restore.html')

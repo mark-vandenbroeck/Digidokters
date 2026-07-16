@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from extensions import db
+from extensions import db, limiter
 from models.user import User
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
@@ -416,6 +416,7 @@ def toestel_volgorde(item_id, richting):
 @admin_bp.route('/backup')
 @login_required
 @admin_required
+@limiter.limit("5 per minute; 20 per hour")
 def backup():
     import json
     from datetime import datetime
@@ -513,6 +514,7 @@ def backup():
 @admin_bp.route('/restore', methods=['GET', 'POST'])
 @login_required
 @admin_required
+@limiter.limit("5 per minute; 20 per hour")
 def restore():
     from utils.tenant import get_huidige_organisatie_id
     from models.organisatie import Organisatie, UserOrganisatie

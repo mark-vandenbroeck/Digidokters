@@ -97,11 +97,42 @@ def create_app(config_class=Config):
         response.headers['Service-Worker-Allowed'] = '/'
         return response
 
-    # Nette foutmelding bij te veel loginpogingen (rate limiting)
+    @app.after_request
+    def add_security_headers(response):
+        if os.environ.get('FLASK_ENV') == 'production':
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            "connect-src 'self';"
+        )
+        return response
+
+    # Foutafhandeling
+    @app.errorhandler(403)
+    def forbidden_error(e):
+        return render_template('errors/403.html'), 403
+
+    @app.errorhandler(404)
+    def not_found_error(e):
+        return render_template('errors/404.html'), 404
+
     @app.errorhandler(429)
-    def te_veel_pogingen(e):
-        flash('Te veel loginpogingen. Probeer het over enkele minuten opnieuw.', 'danger')
-        return render_template('auth/login.html'), 429
+    def ratelimit_handler(e):
+        flash('Te veel aanvragen. Probeer het over enkele minuten opnieuw.', 'danger')
+        return render_template('errors/429.html'), 429
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        db.session.rollback()
+        app.logger.error(f"Internal Server Error: {e}")
+        return render_template('errors/500.html'), 500
 
     # CLI-commando: flask seed
     @app.cli.command('seed')

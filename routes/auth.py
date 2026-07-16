@@ -103,6 +103,7 @@ _EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 @auth_bp.route('/wachtwoord', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("10 per minute")
 def wachtwoord_wijzigen():
     if request.method == 'POST':
         huidig = request.form.get('huidig_wachtwoord', '')

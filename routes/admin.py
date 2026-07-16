@@ -1,6 +1,6 @@
 """Beheer routes: gebruikers, digidokters, leeftijdscategorieën, toestellen."""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from extensions import db
 from models.user import User
@@ -40,6 +40,10 @@ def gebruiker_nieuw():
         rol = request.form.get('rol', 'medewerker')
         tijdelijk_ww = request.form.get('wachtwoord', '').strip()
 
+        if rol == 'platformbeheerder' and current_user.rol != 'platformbeheerder':
+            flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
+            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
+
         if not naam or not tijdelijk_ww:
             flash('Naam en wachtwoord zijn verplicht.', 'danger')
             return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None)
@@ -55,7 +59,7 @@ def gebruiker_nieuw():
             uo = UserOrganisatie(
                 user_id=user.id,
                 organisatie_id=org_id,
-                rol=rol,
+                rol='beheerder' if rol == 'platformbeheerder' else rol,
                 actief=request.form.get('actief') == 'on' if 'actief' in request.form else True
             )
             db.session.add(uo)
@@ -81,7 +85,7 @@ def gebruiker_nieuw():
         uo = UserOrganisatie(
             user_id=user.id,
             organisatie_id=org_id,
-            rol=rol,
+            rol='beheerder' if rol == 'platformbeheerder' else rol,
             actief=request.form.get('actief') == 'on' if 'actief' in request.form else True
         )
         db.session.add(uo)
@@ -105,9 +109,15 @@ def gebruiker_wijzigen(user_id):
     membership = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first_or_404()
 
     if request.method == 'POST':
+        rol = request.form.get('rol', membership.rol)
+        if rol == 'platformbeheerder' and current_user.rol != 'platformbeheerder':
+            flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
+
         user.naam = request.form.get('naam', user.naam).strip()
         user.email = request.form.get('email', '').strip().lower() or None
-        membership.rol = request.form.get('rol', membership.rol)
+        user.rol = rol
+        membership.rol = 'beheerder' if rol == 'platformbeheerder' else rol
         
         if user.id != 1:
             membership.actief = request.form.get('actief') == 'on'

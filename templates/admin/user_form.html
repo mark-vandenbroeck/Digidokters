@@ -42,8 +42,11 @@
                 <div class="mb-3">
                     <label for="rol" class="form-label">Rol <span class="text-danger">*</span></label>
                     <select class="form-select" id="rol" name="rol" required>
-                        <option value="medewerker" {% if (form_data.rol if form_data else (membership.rol if membership else '')) == 'medewerker' %}selected{% endif %}>Medewerker</option>
-                        <option value="beheerder" {% if (form_data.rol if form_data else (membership.rol if membership else '')) == 'beheerder' %}selected{% endif %}>Beheerder</option>
+                        <option value="medewerker" {% if (form_data.rol if form_data else (user.rol if user else (membership.rol if membership else ''))) == 'medewerker' %}selected{% endif %}>Medewerker</option>
+                        <option value="beheerder" {% if (form_data.rol if form_data else (user.rol if user else (membership.rol if membership else ''))) == 'beheerder' %}selected{% endif %}>Beheerder</option>
+                        {% if current_user.rol == 'platformbeheerder' %}
+                        <option value="platformbeheerder" {% if (form_data.rol if form_data else (user.rol if user else '')) == 'platformbeheerder' %}selected{% endif %}>Platformbeheerder</option>
+                        {% endif %}
                     </select>
                 </div>
 

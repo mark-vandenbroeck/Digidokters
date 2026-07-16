@@ -66,6 +66,10 @@ def login():
             return redirect(url_for('auth.wachtwoord_wijzigen'))
 
         # Organisatie context instellen
+        if gebruiker.rol == 'platformbeheerder':
+            flash(f'Welkom, platformbeheerder {gebruiker.naam}!', 'success')
+            return redirect(url_for('platform.dashboard'))
+
         active_memberships = [uo for uo in gebruiker.user_organisaties if uo.actief and uo.organisatie.actief]
         if not active_memberships:
             logout_user()
@@ -156,16 +160,25 @@ def wachtwoord_wijzigen():
 @auth_bp.route('/select-organisatie', methods=['GET', 'POST'])
 @login_required
 def select_org():
-    active_memberships = [uo for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief]
+    if current_user.rol == 'platformbeheerder':
+        from models.organisatie import Organisatie
+        active_orgs = Organisatie.query.filter_by(actief=True).all()
+        class MockMembership:
+            def __init__(self, org):
+                self.organisatie_id = org.id
+                self.organisatie = org
+        memberships = [MockMembership(o) for o in active_orgs]
+    else:
+        memberships = [uo for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief]
     
-    if not active_memberships:
+    if not memberships:
         logout_user()
-        flash('Uw account is niet gekoppeld aan een actieve organisatie.', 'danger')
+        flash('Er zijn geen actieve organisaties beschikbaar.', 'danger')
         return redirect(url_for('auth.login'))
         
     if request.method == 'POST':
         org_id = request.form.get('organisatie_id', type=int)
-        membership = next((uo for uo in active_memberships if uo.organisatie_id == org_id), None)
+        membership = next((m for m in memberships if m.organisatie_id == org_id), None)
         if membership:
             session['organisatie_id'] = org_id
             flash(f'Ingelogd bij organisatie: {membership.organisatie.naam}', 'success')
@@ -176,20 +189,28 @@ def select_org():
         else:
             flash('Ongeldige organisatie selectie.', 'danger')
             
-    return render_template('auth/select_org.html', memberships=active_memberships)
+    return render_template('auth/select_org.html', memberships=memberships)
 
 
 @auth_bp.route('/switch-organisatie', methods=['POST'])
 @login_required
 def switch_organisatie():
     org_id = request.form.get('organisatie_id', type=int)
-    active_memberships = [uo for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief]
-    membership = next((uo for uo in active_memberships if uo.organisatie_id == org_id), None)
-    
-    if membership:
-        session['organisatie_id'] = org_id
-        flash(f'Gewisseld naar organisatie: {membership.organisatie.naam}', 'success')
+    if current_user.rol == 'platformbeheerder':
+        from models.organisatie import Organisatie
+        org = Organisatie.query.filter_by(id=org_id, actief=True).first()
+        if org:
+            session['organisatie_id'] = org_id
+            flash(f'Gewisseld naar organisatie: {org.naam}', 'success')
+        else:
+            flash('Ongeldige organisatie.', 'danger')
     else:
-        flash('U heeft geen toegang tot deze organisatie.', 'danger')
+        active_memberships = [uo for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief]
+        membership = next((uo for uo in active_memberships if uo.organisatie_id == org_id), None)
+        if membership:
+            session['organisatie_id'] = org_id
+            flash(f'Gewisseld naar organisatie: {membership.organisatie.naam}', 'success')
+        else:
+            flash('U heeft geen toegang tot deze organisatie.', 'danger')
         
     return redirect(url_for('reg.lijst'))

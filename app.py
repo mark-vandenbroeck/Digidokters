@@ -33,21 +33,23 @@ def create_app(config_class=Config):
     from routes.admin import admin_bp
     from routes.import_export import ie_bp
     from routes.stats import stats_bp
+    from routes.platform import platform_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(reg_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(ie_bp)
     app.register_blueprint(stats_bp)
+    app.register_blueprint(platform_bp)
 
     # Controleer de organisatie-context voor authenticated requests
-    from flask import session, redirect, url_for, request, flash
+    from flask import session, redirect, url_for, request, flash, g
     from flask_login import current_user
 
     @app.before_request
     def check_organisatie_context():
         if request.endpoint:
-            # Exclude statics, service worker and auth endpoints
+            # Exclude statics, service worker, auth endpoints and platform endpoints
             exempt_endpoints = [
                 'static',
                 'service_worker',
@@ -56,20 +58,35 @@ def create_app(config_class=Config):
                 'auth.select_org',
                 'auth.switch_organisatie',
             ]
-            if request.endpoint in exempt_endpoints or request.endpoint.startswith('auth.'):
+            if request.endpoint in exempt_endpoints or request.endpoint.startswith('auth.') or request.endpoint.startswith('platform.'):
+                if current_user.is_authenticated and current_user.rol == 'platformbeheerder':
+                    from models.organisatie import Organisatie
+                    g.beschikbare_organisaties = Organisatie.query.filter_by(actief=True).all()
                 return
 
         if current_user.is_authenticated:
-            org_id = session.get('organisatie_id')
-            if not org_id:
-                return redirect(url_for('auth.select_org', next=request.full_path))
-            
-            # Controleer of de gebruiker nog een actief lidmaatschap heeft
-            membership = next((uo for uo in current_user.user_organisaties if uo.organisatie_id == org_id and uo.actief and uo.organisatie.actief), None)
-            if not membership:
-                session.pop('organisatie_id', None)
-                flash('Uw toegang tot deze organisatie is niet langer geldig.', 'warning')
-                return redirect(url_for('auth.select_org'))
+            if current_user.rol == 'platformbeheerder':
+                from models.organisatie import Organisatie
+                g.beschikbare_organisaties = Organisatie.query.filter_by(actief=True).all()
+                org_id = session.get('organisatie_id')
+                if not org_id:
+                    return redirect(url_for('auth.select_org', next=request.full_path))
+                org = Organisatie.query.filter_by(id=org_id, actief=True).first()
+                if not org:
+                    session.pop('organisatie_id', None)
+                    flash('De geselecteerde organisatie is niet langer actief.', 'warning')
+                    return redirect(url_for('auth.select_org'))
+            else:
+                org_id = session.get('organisatie_id')
+                if not org_id:
+                    return redirect(url_for('auth.select_org', next=request.full_path))
+                
+                # Controleer of de gebruiker nog een actief lidmaatschap heeft
+                membership = next((uo for uo in current_user.user_organisaties if uo.organisatie_id == org_id and uo.actief and uo.organisatie.actief), None)
+                if not membership:
+                    session.pop('organisatie_id', None)
+                    flash('Uw toegang tot deze organisatie is niet langer geldig.', 'warning')
+                    return redirect(url_for('auth.select_org'))
 
     # Service worker moet op root-niveau staan (niet /static/sw.js) zodat
     # zijn scope de volledige app dekt, wat vereist is voor PWA-installatie.

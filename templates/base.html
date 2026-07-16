@@ -61,18 +61,27 @@
             </a>
         </div>
 
-        {% if current_user.user_organisaties|length > 1 %}
+        {% if current_user.rol == 'platformbeheerder' or current_user.user_organisaties|length > 1 %}
         <div class="px-3 pb-3 border-bottom border-secondary border-opacity-25">
             <form action="{{ url_for('auth.switch_organisatie') }}" method="POST" class="m-0">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-dark text-white border-secondary"><i class="bi bi-building"></i></span>
                     <select name="organisatie_id" onchange="this.form.submit()" class="form-select form-select-sm bg-dark text-white border-secondary">
-                        {% for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief %}
-                        <option value="{{ uo.organisatie_id }}" {% if uo.organisatie_id == session.get('organisatie_id') %}selected{% endif %}>
-                            {{ uo.organisatie.naam }}
-                        </option>
-                        {% endfor %}
+                        {% if current_user.rol == 'platformbeheerder' %}
+                            <option value="">— Kies een organisatie —</option>
+                            {% for org in g.beschikbare_organisaties %}
+                            <option value="{{ org.id }}" {% if org.id == session.get('organisatie_id') %}selected{% endif %}>
+                                {{ org.naam }}
+                            </option>
+                            {% endfor %}
+                        {% else %}
+                            {% for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief %}
+                            <option value="{{ uo.organisatie_id }}" {% if uo.organisatie_id == session.get('organisatie_id') %}selected{% endif %}>
+                                {{ uo.organisatie.naam }}
+                            </option>
+                            {% endfor %}
+                        {% endif %}
                     </select>
                 </div>
             </form>
@@ -87,8 +96,28 @@
         {% endif %}
 
         <nav class="dd-sidebar-nav">
+            {% if current_user.rol == 'platformbeheerder' %}
+            <!-- Platformbeheer -->
+            <div class="dd-nav-section">Platformbeheer</div>
+            <a href="{{ url_for('platform.dashboard') }}"
+               class="dd-nav-link {% if request.endpoint and request.endpoint == 'platform.dashboard' %}active{% endif %}">
+                <i class="bi bi-speedometer2"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('platform.organisaties') }}"
+               class="dd-nav-link {% if request.endpoint and 'organisatie' in request.endpoint and 'platform.' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-building"></i>
+                <span>Organisaties</span>
+            </a>
+            <a href="{{ url_for('platform.koppelingen') }}"
+               class="dd-nav-link {% if request.endpoint and 'koppeling' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-link-45deg"></i>
+                <span>Koppelingen</span>
+            </a>
+            {% endif %}
+
             <!-- Registraties -->
-            <div class="dd-nav-section">Registraties</div>
+            <div class="dd-nav-section mt-3">Registraties</div>
             <a href="{{ url_for('reg.lijst') }}"
                class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('reg.') %}active{% endif %}">
                 <i class="bi bi-clipboard2-pulse"></i>

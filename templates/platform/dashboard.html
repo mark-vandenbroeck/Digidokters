@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}Platform Dashboard – Digidokters{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h1 class="dd-page-title mb-0"><i class="bi bi-speedometer2 me-2 text-primary"></i>Platform Dashboard</h1>
+    <p class="dd-page-subtitle mb-0">Beheer van organisaties en globale gebruikerskoppelingen</p>
+</div>
+
+<!-- Samenvatting KPI's -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-blue-soft text-blue">
+                <i class="bi bi-building"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ total_orgs }}</div>
+                <div class="dd-stat-label">Organisaties (totaal)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-teal-soft text-teal">
+                <i class="bi bi-building-check"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ active_orgs }}</div>
+                <div class="dd-stat-label">Organisaties (actief)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-purple-soft text-purple">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ total_users }}</div>
+                <div class="dd-stat-label">Gebruikers (totaal)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-orange-soft text-orange">
+                <i class="bi bi-link-45deg"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ total_links }}</div>
+                <div class="dd-stat-label">Gebruiker-koppelingen</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Snelkoppelingen en beheersecties -->
+    <div class="col-12 col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-gear-fill me-2"></i>Snelkoppelingen</div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('platform.organisaties') }}" class="btn btn-outline-primary text-start p-3">
+                        <div class="fw-semibold"><i class="bi bi-building me-2"></i>Organisaties beheren</div>
+                        <div class="small text-muted mt-1">Bekijk, bewerk, activeer of maak nieuwe organisaties aan.</div>
+                    </a>
+                    <a href="{{ url_for('platform.koppelingen') }}" class="btn btn-outline-primary text-start p-3">
+                        <div class="fw-semibold"><i class="bi bi-link-45deg me-2"></i>Gebruikers koppelen</div>
+                        <div class="small text-muted mt-1">Koppel gebruikers aan organisaties en beheer hun rollen en status.</div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Systeeminformatie -->
+    <div class="col-12 col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-info-circle-fill me-2"></i>Systeeminformatie</div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="fw-semibold text-muted" style="width: 150px;">Applicatie:</td>
+                            <td>Digidokters Multi-Tenant Platform</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold text-muted">Status:</td>
+                            <td><span class="badge bg-success">Operationeel</span></td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold text-muted">Aantal tenants:</td>
+                            <td>{{ total_orgs }} organisatie(s)</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold text-muted">Rol:</td>
+                            <td>Platformbeheerder (Super-admin)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

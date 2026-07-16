@@ -32,3 +32,16 @@ def actief_required(f):
             return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+def platform_admin_required(f):
+    """Decorator: vereist de globale rol 'platformbeheerder'."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login'))
+        if current_user.rol != 'platformbeheerder':
+            flash('U heeft geen toegang tot deze pagina.', 'danger')
+            return redirect(url_for('reg.lijst'))
+        return f(*args, **kwargs)
+    return decorated_function

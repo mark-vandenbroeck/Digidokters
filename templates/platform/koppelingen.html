@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Koppelingen beheren – Digidokters{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h1 class="dd-page-title mb-0"><i class="bi bi-link-45deg me-2 text-primary"></i>Koppelingen beheren</h1>
+    <p class="dd-page-subtitle mb-0">Beheer de toegang van gebruikers tot de verschillende organisaties</p>
+</div>
+
+<div class="row g-4">
+    <!-- Lijst van koppelingen -->
+    <div class="col-12 col-lg-8">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-list-ul me-2"></i>Bestaande koppelingen</div>
+            <div class="card-body p-0">
+                {% if links %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Gebruiker</th>
+                                <th>Organisatie</th>
+                                <th>Rol</th>
+                                <th>Status</th>
+                                <th class="pe-3 text-end">Acties</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for link in links %}
+                            <tr>
+                                <td class="ps-3 fw-semibold">{{ link.user.naam }}</td>
+                                <td>{{ link.organisatie.naam }}</td>
+                                <td>
+                                    {% if link.rol == 'beheerder' %}
+                                    <span class="badge bg-danger">Beheerder</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Medewerker</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if link.actief %}
+                                    <span class="badge bg-success">Actief</span>
+                                    {% else %}
+                                    <span class="badge bg-dark">Gedeactiveerd</span>
+                                    {% endif %}
+                                </td>
+                                <td class="pe-3 text-end text-nowrap">
+                                    <a href="{{ url_for('platform.koppeling_toggle', link_id=link.id) }}"
+                                       class="btn btn-sm {% if link.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                                       title="{% if link.actief %}Deactiveren{% else %}Activeren{% endif %}">
+                                        <i class="bi {% if link.actief %}bi-person-x{% else %}bi-person-check{% endif %}"></i>
+                                    </a>
+                                    {% if not (link.user_id == 1 and link.organisatie_id == 1) %}
+                                    <form action="{{ url_for('platform.koppeling_verwijderen', link_id=link.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u deze koppeling wilt verwijderen?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Ontkoppelen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">Geen koppelingen gevonden.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Nieuwe koppeling toevoegen -->
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-plus-circle me-2"></i>Nieuwe koppeling</div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="mb-3">
+                        <label for="user_id" class="form-label">Gebruiker <span class="text-danger">*</span></label>
+                        <select class="form-select" id="user_id" name="user_id" required>
+                            <option value="">— Kies een gebruiker —</option>
+                            {% for u in users %}
+                            <option value="{{ u.id }}">{{ u.naam }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="organisatie_id" class="form-label">Organisatie <span class="text-danger">*</span></label>
+                        <select class="form-select" id="organisatie_id" name="organisatie_id" required>
+                            <option value="">— Kies een organisatie —</option>
+                            {% for o in organisaties %}
+                            <option value="{{ o.id }}">{{ o.naam }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="rol" class="form-label">Rol binnen de organisatie <span class="text-danger">*</span></label>
+                        <select class="form-select" id="rol" name="rol" required>
+                            <option value="medewerker" selected>Medewerker</option>
+                            <option value="beheerder">Beheerder</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="actief" name="actief" checked>
+                        <label class="form-check-label" for="actief">Koppeling is actief</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-link-45deg me-1"></i>Gebruiker koppelen
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

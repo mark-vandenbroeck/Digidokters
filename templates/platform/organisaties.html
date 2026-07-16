@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Organisaties beheren – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-building me-2 text-primary"></i>Organisaties beheren</h1>
+        <p class="dd-page-subtitle mb-0">Beheer alle organisaties op dit platform</p>
+    </div>
+    <a href="{{ url_for('platform.organisatie_nieuw') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Nieuwe organisatie
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-3">ID</th>
+                        <th>Naam</th>
+                        <th>Slug</th>
+                        <th>Status</th>
+                        <th>Aangemaakt op</th>
+                        <th class="pe-3 text-end">Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for org in organisaties %}
+                    <tr>
+                        <td class="ps-3 text-muted">{{ org.id }}</td>
+                        <td class="fw-semibold">{{ org.naam }}</td>
+                        <td><code>{{ org.slug }}</code></td>
+                        <td>
+                            {% if org.actief %}
+                            <span class="badge bg-success">Actief</span>
+                            {% else %}
+                            <span class="badge bg-dark">Gedeactiveerd</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ org.aangemaakt_op.strftime('%d/%m/%Y %H:%M') if org.aangemaakt_op else '–' }}</td>
+                        <td class="pe-3 text-end text-nowrap">
+                            <a href="{{ url_for('platform.organisatie_wijzigen', org_id=org.id) }}"
+                               class="btn btn-sm btn-outline-primary" title="Wijzigen">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            {% if org.id != 1 %}
+                            <a href="{{ url_for('platform.organisatie_toggle', org_id=org.id) }}"
+                               class="btn btn-sm {% if org.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
+                               title="{% if org.actief %}Deactiveren{% else %}Activeren{% endif %}">
+                                <i class="bi {% if org.actief %}bi-lock{% else %}bi-unlock{% endif %}"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

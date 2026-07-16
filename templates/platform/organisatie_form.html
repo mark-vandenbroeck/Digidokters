@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}{{ actie }} organisatie – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-12 col-md-8 col-lg-6">
+
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <a href="{{ url_for('platform.organisaties') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="dd-page-title mb-0">
+            <i class="bi bi-building me-2 text-primary"></i>{{ actie }} organisatie
+        </h1>
+    </div>
+    <p class="dd-page-subtitle mb-3">
+        {% if actie == 'Nieuw' %}
+        Maak een nieuwe organisatie (tenant) aan op dit platform.
+        {% else %}
+        Wijzig de instellingen voor {{ org.naam }}.
+        {% endif %}
+    </p>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form method="POST" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label for="naam" class="form-label">Organisatienaam <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="naam" name="naam"
+                           value="{{ form_data.naam if form_data else (org.naam if org else '') }}"
+                           placeholder="Bijv. Stad Leuven" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="slug" class="form-label">Slug (Unieke URL/login ID) <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="slug" name="slug"
+                           value="{{ form_data.slug if form_data else (org.slug if org else '') }}"
+                           placeholder="Bijv. leuven" required>
+                    <div class="form-text">Alleen kleine letters, cijfers en streepjes. Geen spaties.</div>
+                </div>
+
+                <div class="mb-4 form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="actief" name="actief"
+                           {% if not org or org.actief %}checked{% endif %}
+                           {% if org and org.id == 1 %}disabled{% endif %}>
+                    <label class="form-check-label" for="actief">Actief</label>
+                    {% if org and org.id == 1 %}
+                    <div class="form-text">De default organisatie kan niet worden gedeactiveerd.</div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Opslaan
+                    </button>
+                    <a href="{{ url_for('platform.organisaties') }}" class="btn btn-outline-secondary">Annuleren</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}

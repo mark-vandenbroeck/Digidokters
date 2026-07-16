@@ -117,14 +117,20 @@ def create_app(config_class=Config):
     # Foutafhandeling
     @app.errorhandler(403)
     def forbidden_error(e):
+        from utils.mail import stuur_fout_email
+        stuur_fout_email(403, str(e))
         return render_template('errors/403.html'), 403
 
     @app.errorhandler(404)
     def not_found_error(e):
+        from utils.mail import stuur_fout_email
+        stuur_fout_email(404, str(e))
         return render_template('errors/404.html'), 404
 
     @app.errorhandler(429)
     def ratelimit_handler(e):
+        from utils.mail import stuur_fout_email
+        stuur_fout_email(429, str(e))
         flash('Te veel aanvragen. Probeer het over enkele minuten opnieuw.', 'danger')
         return render_template('errors/429.html'), 429
 
@@ -132,6 +138,8 @@ def create_app(config_class=Config):
     def internal_error(e):
         db.session.rollback()
         app.logger.error(f"Internal Server Error: {e}")
+        from utils.mail import stuur_fout_email
+        stuur_fout_email(500, str(e), exception=e)
         return render_template('errors/500.html'), 500
 
     # CLI-commando: flask seed

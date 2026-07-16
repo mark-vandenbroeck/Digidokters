@@ -492,3 +492,14 @@ body {
     padding: 0.2rem 0;
     border-bottom: 1px solid #f1f5f9;
 }
+
+/* User profile link hover styling */
+.dd-user-profile-link {
+    transition: opacity 0.15s ease;
+}
+.dd-user-profile-link:hover {
+    opacity: 0.8;
+}
+.dd-user-profile-link:hover .dd-user-name {
+    text-decoration: underline;
+}

@@ -147,17 +147,16 @@
         <!-- Sidebar footer -->
         <div class="dd-sidebar-footer">
             <div class="dd-user-info">
-                <div class="dd-user-avatar">{{ current_user.naam[0].upper() }}</div>
-                <div class="flex-grow-1 overflow-hidden">
-                    <div class="fw-semibold text-white text-truncate small">{{ current_user.naam }}</div>
-                    <div class="text-white-50" style="font-size:0.7rem">
-                        {{ 'Beheerder' if current_user.is_beheerder() else 'Medewerker' }}
+                <a href="{{ url_for('auth.wachtwoord_wijzigen') }}" class="d-flex align-items-center gap-2 text-decoration-none flex-grow-1 overflow-hidden dd-user-profile-link" title="E-mail of wachtwoord wijzigen">
+                    <div class="dd-user-avatar">{{ current_user.naam[0].upper() }}</div>
+                    <div class="overflow-hidden">
+                        <div class="fw-semibold text-white text-truncate small dd-user-name">{{ current_user.naam }}</div>
+                        <div class="text-white-50" style="font-size:0.7rem">
+                            {{ 'Beheerder' if current_user.is_beheerder() else 'Medewerker' }}
+                        </div>
                     </div>
-                </div>
+                </a>
                 <div class="d-flex gap-1">
-                    <a href="{{ url_for('auth.wachtwoord_wijzigen') }}" class="dd-icon-btn" title="Wachtwoord wijzigen">
-                        <i class="bi bi-key"></i>
-                    </a>
                     <a href="{{ url_for('auth.logout') }}" class="dd-icon-btn" title="Uitloggen">
                         <i class="bi bi-box-arrow-right"></i>
                     </a>

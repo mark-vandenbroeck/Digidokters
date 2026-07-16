@@ -23,6 +23,8 @@ class User(UserMixin, db.Model):
     user_organisaties = db.relationship('UserOrganisatie', back_populates='user', cascade='all, delete-orphan')
 
     def is_beheerder(self):
+        if self.rol == 'platformbeheerder':
+            return True
         from flask import session, has_request_context
         if has_request_context():
             org_id = session.get('organisatie_id')

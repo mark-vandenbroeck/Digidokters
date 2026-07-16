@@ -15,6 +15,9 @@ def admin_required(f):
         if not org_id:
             return redirect(url_for('auth.select_org'))
             
+        if current_user.rol == 'platformbeheerder':
+            return f(*args, **kwargs)
+            
         uo = next((x for x in current_user.user_organisaties if x.organisatie_id == org_id and x.actief and x.organisatie.actief), None)
         if not uo or uo.rol != 'beheerder':
             flash('U heeft geen toegang tot deze pagina.', 'danger')

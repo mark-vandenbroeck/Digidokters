@@ -129,7 +129,7 @@
                 <span>Nieuw bezoek</span>
             </a>
 
-            {% if current_user.is_beheerder() %}
+            {% if current_user.is_beheerder() and session.get('organisatie_id') %}
             <!-- Beheer -->
             <div class="dd-nav-section mt-3">Beheer</div>
             <a href="{{ url_for('admin.gebruikers') }}"

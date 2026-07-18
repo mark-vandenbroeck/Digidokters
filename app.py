@@ -2,6 +2,18 @@ from flask import Flask, send_from_directory, render_template, flash
 from config import Config
 from extensions import db, migrate, login_manager, csrf, limiter
 import os
+from sqlalchemy.engine import Engine
+from sqlalchemy import event
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    except Exception:
+        pass
+    cursor.close()
 
 
 def create_app(config_class=Config):

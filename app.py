@@ -257,6 +257,26 @@ def create_app(config_class=Config):
         
         print(f'✓ Organisatie "{naam}" aangemaakt met slug "{slug}" (met standaard data)')
 
+    # Synchroniseer bestaande gebruikers als Digidokter op de achtergrond bij het opstarten
+    with app.app_context():
+        try:
+            from models.organisatie import UserOrganisatie
+            from models.digidokter import Digidokter
+            memberships = UserOrganisatie.query.all()
+            synced = 0
+            for m in memberships:
+                existing = Digidokter.query.filter_by(organisatie_id=m.organisatie_id, naam=m.user.naam).first()
+                if not existing:
+                    max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).filter_by(organisatie_id=m.organisatie_id).scalar() or 0
+                    dd = Digidokter(naam=m.user.naam, actief=True, volgorde=max_volgorde + 1, organisatie_id=m.organisatie_id)
+                    db.session.add(dd)
+                    synced += 1
+            if synced > 0:
+                db.session.commit()
+                print(f"✓ Synchronisatie: {synced} gebruikers gesynchroniseerd als Digidokter")
+        except Exception:
+            pass
+
     return app
 
 

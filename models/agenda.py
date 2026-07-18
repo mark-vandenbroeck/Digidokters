@@ -18,6 +18,12 @@ class AgendaItem(db.Model):
     locatie_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
     omschrijving = db.Column(db.Text, nullable=True)
     organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False)
+    
+    # Velden voor terugkerende reeksen
+    reeks_id = db.Column(db.String(50), nullable=True)
+    is_terugkerend = db.Column(db.Boolean, default=False, nullable=False)
+    interval = db.Column(db.String(20), nullable=True)  # 'dagelijks', 'wekelijks', 'maandelijks'
+    einddatum = db.Column(db.Date, nullable=True)
 
     # Relationships
     type = db.relationship('ActivityType', backref=db.backref('agenda_items', lazy=True))

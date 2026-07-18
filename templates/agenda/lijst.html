@@ -45,6 +45,9 @@
                         <td class="text-nowrap">{{ item.uur_van }} - {{ item.uur_tot }}</td>
                         <td>
                             <span class="badge bg-blue-soft text-blue">{{ item.type.naam }}</span>
+                            {% if item.is_terugkerend %}
+                            <i class="bi bi-arrow-repeat ms-1 text-primary" title="Terugkerend ({{ item.interval }})"></i>
+                            {% endif %}
                         </td>
                         <td>{{ item.locatie.naam }}</td>
                         <td>{{ item.omschrijving or '<span class="text-muted fst-italic">Geen</span>'|safe }}</td>
@@ -61,8 +64,10 @@
                                class="btn btn-sm btn-outline-primary" title="Wijzigen">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            <form action="{{ url_for('agenda.verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u dit agenda-item wilt verwijderen?');">
+                            <form id="delete_form_{{ item.id }}" action="{{ url_for('agenda.verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" 
+                                  onsubmit="return handleAgendaDelete({{ item.id }}, {{ 'true' if item.is_terugkerend else 'false' }});">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="verwijder_reeks" id="verwijder_reeks_input_{{ item.id }}" value="false">
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
                                     <i class="bi bi-trash"></i>
                                 </button>
@@ -76,4 +81,25 @@
         </div>
     </div>
 </div>
+
+<script>
+function handleAgendaDelete(itemId, isTerugkerend) {
+    if (!isTerugkerend) {
+        return confirm('Weet u zeker dat u dit agenda-item wilt verwijderen?');
+    }
+
+    const input = document.getElementById('verwijder_reeks_input_' + itemId);
+
+    if (confirm("Dit is een terugkerende activiteit. Wilt u de GEHELE REEKS van activiteiten verwijderen?\n\n(Klik 'OK' voor de gehele reeks, of 'Annuleren' om te bepalen of u alleen dit specifieke item wilt verwijderen.)")) {
+        input.value = 'true';
+        return true;
+    } else {
+        if (confirm("Wilt u ALLEEN DEZE SPECIFIEKE activiteit uit de reeks verwijderen?")) {
+            input.value = 'false';
+            return true;
+        }
+    }
+    return false;
+}
+</script>
 {% endblock %}

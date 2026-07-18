@@ -99,25 +99,84 @@ def nieuw():
             else:
                 fouten.append(f'Ongeldige digidokter geselecteerd (ID: {d_id}).')
 
+        is_terugkerend = request.form.get('is_terugkerend') == 'on'
+        interval = request.form.get('interval') if is_terugkerend else None
+        einddatum_str = request.form.get('einddatum', '').strip() if is_terugkerend else ''
+
+        einddatum = None
+        if is_terugkerend:
+            if interval not in ['dagelijks', 'wekelijks', 'maandelijks']:
+                fouten.append('Selecteer een geldig herhalingsinterval.')
+            if not einddatum_str:
+                fouten.append('Einddatum is verplicht bij een terugkerende activiteit.')
+            else:
+                try:
+                    einddatum = date.fromisoformat(einddatum_str)
+                    if datum and einddatum < datum:
+                        fouten.append('Einddatum mag niet vóór de begindatum liggen.')
+                except ValueError:
+                    fouten.append('Ongeldige einddatum.')
+
         if fouten:
             for f in fouten:
                 flash(f, 'danger')
             return render_template('agenda/item_form.html', actie='Toevoegen', item=None, **keuzes, form_data=request.form)
 
-        item = AgendaItem(
-            datum=datum,
-            uur_van=uur_van,
-            uur_tot=uur_tot,
-            type_id=type_id,
-            locatie_id=locatie_id,
-            omschrijving=omschrijving
-        )
-        set_organisatie_id_op_model(item)
-        item.digidokters = selected_digidokters
-        
-        db.session.add(item)
+        import uuid
+        from datetime import timedelta
+
+        reeks_id = str(uuid.uuid4()) if is_terugkerend else None
+        current_date = datum
+        items_to_save = [current_date]
+
+        def add_month(d):
+            import calendar
+            month = d.month
+            year = d.year
+            month += 1
+            if month > 12:
+                month = 1
+                year += 1
+            day = min(d.day, calendar.monthrange(year, month)[1])
+            return date(year, month, day)
+
+        if is_terugkerend and interval and einddatum:
+            while True:
+                if interval == 'dagelijks':
+                    current_date += timedelta(days=1)
+                elif interval == 'wekelijks':
+                    current_date += timedelta(weeks=1)
+                elif interval == 'maandelijks':
+                    current_date = add_month(current_date)
+                
+                if current_date > einddatum:
+                    break
+                items_to_save.append(current_date)
+                if len(items_to_save) >= 100:
+                    break
+
+        for d in items_to_save:
+            item = AgendaItem(
+                datum=d,
+                uur_van=uur_van,
+                uur_tot=uur_tot,
+                type_id=type_id,
+                locatie_id=locatie_id,
+                omschrijving=omschrijving,
+                is_terugkerend=is_terugkerend,
+                interval=interval,
+                einddatum=einddatum,
+                reeks_id=reeks_id
+            )
+            set_organisatie_id_op_model(item)
+            item.digidokters = selected_digidokters
+            db.session.add(item)
+            
         db.session.commit()
-        flash('Agenda-item succesvol toegevoegd.', 'success')
+        if is_terugkerend:
+            flash(f'{len(items_to_save)} agenda-items succesvol toegevoegd aan de reeks.', 'success')
+        else:
+            flash('Agenda-item succesvol toegevoegd.', 'success')
         return redirect(url_for('agenda.lijst'))
 
     return render_template('agenda/item_form.html', actie='Toevoegen', item=None, **keuzes)
@@ -219,7 +278,15 @@ def verwijderen(item_id):
     if item.organisatie_id != org_id:
         abort(403)
 
-    db.session.delete(item)
+    verwijder_reeks = request.form.get('verwijder_reeks') == 'true'
+
+    if verwijder_reeks and item.reeks_id:
+        # Verwijder de hele reeks
+        AgendaItem.query.filter_by(organisatie_id=org_id, reeks_id=item.reeks_id).delete()
+        flash('De gehele reeks van activiteiten is succesvol verwijderd.', 'success')
+    else:
+        db.session.delete(item)
+        flash('Agenda-item succesvol verwijderd.', 'success')
+
     db.session.commit()
-    flash('Agenda-item succesvol verwijderd.', 'success')
     return redirect(url_for('agenda.lijst'))

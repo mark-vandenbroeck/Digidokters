@@ -94,6 +94,63 @@
                     <div class="form-text">Selecteer de digidokters die bij deze activiteit aanwezig zullen zijn.</div>
                 </div>
 
+                {% if actie == 'Toevoegen' %}
+                <!-- Terugkerende activiteit opties -->
+                <div class="card bg-light border mb-4">
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_terugkerend" id="is_terugkerend"
+                                   {% if form_data and form_data.get('is_terugkerend') == 'on' %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="is_terugkerend">
+                                Terugkerende activiteit
+                            </label>
+                        </div>
+                        
+                        <div id="recurrence_fields" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="interval" class="form-label">Herhaal-interval <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="interval" name="interval">
+                                        <option value="wekelijks" {% if form_data and form_data.get('interval') == 'wekelijks' %}selected{% endif %}>Wekelijks</option>
+                                        <option value="dagelijks" {% if form_data and form_data.get('interval') == 'dagelijks' %}selected{% endif %}>Dagelijks</option>
+                                        <option value="maandelijks" {% if form_data and form_data.get('interval') == 'maandelijks' %}selected{% endif %}>Maandelijks</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="einddatum" class="form-label">Einddatum herhaling <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="einddatum" name="einddatum"
+                                           value="{{ form_data.einddatum if form_data else '' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const isTerugkerendCheckbox = document.getElementById('is_terugkerend');
+                    const recurrenceFields = document.getElementById('recurrence_fields');
+                    const intervalSelect = document.getElementById('interval');
+                    const einddatumInput = document.getElementById('einddatum');
+
+                    function toggleRecurrence() {
+                        if (isTerugkerendCheckbox.checked) {
+                            recurrenceFields.style.display = 'block';
+                            intervalSelect.setAttribute('required', 'required');
+                            einddatumInput.setAttribute('required', 'required');
+                        } else {
+                            recurrenceFields.style.display = 'none';
+                            intervalSelect.removeAttribute('required');
+                            einddatumInput.removeAttribute('required');
+                        }
+                    }
+
+                    isTerugkerendCheckbox.addEventListener('change', toggleRecurrence);
+                    toggleRecurrence(); // initial state
+                });
+                </script>
+                {% endif %}
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-circle me-1"></i>Opslaan

@@ -65,6 +65,14 @@ def gebruiker_nieuw():
                 actief=request.form.get('actief') == 'on' if 'actief' in request.form else True
             )
             db.session.add(uo)
+            
+            # Voeg ook toe als Digidokter
+            existing_dd = Digidokter.query.filter_by(organisatie_id=org_id, naam=user.naam).first()
+            if not existing_dd:
+                max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).filter_by(organisatie_id=org_id).scalar() or 0
+                dd = Digidokter(naam=user.naam, actief=True, volgorde=max_volgorde + 1, organisatie_id=org_id)
+                db.session.add(dd)
+                
             db.session.commit()
             flash(f'Bestaande gebruiker {user.naam} gekoppeld aan de organisatie.', 'success')
             return redirect(url_for('admin.gebruikers'))
@@ -91,6 +99,14 @@ def gebruiker_nieuw():
             actief=request.form.get('actief') == 'on' if 'actief' in request.form else True
         )
         db.session.add(uo)
+        
+        # Voeg ook toe als Digidokter
+        existing_dd = Digidokter.query.filter_by(organisatie_id=org_id, naam=user.naam).first()
+        if not existing_dd:
+            max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).filter_by(organisatie_id=org_id).scalar() or 0
+            dd = Digidokter(naam=user.naam, actief=True, volgorde=max_volgorde + 1, organisatie_id=org_id)
+            db.session.add(dd)
+            
         db.session.commit()
         
         flash(f'Gebruiker {naam} aangemaakt. Tijdelijk wachtwoord: {tijdelijk_ww}', 'success')

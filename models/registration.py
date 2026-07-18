@@ -35,10 +35,20 @@ class Registration(db.Model):
         """Genereer een uniek registratienummer: YYYY-NNNN voor de specifieke organisatie."""
         if jaar is None:
             jaar = date.today().year
-        # Tel bestaande registraties voor dit jaar binnen deze organisatie
-        from sqlalchemy import extract
-        aantal = db.session.query(Registration).filter(
+        # Zoek het hoogste nummer van dit jaar in de organisatie
+        pattern = f"{jaar}-%"
+        max_num = db.session.query(db.func.max(Registration.registratienummer)).filter(
             Registration.organisatie_id == organisatie_id,
-            extract('year', Registration.datum) == jaar
-        ).count()
-        return f"{jaar}-{aantal + 1:04d}"
+            Registration.registratienummer.like(pattern)
+        ).scalar()
+        
+        if max_num:
+            try:
+                sequence_part = int(max_num.split('-')[1])
+                next_seq = sequence_part + 1
+            except (ValueError, IndexError):
+                next_seq = 1
+        else:
+            next_seq = 1
+            
+        return f"{jaar}-{next_seq:04d}"

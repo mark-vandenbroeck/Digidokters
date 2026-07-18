@@ -258,3 +258,21 @@ def wijzigen(reg_id):
         return redirect(url_for('reg.bekijken', reg_id=reg.id))
 
     return render_template('registrations/edit.html', reg=reg, **keuzes)
+
+
+@reg_bp.route('/registraties/<int:reg_id>/verwijder', methods=['POST'])
+@login_required
+@writer_required
+def verwijderen(reg_id):
+    from flask import abort
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    reg = db.get_or_404(Registration, reg_id)
+
+    if reg.organisatie_id != org_id:
+        abort(403)
+
+    db.session.delete(reg)
+    db.session.commit()
+    flash(f'Registratie {reg.registratienummer} is succesvol verwijderd.', 'success')
+    return redirect(url_for('reg.lijst'))

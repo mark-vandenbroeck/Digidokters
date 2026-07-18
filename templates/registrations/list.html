@@ -101,10 +101,19 @@
                                class="btn btn-sm btn-outline-secondary" title="Bekijken">
                                 <i class="bi bi-eye"></i>
                             </a>
+                            {% if not current_user.is_lezer() %}
                             <a href="{{ url_for('reg.wijzigen', reg_id=r.id) }}"
                                class="btn btn-sm btn-outline-primary ms-1" title="Wijzigen">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            <form action="{{ url_for('reg.verwijderen', reg_id=r.id) }}" method="POST" class="d-inline ms-1"
+                                  onsubmit="return confirm('Weet u zeker dat u deze registratie wilt verwijderen?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

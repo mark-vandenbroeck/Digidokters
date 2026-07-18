@@ -27,7 +27,7 @@
 </head>
 <body>
 
-{% if current_user.is_authenticated and session.get('organisatie_id') %}
+{% if current_user.is_authenticated and (session.get('organisatie_id') or current_user.rol == 'platformbeheerder') %}
 <!-- ═══════════════════════════════════════════════════════════ SIDEBAR LAYOUT -->
 
 <!-- Mobile topbar -->

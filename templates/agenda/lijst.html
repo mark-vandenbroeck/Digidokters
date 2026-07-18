@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Agenda – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-calendar-event me-2 text-primary"></i>Agenda</h1>
+        <p class="dd-page-subtitle mb-0">Activiteiten en bijeenkomsten</p>
+    </div>
+    {% if kan_schrijven %}
+    <a href="{{ url_for('agenda.nieuw') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>Nieuwe activiteit
+    </a>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-3">Datum</th>
+                        <th>Tijdstip</th>
+                        <th>Activiteit</th>
+                        <th>Locatie</th>
+                        <th>Omschrijving</th>
+                        <th>Digidokters</th>
+                        {% if kan_schrijven %}
+                        <th class="pe-3 text-end">Acties</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if not items %}
+                    <tr>
+                        <td colspan="{% if kan_schrijven %}7{% else %}6{% endif %}" class="text-center py-4 text-muted">
+                            <em>Geen agenda-items gevonden.</em>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% for item in items %}
+                    <tr>
+                        <td class="ps-3 fw-medium text-nowrap">{{ item.datum.strftime('%d/%m/%Y') }}</td>
+                        <td class="text-nowrap">{{ item.uur_van }} - {{ item.uur_tot }}</td>
+                        <td>
+                            <span class="badge bg-blue-soft text-blue">{{ item.type.naam }}</span>
+                        </td>
+                        <td>{{ item.locatie.naam }}</td>
+                        <td>{{ item.omschrijving or '<span class="text-muted fst-italic">Geen</span>'|safe }}</td>
+                        <td>
+                            {% for dd in item.digidokters %}
+                            <span class="badge bg-secondary mb-1">{{ dd.naam }}</span>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endfor %}
+                        </td>
+                        {% if kan_schrijven %}
+                        <td class="pe-3 text-end text-nowrap">
+                            <a href="{{ url_for('agenda.wijzigen', item_id=item.id) }}"
+                               class="btn btn-sm btn-outline-primary" title="Wijzigen">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form action="{{ url_for('agenda.verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u dit agenda-item wilt verwijderen?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

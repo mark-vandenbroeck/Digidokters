@@ -53,6 +53,10 @@ def organisatie_nieuw():
         org = Organisatie(naam=naam, slug=slug, actief=actief)
         db.session.add(org)
         db.session.commit()
+        
+        from utils.tenant import seed_organisatie_defaults
+        seed_organisatie_defaults(org.id)
+        
         flash(f'Organisatie {naam} aangemaakt.', 'success')
         return redirect(url_for('platform.organisaties'))
 

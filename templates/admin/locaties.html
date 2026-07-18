@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Beheer Locaties – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-geo-alt me-2 text-primary"></i>Locaties</h1>
+        <p class="dd-page-subtitle mb-0">Beheer de lijst met locaties</p>
+    </div>
+    <a href="{{ url_for('admin.locatie_nieuw') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Nieuwe locatie
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if items %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-3" style="width:60px">Sortering</th>
+                        <th>Naam</th>
+                        <th>Status</th>
+                        <th class="pe-3 text-end">Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="ps-3">
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('admin.locatie_volgorde', item_id=item.id, richting='omhoog') }}"
+                                   class="btn btn-light btn-sort {% if loop.first %}disabled{% endif %}" title="Omhoog">
+                                    <i class="bi bi-chevron-up"></i>
+                                </a>
+                                <a href="{{ url_for('admin.locatie_volgorde', item_id=item.id, richting='omlaag') }}"
+                                   class="btn btn-light btn-sort {% if loop.last %}disabled{% endif %}" title="Omlaag">
+                                    <i class="bi bi-chevron-down"></i>
+                                </a>
+                            </div>
+                        </td>
+                        <td class="fw-medium">{{ item.naam }}</td>
+                        <td>
+                            {% if item.actief %}
+                            <span class="badge bg-success">Actief</span>
+                            {% else %}
+                            <span class="badge bg-dark">Gedeactiveerd</span>
+                            {% endif %}
+                        </td>
+                        <td class="pe-3 text-end text-nowrap">
+                            <a href="{{ url_for('admin.locatie_wijzigen', item_id=item.id) }}"
+                               class="btn btn-sm btn-outline-primary" title="Wijzigen">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{{ url_for('admin.locatie_toggle', item_id=item.id) }}"
+                               class="btn btn-sm {% if item.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
+                               title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
+                                <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-geo-alt fs-1 text-muted mb-3 d-block"></i>
+            <p class="text-muted">Geen locaties gedefinieerd.</p>
+            <a href="{{ url_for('admin.locatie_nieuw') }}" class="btn btn-sm btn-primary">Eerste toevoegen</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

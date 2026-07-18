@@ -31,3 +31,42 @@ def set_organisatie_id_op_model(instance):
     org_id = get_huidige_organisatie_id()
     if org_id is not None:
         instance.organisatie_id = org_id
+
+
+def seed_organisatie_defaults(org_id):
+    """Seed de standaard gegevens (leeftijdscategorieën, toestellen, activiteitstypes, locaties) voor een nieuwe organisatie."""
+    from models.age_category import AgeCategory
+    from models.device import Device
+    from models.activity_type import ActivityType
+    from models.location import Location
+    from models.digidokter import Digidokter
+
+    # Digidokters
+    if not Digidokter.query.filter_by(organisatie_id=org_id).first():
+        for i, name in enumerate(['Mark', 'Jan', 'Els']):
+            db.session.add(Digidokter(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+
+    # Leeftijdscategorieën
+    if not AgeCategory.query.filter_by(organisatie_id=org_id).first():
+        for i, name in enumerate(['Jonger dan 18', '18 - 30', '31 - 60', '60+']):
+            db.session.add(AgeCategory(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+
+    # Toestellen
+    if not Device.query.filter_by(organisatie_id=org_id).first():
+        for i, name in enumerate([
+            'Smartphone Android', 'Smartphone iPhone', 'Tablet Android', 'iPad',
+            'Laptop Windows', 'MacBook', 'Ander toestel'
+        ]):
+            db.session.add(Device(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+
+    # Activiteitstypes
+    if not ActivityType.query.filter_by(organisatie_id=org_id).first():
+        for i, name in enumerate(['Digidokters', 'Digicafé', 'Lunchvergadering']):
+            db.session.add(ActivityType(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+
+    # Locaties
+    if not Location.query.filter_by(organisatie_id=org_id).first():
+        for i, name in enumerate(['Bib Londerzeel', 'Buurttafel', 'Brouwerij De Palm']):
+            db.session.add(Location(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+
+    db.session.commit()

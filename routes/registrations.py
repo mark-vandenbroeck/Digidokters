@@ -7,6 +7,7 @@ from models.registration import Registration
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
+from utils.decorators import writer_required
 
 reg_bp = Blueprint('reg', __name__)
 
@@ -80,6 +81,7 @@ def lijst():
 
 @reg_bp.route('/registraties/nieuw', methods=['GET', 'POST'])
 @login_required
+@writer_required
 def nieuw():
     keuzes = _keuzelijsten()
 
@@ -176,6 +178,7 @@ def bekijken(reg_id):
 
 @reg_bp.route('/registraties/<int:reg_id>/wijzig', methods=['GET', 'POST'])
 @login_required
+@writer_required
 def wijzigen(reg_id):
     from utils.tenant import get_huidige_organisatie_id
     org_id = get_huidige_organisatie_id()

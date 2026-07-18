@@ -1,4 +1,4 @@
-"""Beheer routes: gebruikers, digidokters, leeftijdscategorieën, toestellen."""
+"""Beheer routes: gebruikers, digidokters, leeftijdscategorieën, toestellen, activiteitstypes, locaties."""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
@@ -7,6 +7,8 @@ from models.user import User
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
+from models.activity_type import ActivityType
+from models.location import Location
 from utils.decorators import admin_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/beheer')
@@ -488,6 +490,35 @@ def backup():
             'gewijzigd_op': r.gewijzigd_op.isoformat() if r.gewijzigd_op else None
         })
         
+    activity_types_data = []
+    for at in ActivityType.query.filter_by(organisatie_id=org_id).all():
+        activity_types_data.append({
+            'naam': at.naam,
+            'actief': at.actief,
+            'volgorde': at.volgorde
+        })
+
+    locations_data = []
+    for l in Location.query.filter_by(organisatie_id=org_id).all():
+        locations_data.append({
+            'naam': l.naam,
+            'actief': l.actief,
+            'volgorde': l.volgorde
+        })
+
+    agenda_items_data = []
+    from models.agenda import AgendaItem
+    for item in AgendaItem.query.filter_by(organisatie_id=org_id).all():
+        agenda_items_data.append({
+            'datum': item.datum.isoformat() if item.datum else None,
+            'uur_van': item.uur_van,
+            'uur_tot': item.uur_tot,
+            'type_naam': item.type.naam,
+            'locatie_naam': item.locatie.naam,
+            'omschrijving': item.omschrijving,
+            'digidokter_namen': [dd.naam for dd in item.digidokters]
+        })
+
     backup_dict = {
         'organisatie': {
             'naam': org.naam,
@@ -497,7 +528,10 @@ def backup():
         'digidokters': digidokters_data,
         'age_categories': age_cats_data,
         'devices': devices_data,
-        'registrations': registrations_data
+        'activity_types': activity_types_data,
+        'locations': locations_data,
+        'registrations': registrations_data,
+        'agenda_items': agenda_items_data
     }
     
     json_bytes = json.dumps(backup_dict, indent=2, ensure_ascii=False).encode('utf-8')
@@ -523,6 +557,8 @@ def restore():
     from models.age_category import AgeCategory
     from models.device import Device
     from models.registration import Registration
+    from models.activity_type import ActivityType
+    from models.location import Location
     import json
     from datetime import datetime, timezone
     
@@ -549,10 +585,14 @@ def restore():
         try:
             with db.session.begin_nested():
                 # 1. Verwijder bestaande organisatiegegevens
+                from models.agenda import AgendaItem
                 Registration.query.filter_by(organisatie_id=org_id).delete()
+                AgendaItem.query.filter_by(organisatie_id=org_id).delete()
                 Digidokter.query.filter_by(organisatie_id=org_id).delete()
                 AgeCategory.query.filter_by(organisatie_id=org_id).delete()
                 Device.query.filter_by(organisatie_id=org_id).delete()
+                ActivityType.query.filter_by(organisatie_id=org_id).delete()
+                Location.query.filter_by(organisatie_id=org_id).delete()
                 
                 # 2. Bewaar de huidige ingelogde user
                 huidige_user_id = current_user.id
@@ -683,7 +723,81 @@ def restore():
                         organisatie_id=org_id
                     )
                     db.session.add(r)
-            
+
+                # 8. Herstel activiteitstypes
+                activity_types_map = {}
+                if 'activity_types' in data:
+                    for at_data in data['activity_types']:
+                        at = ActivityType(
+                            naam=at_data['naam'],
+                            actief=at_data['actief'],
+                            volgorde=at_data['volgorde'],
+                            organisatie_id=org_id
+                        )
+                        db.session.add(at)
+                        db.session.flush()
+                        activity_types_map[at.naam] = at.id
+                else:
+                    for i, name in enumerate(['Digidokters', 'Digicafé', 'Lunchvergadering']):
+                        at = ActivityType(naam=name, actief=True, volgorde=i, organisatie_id=org_id)
+                        db.session.add(at)
+                        db.session.flush()
+                        activity_types_map[name] = at.id
+
+                # 9. Herstel locaties
+                locations_map = {}
+                if 'locations' in data:
+                    for l_data in data['locations']:
+                        l = Location(
+                            naam=l_data['naam'],
+                            actief=l_data['actief'],
+                            volgorde=l_data['volgorde'],
+                            organisatie_id=org_id
+                        )
+                        db.session.add(l)
+                        db.session.flush()
+                        locations_map[l.naam] = l.id
+                else:
+                    for i, name in enumerate(['Bib Londerzeel', 'Buurttafel', 'Brouwerij De Palm']):
+                        l = Location(naam=name, actief=True, volgorde=i, organisatie_id=org_id)
+                        db.session.add(l)
+                        db.session.flush()
+                        locations_map[name] = l.id
+
+                # 10. Herstel agenda-items
+                if 'agenda_items' in data:
+                    for item_data in data['agenda_items']:
+                        from datetime import datetime as dt
+                        datum = dt.fromisoformat(item_data['datum']).date() if item_data.get('datum') else None
+                        
+                        type_id = activity_types_map.get(item_data['type_name'])
+                        locatie_id = locations_map.get(item_data['locatie_name'])
+                        
+                        if not type_id:
+                            type_id = list(activity_types_map.values())[0] if activity_types_map else None
+                        if not locatie_id:
+                            locatie_id = list(locations_map.values())[0] if locations_map else None
+                            
+                        item = AgendaItem(
+                            datum=datum,
+                            uur_van=item_data['uur_van'],
+                            uur_tot=item_data['uur_tot'],
+                            type_id=type_id,
+                            locatie_id=locatie_id,
+                            omschrijving=item_data.get('omschrijving'),
+                            organisatie_id=org_id
+                        )
+                        
+                        selected_dds = []
+                        for dd_name in item_data.get('digidokter_namen', []):
+                            dd_id = digidokters_map.get(dd_name)
+                            if dd_id:
+                                d = db.session.get(Digidokter, dd_id)
+                                if d:
+                                    selected_dds.append(d)
+                        item.digidokters = selected_dds
+                        
+                        db.session.add(item)
             db.session.commit()
             flash('De organisatie-data is succesvol hersteld.', 'success')
             return redirect(url_for('admin.gebruikers'))
@@ -694,3 +808,155 @@ def restore():
             return redirect(url_for('admin.restore'))
             
     return render_template('admin/restore.html')
+
+
+# ─── Activiteitstypes ───────────────────────────────────────────────────────
+
+@admin_bp.route('/activiteitstypes')
+@login_required
+@admin_required
+def activiteitstypes():
+    from utils.tenant import filter_op_organisatie
+    items = filter_op_organisatie(ActivityType.query, ActivityType).order_by(ActivityType.volgorde, ActivityType.naam).all()
+    return render_template('admin/activiteitstypes.html', items=items)
+
+
+@admin_bp.route('/activiteitstypes/nieuw', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def activiteitstype_nieuw():
+    from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model
+    org_id = get_huidige_organisatie_id()
+    
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        if not naam:
+            flash('Naam is verplicht.', 'danger')
+            return render_template('admin/item_form.html', titel='Activiteitstype', actie='Toevoegen', item=None, terug_url=url_for('admin.activiteitstypes'))
+            
+        existing = ActivityType.query.filter_by(organisatie_id=org_id, naam=naam).first()
+        if existing:
+            flash('Dit activiteitstype bestaat al.', 'danger')
+            return render_template('admin/item_form.html', titel='Activiteitstype', actie='Toevoegen', item=None, form_data=request.form, terug_url=url_for('admin.activiteitstypes'))
+            
+        max_volgorde = db.session.query(db.func.max(ActivityType.volgorde)).filter_by(organisatie_id=org_id).scalar() or 0
+        item = ActivityType(naam=naam, actief=True, volgorde=max_volgorde + 1)
+        set_organisatie_id_op_model(item)
+        db.session.add(item)
+        db.session.commit()
+        flash(f'Activiteitstype {naam} toegevoegd.', 'success')
+        return redirect(url_for('admin.activiteitstypes'))
+        
+    return render_template('admin/item_form.html', titel='Activiteitstype', actie='Toevoegen', item=None, terug_url=url_for('admin.activiteitstypes'))
+
+
+@admin_bp.route('/activiteitstypes/<int:item_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def activiteitstype_wijzigen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(ActivityType, item_id)
+    
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+        
+    if request.method == 'POST':
+        item.naam = request.form.get('naam', item.naam).strip()
+        item.actief = request.form.get('actief') == 'on'
+        db.session.commit()
+        flash(f'{item.naam} bijgewerkt.', 'success')
+        return redirect(url_for('admin.activiteitstypes'))
+    return render_template('admin/item_form.html', titel='Activiteitstype', actie='Wijzigen',
+                           item=item, terug_url=url_for('admin.activiteitstypes'))
+
+
+@admin_bp.route('/activiteitstypes/<int:item_id>/toggle')
+@login_required
+@admin_required
+def activiteitstype_toggle(item_id):
+    return _beheer_toggle(ActivityType, item_id, 'admin.activiteitstypes')
+
+
+@admin_bp.route('/activiteitstypes/<int:item_id>/volgorde/<richting>')
+@login_required
+@admin_required
+def activiteitstype_volgorde(item_id, richting):
+    return _beheer_volgorde(ActivityType, item_id, richting, 'admin.activiteitstypes')
+
+
+# ─── Locaties ───────────────────────────────────────────────────────────────
+
+@admin_bp.route('/locaties')
+@login_required
+@admin_required
+def locaties():
+    from utils.tenant import filter_op_organisatie
+    items = filter_op_organisatie(Location.query, Location).order_by(Location.volgorde, Location.naam).all()
+    return render_template('admin/locaties.html', items=items)
+
+
+@admin_bp.route('/locaties/nieuw', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def locatie_nieuw():
+    from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model
+    org_id = get_huidige_organisatie_id()
+    
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        if not naam:
+            flash('Naam is verplicht.', 'danger')
+            return render_template('admin/item_form.html', titel='Locatie', actie='Toevoegen', item=None, terug_url=url_for('admin.locaties'))
+            
+        existing = Location.query.filter_by(organisatie_id=org_id, naam=naam).first()
+        if existing:
+            flash('Deze locatie bestaat al.', 'danger')
+            return render_template('admin/item_form.html', titel='Locatie', actie='Toevoegen', item=None, form_data=request.form, terug_url=url_for('admin.locaties'))
+            
+        max_volgorde = db.session.query(db.func.max(Location.volgorde)).filter_by(organisatie_id=org_id).scalar() or 0
+        item = Location(naam=naam, actief=True, volgorde=max_volgorde + 1)
+        set_organisatie_id_op_model(item)
+        db.session.add(item)
+        db.session.commit()
+        flash(f'Locatie {naam} toegevoegd.', 'success')
+        return redirect(url_for('admin.locaties'))
+        
+    return render_template('admin/item_form.html', titel='Locatie', actie='Toevoegen', item=None, terug_url=url_for('admin.locaties'))
+
+
+@admin_bp.route('/locaties/<int:item_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def locatie_wijzigen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Location, item_id)
+    
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+        
+    if request.method == 'POST':
+        item.naam = request.form.get('naam', item.naam).strip()
+        item.actief = request.form.get('actief') == 'on'
+        db.session.commit()
+        flash(f'{item.naam} bijgewerkt.', 'success')
+        return redirect(url_for('admin.locaties'))
+    return render_template('admin/item_form.html', titel='Locatie', actie='Wijzigen',
+                           item=item, terug_url=url_for('admin.locaties'))
+
+
+@admin_bp.route('/locaties/<int:item_id>/toggle')
+@login_required
+@admin_required
+def locatie_toggle(item_id):
+    return _beheer_toggle(Location, item_id, 'admin.locaties')
+
+
+@admin_bp.route('/locaties/<int:item_id>/volgorde/<richting>')
+@login_required
+@admin_required
+def locatie_volgorde(item_id, richting):
+    return _beheer_volgorde(Location, item_id, richting, 'admin.locaties')

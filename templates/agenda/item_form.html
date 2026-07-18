@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}{{ actie }} Agenda-item – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-12 col-md-10 col-lg-8">
+
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <a href="{{ url_for('agenda.lijst') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="dd-page-title mb-0">{{ actie }} Agenda-item</h1>
+    </div>
+    <p class="dd-page-subtitle mb-4">Vul de details van de activiteit in.</p>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="datum" class="form-label">Datum <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="datum" name="datum" 
+                               value="{{ form_data.datum if form_data else (item.datum.isoformat() if item and item.datum else '') }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="uur_van" class="form-label">Van (HH:MM) <span class="text-danger">*</span></label>
+                        <input type="time" class="form-control" id="uur_van" name="uur_van" 
+                               value="{{ form_data.uur_van if form_data else (item.uur_van if item else '') }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="uur_tot" class="form-label">Tot (HH:MM) <span class="text-danger">*</span></label>
+                        <input type="time" class="form-control" id="uur_tot" name="uur_tot" 
+                               value="{{ form_data.uur_tot if form_data else (item.uur_tot if item else '') }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="type_id" class="form-label">Type activiteit <span class="text-danger">*</span></label>
+                        <select class="form-select" id="type_id" name="type_id" required>
+                            <option value="">— Kies type —</option>
+                            {% for t in types %}
+                            <option value="{{ t.id }}" 
+                                    {% if (form_data.type_id|int if form_data else (item.type_id if item else 0)) == t.id %}selected{% endif %}>
+                                {{ t.naam }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="locatie_id" class="form-label">Locatie <span class="text-danger">*</span></label>
+                        <select class="form-select" id="locatie_id" name="locatie_id" required>
+                            <option value="">— Kies locatie —</option>
+                            {% for l in locaties %}
+                            <option value="{{ l.id }}" 
+                                    {% if (form_data.locatie_id|int if form_data else (item.locatie_id if item else 0)) == l.id %}selected{% endif %}>
+                                {{ l.naam }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="omschrijving" class="form-label">Omschrijving</label>
+                    <textarea class="form-control" id="omschrijving" name="omschrijving" rows="3" 
+                              placeholder="Korte toelichting over de activiteit...">{{ form_data.omschrijving if form_data else (item.omschrijving if item else '') }}</textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label d-block fw-semibold">Gekoppelde Digidokters</label>
+                    <div class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
+                        {% set checked_ids = [] %}
+                        {% if form_data %}
+                            {% set dummy = checked_ids.extend(request.form.getlist('digidokter_ids', type=int)) %}
+                        {% elif item %}
+                            {% set dummy = checked_ids.extend(item.digidokters|map(attribute='id')) %}
+                        {% endif %}
+                        
+                        {% for dd in digidokters %}
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="digidokter_ids" value="{{ dd.id }}" id="dd_{{ dd.id }}"
+                                   {% if dd.id in checked_ids %}checked{% endif %}>
+                            <label class="form-check-label" for="dd_{{ dd.id }}">
+                                {{ dd.naam }}
+                            </label>
+                        </div>
+                        {% else %}
+                        <span class="text-muted fst-italic">Geen actieve digidokters gevonden om te koppelen.</span>
+                        {% endfor %}
+                    </div>
+                    <div class="form-text">Selecteer de digidokters die bij deze activiteit aanwezig zullen zijn.</div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>Opslaan
+                    </button>
+                    <a href="{{ url_for('agenda.lijst') }}" class="btn btn-outline-secondary">Annuleren</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}

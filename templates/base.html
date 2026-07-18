@@ -123,10 +123,17 @@
                 <i class="bi bi-clipboard2-pulse"></i>
                 <span>Registraties</span>
             </a>
+            {% if not current_user.is_lezer() %}
             <a href="{{ url_for('reg.nieuw') }}"
                class="dd-nav-link {% if request.endpoint == 'reg.nieuw' %}active{% endif %}">
                 <i class="bi bi-plus-circle"></i>
                 <span>Nieuw bezoek</span>
+            </a>
+            {% endif %}
+            <a href="{{ url_for('agenda.lijst') }}"
+               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('agenda.') %}active{% endif %}">
+                <i class="bi bi-calendar-event"></i>
+                <span>Agenda</span>
             </a>
 
             {% if current_user.is_beheerder() and session.get('organisatie_id') %}
@@ -141,6 +148,16 @@
                class="dd-nav-link {% if request.endpoint and 'digidokter' in request.endpoint %}active{% endif %}">
                 <i class="bi bi-person-badge"></i>
                 <span>Digidokters</span>
+            </a>
+            <a href="{{ url_for('admin.activiteitstypes') }}"
+               class="dd-nav-link {% if request.endpoint and 'activiteitstype' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-tags"></i>
+                <span>Activiteitstypes</span>
+            </a>
+            <a href="{{ url_for('admin.locaties') }}"
+               class="dd-nav-link {% if request.endpoint and 'locatie' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-geo-alt"></i>
+                <span>Locaties</span>
             </a>
             <a href="{{ url_for('admin.leeftijdscategorieën') }}"
                class="dd-nav-link {% if request.endpoint and 'leeftijd' in request.endpoint %}active{% endif %}">

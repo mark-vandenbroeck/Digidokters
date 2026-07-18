@@ -35,6 +35,18 @@ class User(UserMixin, db.Model):
                 return False
         return self.rol == 'beheerder'
 
+    def is_lezer(self):
+        if self.rol == 'platformbeheerder':
+            return False
+        from flask import session, has_request_context
+        if has_request_context():
+            org_id = session.get('organisatie_id')
+            if org_id:
+                for uo in self.user_organisaties:
+                    if uo.organisatie_id == org_id and uo.actief:
+                        return uo.rol == 'lezer'
+        return self.rol == 'lezer'
+
     def __repr__(self):
         return f'<User {self.naam}>'
 

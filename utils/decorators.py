@@ -48,3 +48,25 @@ def platform_admin_required(f):
             return redirect(url_for('reg.lijst'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+def writer_required(f):
+    """Decorator: vereist dat de gebruiker medewerker of beheerder is (niet lezer)."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login'))
+        
+        org_id = session.get('organisatie_id')
+        if not org_id:
+            return redirect(url_for('auth.select_org'))
+            
+        if current_user.rol == 'platformbeheerder':
+            return f(*args, **kwargs)
+            
+        uo = next((x for x in current_user.user_organisaties if x.organisatie_id == org_id and x.actief and x.organisatie.actief), None)
+        if not uo or uo.rol == 'lezer':
+            flash('U heeft geen schrijfrechten voor deze organisatie.', 'danger')
+            return redirect(url_for('reg.lijst'))
+        return f(*args, **kwargs)
+    return decorated_function

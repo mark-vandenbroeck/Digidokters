@@ -25,7 +25,7 @@ def create_app(config_class=Config):
     os.makedirs(app.config['IMPORT_LOG_FOLDER'], exist_ok=True)
 
     # Importeer modellen zodat Flask-Migrate ze detecteert
-    from models import user, digidokter, age_category, device, registration, organisatie  # noqa: F401
+    from models import user, digidokter, age_category, device, registration, organisatie, activity_type, location, agenda  # noqa: F401
 
     # Registreer blueprints
     from routes.auth import auth_bp
@@ -34,6 +34,7 @@ def create_app(config_class=Config):
     from routes.import_export import ie_bp
     from routes.stats import stats_bp
     from routes.platform import platform_bp
+    from routes.agenda import agenda_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(reg_bp)
@@ -41,6 +42,7 @@ def create_app(config_class=Config):
     app.register_blueprint(ie_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(platform_bp)
+    app.register_blueprint(agenda_bp)
 
     # Controleer de organisatie-context voor authenticated requests
     from flask import session, redirect, url_for, request, flash, g
@@ -151,6 +153,8 @@ def create_app(config_class=Config):
         from models.digidokter import Digidokter
         from models.age_category import AgeCategory
         from models.device import Device
+        from models.activity_type import ActivityType
+        from models.location import Location
         from werkzeug.security import generate_password_hash
 
         # 1. Seed Organisatie
@@ -165,7 +169,7 @@ def create_app(config_class=Config):
 
         # 2. Seed Admin User
         admin_email = 'mark.vandenbroeck@gmail.com'
-        admin = User.query.filter_by(email=admin_email).first()
+        admin = User.query.filter((User.email == admin_email) | (User.naam == 'Mark')).first()
         if not admin:
             admin = User(
                 naam='Mark',
@@ -219,6 +223,20 @@ def create_app(config_class=Config):
             db.session.commit()
             print("✓ Toestellen geïnitialiseerd voor standaard organisatie")
 
+        # 7. Seed Activiteitstypes
+        if not ActivityType.query.filter_by(organisatie_id=default_org.id).first():
+            for i, name in enumerate(['Digidokters', 'Digicafé', 'Lunchvergadering']):
+                db.session.add(ActivityType(naam=name, actief=True, volgorde=i, organisatie_id=default_org.id))
+            db.session.commit()
+            print("✓ Activiteitstypes geïnitialiseerd voor standaard organisatie")
+
+        # 8. Seed Locaties
+        if not Location.query.filter_by(organisatie_id=default_org.id).first():
+            for i, name in enumerate(['Bib Londerzeel', 'Buurttafel', 'Brouwerij De Palm']):
+                db.session.add(Location(naam=name, actief=True, volgorde=i, organisatie_id=default_org.id))
+            db.session.commit()
+            print("✓ Locaties geïnitialiseerd voor standaard organisatie")
+
     # CLI-commando: flask create-org <naam> <slug>
     import click
     @app.cli.command('create-org')
@@ -233,7 +251,11 @@ def create_app(config_class=Config):
         org = Organisatie(naam=naam, slug=slug, actief=True)
         db.session.add(org)
         db.session.commit()
-        print(f'✓ Organisatie "{naam}" aangemaakt met slug "{slug}"')
+        
+        from utils.tenant import seed_organisatie_defaults
+        seed_organisatie_defaults(org.id)
+        
+        print(f'✓ Organisatie "{naam}" aangemaakt met slug "{slug}" (met standaard data)')
 
     return app
 

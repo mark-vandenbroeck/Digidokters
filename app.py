@@ -8,12 +8,14 @@ from sqlalchemy import event
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    try:
-        cursor.execute("PRAGMA foreign_keys=ON")
-    except Exception:
-        pass
-    cursor.close()
+    # Enkel uitvoeren op SQLite databaseverbindingen
+    if 'sqlite' in str(type(dbapi_connection)).lower():
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        except Exception:
+            pass
+        cursor.close()
 
 
 def create_app(config_class=Config):

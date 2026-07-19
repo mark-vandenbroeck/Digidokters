@@ -251,7 +251,7 @@ def digidokter_nieuw():
                                    item=None, terug_url=url_for('admin.digidokters'))
         max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).filter(Digidokter.organisatie_id == org_id).scalar() or 0
         db.session.add(Digidokter(naam=naam, volgorde=max_volgorde + 1, organisatie_id=org_id,
-                                  actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
+                                  actief=request.form.get('actief') == 'on'))
         db.session.commit()
         flash(f'Digidokter {naam} toegevoegd.', 'success')
         return redirect(url_for('admin.digidokters'))

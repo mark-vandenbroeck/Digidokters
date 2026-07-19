@@ -178,10 +178,10 @@ def nieuw():
         selected_digidokters = []
         for d_id in digidokter_ids:
             d = db.session.get(Digidokter, d_id)
-            if d and d.organisatie_id == org_id:
+            if d and d.organisatie_id == org_id and d.actief:
                 selected_digidokters.append(d)
             else:
-                fouten.append(f'Ongeldige digidokter geselecteerd (ID: {d_id}).')
+                fouten.append(f'Ongeldige of inactieve digidokter geselecteerd (ID: {d_id}).')
 
         is_terugkerend = request.form.get('is_terugkerend') == 'on'
         interval = request.form.get('interval') if is_terugkerend else None
@@ -328,10 +328,10 @@ def wijzigen(item_id):
         selected_digidokters = []
         for d_id in digidokter_ids:
             d = db.session.get(Digidokter, d_id)
-            if d and d.organisatie_id == org_id:
+            if d and d.organisatie_id == org_id and d.actief:
                 selected_digidokters.append(d)
             else:
-                fouten.append(f'Ongeldige digidokter geselecteerd (ID: {d_id}).')
+                fouten.append(f'Ongeldige of inactieve digidokter geselecteerd (ID: {d_id}).')
 
         if fouten:
             for f in fouten:

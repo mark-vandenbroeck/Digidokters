@@ -172,6 +172,108 @@ def overzicht():
     per_week_vorig_jaar = [tellingen_vorig.get(w, 0) if w <= laatste_week_vorig else None
                             for w in range(1, max_weken + 1)]
 
+    # ---------------------------------------------------------
+    # AGENDA & VRIJWILLIGERS STATISTIEKEN (Nieuwe Tab)
+    # ---------------------------------------------------------
+    from models.agenda import AgendaItem
+    from models.location import Location
+    from models.activity_type import ActivityType
+
+    # Haal agenda-items op van dit jaar voor deze organisatie
+    agenda_items = (
+        AgendaItem.query
+        .filter(AgendaItem.organisatie_id == org_id, extract('year', AgendaItem.datum) == jaar)
+        .all()
+    )
+
+    totaal_sessies = len(agenda_items)
+    
+    # Berekening uren
+    def calc_duration_hours(item):
+        try:
+            h1, m1 = map(int, item.uur_van.split(':'))
+            h2, m2 = map(int, item.uur_tot.split(':'))
+            t1 = h1 + m1 / 60.0
+            t2 = h2 + m2 / 60.0
+            return max(0.0, t2 - t1)
+        except Exception:
+            return 0.0
+
+    totaal_vrijwilligersuren = 0.0
+    actieve_vrijwilligers_set = set()
+    
+    hours_per_digidokter = {}
+    sessions_per_digidokter = {}
+    sessions_per_location = {}
+    sessions_per_type = {}
+    hours_per_month_dict = {m: 0.0 for m in range(1, 13)}
+
+    for item in agenda_items:
+        duration = calc_duration_hours(item)
+        num_vols = len(item.digidokters)
+        totaal_vrijwilligersuren += duration * num_vols
+        
+        # Maandelijkse uren
+        m = item.datum.month
+        hours_per_month_dict[m] = hours_per_month_dict.get(m, 0.0) + (duration * num_vols)
+        
+        # Locatie aggregatie
+        loc_naam = item.locatie.naam if item.locatie else 'Onbekende locatie'
+        sessions_per_location[loc_naam] = sessions_per_location.get(loc_naam, 0) + 1
+        
+        # Type aggregatie
+        type_naam = item.type.naam if item.type else 'Onbekend type'
+        sessions_per_type[type_naam] = sessions_per_type.get(type_naam, 0) + 1
+        
+        # Digidokters aggregatie
+        for dd in item.digidokters:
+            actieve_vrijwilligers_set.add(dd.id)
+            hours_per_digidokter[dd.naam] = hours_per_digidokter.get(dd.naam, 0.0) + duration
+            sessions_per_digidokter[dd.naam] = sessions_per_digidokter.get(dd.naam, 0) + 1
+
+    totaal_actieve_vrijwilligers = len(actieve_vrijwilligers_set)
+    
+    # Sorteer inzet per digidokter op uren desc
+    vrijwilligers_inzet = []
+    for naam in sorted(sessions_per_digidokter.keys()):
+        vrijwilligers_inzet.append({
+            'naam': naam,
+            'sessies': sessions_per_digidokter[naam],
+            'uren': round(hours_per_digidokter[naam], 1)
+        })
+    vrijwilligers_inzet = sorted(vrijwilligers_inzet, key=lambda x: x['uren'], reverse=True)
+
+    # Sorteer locaties en types op aantal sessies desc
+    locatie_bezetting = sorted(sessions_per_location.items(), key=lambda x: x[1], reverse=True)
+    type_bezetting = sorted(sessions_per_type.items(), key=lambda x: x[1], reverse=True)
+
+    # Maandelijkse uren trend
+    maand_labels = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
+    vrijwilligersuren_per_maand = [round(hours_per_month_dict[m], 1) for m in range(1, 13)]
+
+    # Druktest / ratio per dag
+    reg_counts = (
+        db.session.query(Registration.datum, func.count(Registration.id))
+        .filter(Registration.organisatie_id == org_id, extract('year', Registration.datum) == jaar)
+        .group_by(Registration.datum)
+        .all()
+    )
+    reg_counts_dict = {r[0]: r[1] for r in reg_counts}
+
+    sessions_ratio = []
+    for item in agenda_items:
+        vol_count = len(item.digidokters)
+        visit_count = reg_counts_dict.get(item.datum, 0)
+        ratio = round(visit_count / vol_count, 1) if vol_count > 0 else 0
+        sessions_ratio.append({
+            'datum': item.datum,
+            'omschrijving': item.omschrijving or item.type.naam,
+            'vrijwilligers': vol_count,
+            'bezoeken': visit_count,
+            'ratio': ratio
+        })
+    sessions_ratio = sorted(sessions_ratio, key=lambda x: x['datum'], reverse=True)[:10]
+
     return render_template(
         'stats/overview.html',
         jaar=jaar,
@@ -189,4 +291,15 @@ def overzicht():
         per_week=per_week,
         per_week_vorig_jaar=per_week_vorig_jaar,
         vorig_jaar=jaar - 1,
+        
+        # Agenda & Vrijwilligers
+        totaal_sessies=totaal_sessies,
+        totaal_vrijwilligersuren=round(totaal_vrijwilligersuren, 1),
+        totaal_actieve_vrijwilligers=totaal_actieve_vrijwilligers,
+        vrijwilligers_inzet=vrijwilligers_inzet,
+        locatie_bezetting=locatie_bezetting,
+        type_bezetting=type_bezetting,
+        maand_labels=maand_labels,
+        vrijwilligersuren_per_maand=vrijwilligersuren_per_maand,
+        sessions_ratio=sessions_ratio
     )

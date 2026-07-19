@@ -14,17 +14,102 @@
     {% endif %}
 </div>
 
+{% macro sort_link(col_name, display_text) %}
+    {% set target_dir = 'desc' if sort_by == col_name and direction == 'asc' else 'asc' %}
+    <a href="{{ url_for('agenda.lijst', sort_by=col_name, direction=target_dir, toon_verleden=('on' if toon_verleden else ''), datum_van=datum_van, datum_tot=datum_tot, type_id=filter_type_id, locatie_id=filter_locatie_id, digidokter_id=filter_digidokter_id) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+        {{ display_text }}
+        {% if sort_by == col_name %}
+            {% if direction == 'asc' %}
+                <i class="bi bi-arrow-up-short"></i>
+            {% else %}
+                <i class="bi bi-arrow-down-short"></i>
+            {% endif %}
+        {% else %}
+            <i class="bi bi-arrow-down-up text-muted" style="font-size: 0.8em; opacity: 0.4;"></i>
+        {% endif %}
+    </a>
+{% endmacro %}
+
+<!-- Zoekbalk & filters -->
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <form method="GET" action="{{ url_for('agenda.lijst') }}">
+            <!-- We behouden de actieve sortering -->
+            <input type="hidden" name="sort_by" value="{{ sort_by }}">
+            <input type="hidden" name="direction" value="{{ direction }}">
+
+            <div class="row g-2 align-items-end">
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1">Datum van</label>
+                    <input type="date" class="form-control form-control-sm" name="datum_van" value="{{ datum_van }}">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1">Datum tot</label>
+                    <input type="date" class="form-control form-control-sm" name="datum_tot" value="{{ datum_tot }}">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1">Activiteit</label>
+                    <select class="form-select form-select-sm" name="type_id">
+                        <option value="0">Alle</option>
+                        {% for t in types %}
+                        <option value="{{ t.id }}" {{ 'selected' if t.id == filter_type_id }}>{{ t.naam }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1">Locatie</label>
+                    <select class="form-select form-select-sm" name="locatie_id">
+                        <option value="0">Alle</option>
+                        {% for l in locaties %}
+                        <option value="{{ l.id }}" {{ 'selected' if l.id == filter_locatie_id }}>{{ l.naam }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1">Digidokter</label>
+                    <select class="form-select form-select-sm" name="digidokter_id">
+                        <option value="0">Alle</option>
+                        {% for d in digidokters %}
+                        <option value="{{ d.id }}" {{ 'selected' if d.id == filter_digidokter_id }}>{{ d.naam }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-funnel me-1"></i>Filteren
+                    </button>
+                    <a href="{{ url_for('agenda.lijst') }}" class="btn btn-outline-secondary btn-sm" title="Filters resetten">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-2 align-items-center mt-2">
+                <div class="col-12">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" name="toon_verleden" id="toon_verleden"
+                               {% if toon_verleden %}checked{% endif %} onchange="this.form.submit()">
+                        <label class="form-check-label small" for="toon_verleden">
+                            Toon ook voorbije activiteiten
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>
                     <tr>
-                        <th class="ps-3">Datum</th>
-                        <th>Tijdstip</th>
-                        <th>Activiteit</th>
-                        <th>Locatie</th>
-                        <th>Omschrijving</th>
+                        <th class="ps-3">{{ sort_link('datum', 'Datum') }}</th>
+                        <th>{{ sort_link('tijd', 'Tijdstip') }}</th>
+                        <th>{{ sort_link('type', 'Activiteit') }}</th>
+                        <th>{{ sort_link('locatie', 'Locatie') }}</th>
+                        <th>{{ sort_link('omschrijving', 'Omschrijving') }}</th>
                         <th>Digidokters</th>
                         {% if kan_schrijven %}
                         <th class="pe-3 text-end">Acties</th>

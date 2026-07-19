@@ -23,17 +23,101 @@ def _keuzelijsten():
 @login_required
 def lijst():
     org_id = get_huidige_organisatie_id()
-    # Haal agenda-items op gesorteerd op datum en uur_van
-    items = filter_op_organisatie(AgendaItem.query, AgendaItem).order_by(AgendaItem.datum.desc(), AgendaItem.uur_van.desc()).all()
     
-    # We checken de rol van de actieve gebruiker om te bepalen of hij acties mag doen (nieuw/wijzig/verwijder)
+    # Haal filter parameters op
+    toon_verleden = request.args.get('toon_verleden') == 'on'
+    datum_van = request.args.get('datum_van', '').strip()
+    datum_tot = request.args.get('datum_tot', '').strip()
+    type_id = request.args.get('type_id', 0, type=int)
+    locatie_id = request.args.get('locatie_id', 0, type=int)
+    digidokter_id = request.args.get('digidokter_id', 0, type=int)
+    
+    # Haal sorteer parameters op
+    sort_by = request.args.get('sort_by', 'datum').strip()
+    direction = request.args.get('direction', 'asc').strip()
+    
+    # Bouw query op
+    query = filter_op_organisatie(AgendaItem.query, AgendaItem)
+    
+    # Datum filter: toon_verleden default = False (enkel toekomstig/vandaag)
+    if not toon_verleden:
+        query = query.filter(AgendaItem.datum >= date.today())
+        
+    if datum_van:
+        try:
+            query = query.filter(AgendaItem.datum >= date.fromisoformat(datum_van))
+        except ValueError:
+            pass
+            
+    if datum_tot:
+        try:
+            query = query.filter(AgendaItem.datum <= date.fromisoformat(datum_tot))
+        except ValueError:
+            pass
+            
+    if type_id:
+        query = query.filter(AgendaItem.type_id == type_id)
+        
+    if locatie_id:
+        query = query.filter(AgendaItem.locatie_id == locatie_id)
+        
+    if digidokter_id:
+        query = query.filter(AgendaItem.digidokters.any(Digidokter.id == digidokter_id))
+        
+    # Sortering toepassen
+    if sort_by == 'tijd':
+        if direction == 'desc':
+            query = query.order_by(AgendaItem.uur_van.desc())
+        else:
+            query = query.order_by(AgendaItem.uur_van.asc())
+    elif sort_by == 'type':
+        query = query.join(ActivityType, AgendaItem.type_id == ActivityType.id)
+        if direction == 'desc':
+            query = query.order_by(ActivityType.naam.desc())
+        else:
+            query = query.order_by(ActivityType.naam.asc())
+    elif sort_by == 'locatie':
+        query = query.join(Location, AgendaItem.locatie_id == Location.id)
+        if direction == 'desc':
+            query = query.order_by(Location.naam.desc())
+        else:
+            query = query.order_by(Location.naam.asc())
+    elif sort_by == 'omschrijving':
+        if direction == 'desc':
+            query = query.order_by(AgendaItem.omschrijving.desc())
+        else:
+            query = query.order_by(AgendaItem.omschrijving.asc())
+    else:  # sort_by == 'datum'
+        if direction == 'desc':
+            query = query.order_by(AgendaItem.datum.desc(), AgendaItem.uur_van.desc())
+        else:
+            query = query.order_by(AgendaItem.datum.asc(), AgendaItem.uur_van.asc())
+            
+    items = query.all()
+    
+    # Keuzelijsten voor de filters
+    keuzes = _keuzelijsten()
+    
     kan_schrijven = True
     if current_user.rol != 'platformbeheerder':
         uo = next((x for x in current_user.user_organisaties if x.organisatie_id == org_id and x.actief and x.organisatie.actief), None)
         if not uo or uo.rol == 'lezer':
             kan_schrijven = False
 
-    return render_template('agenda/lijst.html', items=items, kan_schrijven=kan_schrijven)
+    return render_template(
+        'agenda/lijst.html',
+        items=items,
+        kan_schrijven=kan_schrijven,
+        toon_verleden=toon_verleden,
+        datum_van=datum_van,
+        datum_tot=datum_tot,
+        filter_type_id=type_id,
+        filter_locatie_id=locatie_id,
+        filter_digidokter_id=digidokter_id,
+        sort_by=sort_by,
+        direction=direction,
+        **keuzes
+    )
 
 @agenda_bp.route('/agenda/nieuw', methods=['GET', 'POST'])
 @login_required

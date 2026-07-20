@@ -171,6 +171,14 @@ def create_app(config_class=Config):
         from models.location import Location
         from werkzeug.security import generate_password_hash
 
+        # 0. Schoning inactieve e-mailteksten ('none', 'null', '') naar SQL NULL
+        try:
+            db.session.execute(db.text("UPDATE users SET email = NULL WHERE LOWER(email) IN ('none', 'null', '', 'n/a');"))
+            db.session.commit()
+            print('✓ E-mailadressen in database opgeschoond naar NULL')
+        except Exception:
+            db.session.rollback()
+
         # 1. Seed Organisatie
         default_org = Organisatie.query.filter_by(slug='digidokters').first()
         if not default_org:

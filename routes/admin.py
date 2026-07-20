@@ -38,7 +38,8 @@ def gebruiker_nieuw():
 
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
-        email = request.form.get('email', '').strip().lower() or None
+        email_raw = request.form.get('email', '').strip().lower()
+        email = email_raw if email_raw and email_raw not in ('none', 'null', 'undefined', 'n/a', '') else None
         rol = request.form.get('rol', 'medewerker')
         tijdelijk_ww = request.form.get('wachtwoord', '').strip()
 
@@ -77,7 +78,7 @@ def gebruiker_nieuw():
             flash(f'Bestaande gebruiker {user.naam} gekoppeld aan de organisatie.', 'success')
             return redirect(url_for('admin.gebruikers'))
 
-        if email and User.query.filter_by(email=email).first():
+        if email and User.query.filter(db.func.lower(User.email) == email).first():
             flash('Dit e-mailadres is al in gebruik.', 'danger')
             return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
 
@@ -132,8 +133,26 @@ def gebruiker_wijzigen(user_id):
             flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
             return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
 
-        user.naam = request.form.get('naam', user.naam).strip()
-        user.email = request.form.get('email', '').strip().lower() or None
+        naam_in = request.form.get('naam', user.naam).strip()
+        email_raw = request.form.get('email', '').strip().lower()
+        email_in = email_raw if email_raw and email_raw not in ('none', 'null', 'undefined', 'n/a', '') else None
+
+        # Controleer unieke naam
+        if naam_in != user.naam:
+            bestaande_naam = User.query.filter(db.func.lower(User.naam) == naam_in.lower(), User.id != user.id).first()
+            if bestaande_naam:
+                flash(f'Gebruikersnaam {naam_in} is al in gebruik.', 'danger')
+                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
+
+        # Controleer unieke email
+        if email_in and email_in != user.email:
+            bestaande_email = User.query.filter(db.func.lower(User.email) == email_in, User.id != user.id).first()
+            if bestaande_email:
+                flash(f'Het e-mailadres {email_in} is al in gebruik door {bestaande_email.naam}.', 'danger')
+                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
+
+        user.naam = naam_in
+        user.email = email_in
         user.rol = rol
         membership.rol = 'beheerder' if rol == 'platformbeheerder' else rol
         
@@ -145,9 +164,14 @@ def gebruiker_wijzigen(user_id):
             user.wachtwoord_hash = generate_password_hash(nieuw_ww)
             user.moet_wachtwoord_wijzigen = True
             
-        db.session.commit()
-        flash(f'Gebruiker {user.naam} bijgewerkt.', 'success')
-        return redirect(url_for('admin.gebruikers'))
+        try:
+            db.session.commit()
+            flash(f'Gebruiker {user.naam} bijgewerkt.', 'success')
+            return redirect(url_for('admin.gebruikers'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fout bij opslaan van gebruiker: {str(e)}', 'danger')
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
 
     return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership)
 

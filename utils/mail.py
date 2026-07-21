@@ -87,9 +87,9 @@ Digidokters Systeem
         msg['To'] = ", ".join(ontvangers)
         
         if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
         else:
-            server = smtplib.SMTP(smtp_server, smtp_port)
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
             server.starttls()
             
         if smtp_username and smtp_password:

@@ -136,7 +136,19 @@
                 <span>Agenda</span>
             </a>
 
+            {% if not current_user.is_lezer() %}
+            <!-- Documentbeheer -->
+            <div class="dd-nav-section mt-3">Documentbeheer</div>
+            <a href="{{ url_for('doc.index') }}"
+               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('doc.') %}active{% endif %}">
+                <i class="bi bi-folder-symlink"></i>
+                <span>Documenten</span>
+            </a>
+            {% endif %}
+
+
             {% if current_user.is_beheerder() and session.get('organisatie_id') %}
+
             <!-- Beheer -->
             <div class="dd-nav-section mt-3">Beheer</div>
             <a href="{{ url_for('admin.gebruikers') }}"

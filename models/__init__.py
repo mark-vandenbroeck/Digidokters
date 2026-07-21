@@ -8,8 +8,11 @@ from .organisatie import Organisatie, UserOrganisatie
 from .activity_type import ActivityType
 from .location import Location
 from .agenda import AgendaItem
+from .document import Folder, Document
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
-    'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem'
+    'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem',
+    'Folder', 'Document'
 ]
+

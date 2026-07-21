@@ -49,6 +49,7 @@ def create_app(config_class=Config):
     from routes.stats import stats_bp
     from routes.platform import platform_bp
     from routes.agenda import agenda_bp
+    from routes.documents import doc_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(reg_bp)
@@ -57,6 +58,8 @@ def create_app(config_class=Config):
     app.register_blueprint(stats_bp)
     app.register_blueprint(platform_bp)
     app.register_blueprint(agenda_bp)
+    app.register_blueprint(doc_bp)
+
 
     # Controleer de organisatie-context voor authenticated requests
     from flask import session, redirect, url_for, request, flash, g

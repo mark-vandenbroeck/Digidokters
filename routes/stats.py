@@ -178,11 +178,17 @@ def overzicht():
     from models.agenda import AgendaItem
     from models.location import Location
     from models.activity_type import ActivityType
+    from sqlalchemy.orm import joinedload, selectinload
 
-    # Haal agenda-items op van dit jaar voor deze organisatie
+    # Haal agenda-items op van dit jaar voor deze organisatie met eager loading
     agenda_items = (
         AgendaItem.query
         .filter(AgendaItem.organisatie_id == org_id, extract('year', AgendaItem.datum) == jaar)
+        .options(
+            joinedload(AgendaItem.type),
+            joinedload(AgendaItem.locatie),
+            selectinload(AgendaItem.digidokters)
+        )
         .all()
     )
 

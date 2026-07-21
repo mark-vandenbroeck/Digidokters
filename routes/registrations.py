@@ -7,6 +7,7 @@ from models.registration import Registration
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
+from sqlalchemy.orm import joinedload
 from utils.decorators import writer_required
 
 reg_bp = Blueprint('reg', __name__)
@@ -40,7 +41,15 @@ def lijst():
     filter_datum_tot = request.args.get('datum_tot', '')
 
     from utils.tenant import filter_op_organisatie
-    query = filter_op_organisatie(Registration.query, Registration).order_by(Registration.datum.desc(), Registration.id.desc())
+    query = (
+        filter_op_organisatie(Registration.query, Registration)
+        .options(
+            joinedload(Registration.digidokter),
+            joinedload(Registration.leeftijdscategorie),
+            joinedload(Registration.toestel)
+        )
+        .order_by(Registration.datum.desc(), Registration.id.desc())
+    )
 
     if zoek:
         query = query.filter(

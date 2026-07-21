@@ -6,6 +6,7 @@ from models.agenda import AgendaItem
 from models.activity_type import ActivityType
 from models.location import Location
 from models.digidokter import Digidokter
+from sqlalchemy.orm import joinedload, selectinload
 from utils.decorators import writer_required
 from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model, filter_op_organisatie
 
@@ -36,8 +37,15 @@ def lijst():
     sort_by = request.args.get('sort_by', 'datum').strip()
     direction = request.args.get('direction', 'asc').strip()
     
-    # Bouw query op
-    query = filter_op_organisatie(AgendaItem.query, AgendaItem)
+    # Bouw query op met eager loading voor optimale performance (voorkomt N+1 queries)
+    query = (
+        filter_op_organisatie(AgendaItem.query, AgendaItem)
+        .options(
+            joinedload(AgendaItem.type),
+            joinedload(AgendaItem.locatie),
+            selectinload(AgendaItem.digidokters)
+        )
+    )
     
     # Datum filter: toon_verleden default = False (enkel toekomstig/vandaag)
     if not toon_verleden:

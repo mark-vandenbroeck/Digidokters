@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: digidokters
+    name: digidokters-eu
     env: python
     region: frankfurt
     plan: free

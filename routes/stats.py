@@ -267,18 +267,21 @@ def overzicht():
     reg_counts_dict = {r[0]: r[1] for r in reg_counts}
 
     sessions_ratio = []
+    today = date.today()
     for item in agenda_items:
-        vol_count = len(item.digidokters)
-        visit_count = reg_counts_dict.get(item.datum, 0)
-        ratio = round(visit_count / vol_count, 1) if vol_count > 0 else 0
-        sessions_ratio.append({
-            'datum': item.datum,
-            'omschrijving': item.omschrijving or item.type.naam,
-            'vrijwilligers': vol_count,
-            'bezoeken': visit_count,
-            'ratio': ratio
-        })
+        if item.datum <= today:
+            vol_count = len(item.digidokters)
+            visit_count = reg_counts_dict.get(item.datum, 0)
+            ratio = round(visit_count / vol_count, 1) if vol_count > 0 else 0
+            sessions_ratio.append({
+                'datum': item.datum,
+                'omschrijving': item.omschrijving or item.type.naam,
+                'vrijwilligers': vol_count,
+                'bezoeken': visit_count,
+                'ratio': ratio
+            })
     sessions_ratio = sorted(sessions_ratio, key=lambda x: x['datum'], reverse=True)[:10]
+
 
     return render_template(
         'stats/overview.html',

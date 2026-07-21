@@ -25,10 +25,12 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 
 ### Belangrijkste tabellen en datamodel:
 1.  **Organisaties (`organisaties`):** Beheert de verschillende tenants (bijv. Londerzeel).
-2.  **Gebruikers (`users`):** Beheert beheerders en medewerkers. Gekoppeld aan organisaties via `user_organisaties`.
+2.  **Gebruikers (`users`):** Beheert beheerders en medewerkers. Gekoppeld aan organisaties via `user_organisaties`. Tevens voorzien van wachtwoord-resetkolommen (`reset_code`, `reset_code_verloopt_op`).
 3.  **Digidokters (`digidokters`):** Vrijwilligers binnen een specifieke organisatie.
-4.  **Registraties (`registrations`):** Registratie van een cliëntbezoek (leeftijdscategorie, toestel, geslacht, gekoppelde digidokter, datum, omschrijving en nieuwe/terugkerende status).
-5.  **Agenda-items (`agenda_items`):** Geplande sessies met datum, begin-/eindtijd, type activiteit, locatie en de gekoppelde aanwezige digidokters.
+4.  **Registraties (`registrations`):** Registratie van een cliëntbezoek.
+5.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
+6.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
+7.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering.
 
 ---
 
@@ -42,13 +44,28 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   Ondersteunt eenmalige en terugkerende activiteiten (dagelijks, wekelijks, maandelijks) met een optionele einddatum.
 *   Uur- en datumfilters (toekomstige vs. voorbije activiteiten tonen).
 *   Sorteerbare kolommen op alle eigenschappen (datum, tijd, locatie, type, etc.).
+*   Aanpasbare status (actief/gedeactiveerd) en badgekleur per activiteitstype (Blauw, Teal, Paars, Oranje) die direct in de agenda-lijst worden getoond.
 
 ### 3. Statistieken & Dashboard
 Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 *   **Bezoekers & Consultaties:** Tijdlijn per week (jaar-op-jaar), maandelijkse verdelingen, meest populaire leeftijdscategorieën, toestellen, geslachtsverdeling en drukste dagen.
-*   **Vrijwilligers & Agenda:** Totaal aantal gepresteerde uren per digidokter, sessies per locatie en activiteitstype, urentrend per maand (Chart.js bar-chart) en de **Druktest ratio** (gemiddeld aantal bezoeken per aanwezige vrijwilliger per sessie).
+*   **Vrijwilligers & Agenda:** Totaal aantal gepresteerde uren per digidokter, sessies per locatie en activiteitstype, urentrend per maand en de **Druktest ratio** (gemiddeld aantal bezoeken per aanwezige vrijwilliger per sessie, uitsluitend berekend voor activiteiten in het verleden).
 
-### 4. CSV Import-script (`scripts/import_agenda.py`)
+### 4. Documentbeheer
+*   Volledige hiërarchische mappenstructuur per organisatie.
+*   Uploaden en downloaden van bestanden (PDF, Word, Excel, afbeeldingen) met een limiet van 16 MB per bestand.
+*   Binaire bestandsobjecten worden direct in de database opgeslagen (`LargeBinary`), zodat ze automatisch meegaan in databasebackups en isolatie.
+*   In-browser preview voor ondersteunde bestandstypen (zoals PDF en afbeeldingen).
+*   **Versiebeheer:** Mogelijkheid om bestaande documenten te overschrijven, waarbij het versienummer automatisch wordt verhoogd (v1, v2, v3...).
+*   Toegang is afgeschermd voor gebruikers met de rol `lezer`.
+
+### 5. Wachtwoord Vergeten & Herstelprocedure
+*   Ingebouwde herstelprocedure via het inlogscherm.
+*   Gebruikers voeren hun gebruikersnaam in en ontvangen een 6-cijferige verificatiecode op hun geregistreerde e-mailadres via de Brevo HTTPS REST API.
+*   De code heeft een verlooptijd van exact 30 minuten.
+*   Bij invoer van de juiste code kan de gebruiker een nieuw wachtwoord instellen dat direct wordt gevalideerd op complexiteitseisen.
+
+### 6. CSV Import-script (`scripts/import_agenda.py`)
 Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezigheden te importeren:
 *   **Naam-opschoning:** Filtert achternamen en toevoegingen (zoals `(bib)` of `(eenmalig)`) weg, zodat enkel de voornaam wordt gebruikt.
 *   **LukS-regel:** Vervangt alle namen die beginnen met `LukS` (case-insensitive) automatisch door `Luk`.

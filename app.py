@@ -127,16 +127,16 @@ def create_app(config_class=Config):
                 'message': 'Geef een ontvanger op via ?to=jouw-email@domain.com'
             }), 400
             
-        smtp_server = os.environ.get('SMTP_SERVER', 'smtp-relay.brevo.com')
-        smtp_port = int(os.environ.get('SMTP_PORT', '587'))
-        smtp_username = os.environ.get('SMTP_USERNAME')
-        smtp_password = os.environ.get('SMTP_PASSWORD')
-        smtp_sender = os.environ.get('SMTP_SENDER', 'digidokters@gmail.com')
+        smtp_server = os.environ.get('SMTP_SERVER') or os.environ.get('MAIL_SERVER', 'smtp-relay.brevo.com')
+        smtp_port = int(os.environ.get('SMTP_PORT') or os.environ.get('MAIL_PORT', '587'))
+        smtp_username = os.environ.get('SMTP_USERNAME') or os.environ.get('MAIL_USERNAME')
+        smtp_password = os.environ.get('SMTP_PASSWORD') or os.environ.get('MAIL_PASSWORD')
+        smtp_sender = os.environ.get('SMTP_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER', 'digidokters@gmail.com')
         
         if not smtp_username or not smtp_password:
             return jsonify({
                 'status': 'error',
-                'message': f'SMTP_USERNAME of SMTP_PASSWORD is nog niet ingesteld in de omgevingsvariabelen (SMTP_SERVER: {smtp_server}).'
+                'message': f'Geen SMTP/MAIL gebruikersnaam of wachtwoord ingesteld in de omgevingsvariabelen (Server: {smtp_server}).'
             }), 400
 
         try:

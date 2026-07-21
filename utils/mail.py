@@ -66,12 +66,12 @@ Met vriendelijke groet,
 Digidokters Systeem
 """
         
-        # 3. SMTP-instellingen inladen
-        smtp_server = os.environ.get('SMTP_SERVER')
-        smtp_port = int(os.environ.get('SMTP_PORT', '587'))
-        smtp_username = os.environ.get('SMTP_USERNAME')
-        smtp_password = os.environ.get('SMTP_PASSWORD')
-        smtp_sender = os.environ.get('SMTP_SENDER', 'noreply@digidokters.be')
+        # 3. SMTP-instellingen inladen (ondersteunt zowel SMTP_ als MAIL_ namen)
+        smtp_server = os.environ.get('SMTP_SERVER') or os.environ.get('MAIL_SERVER')
+        smtp_port = int(os.environ.get('SMTP_PORT') or os.environ.get('MAIL_PORT', '587'))
+        smtp_username = os.environ.get('SMTP_USERNAME') or os.environ.get('MAIL_USERNAME')
+        smtp_password = os.environ.get('SMTP_PASSWORD') or os.environ.get('MAIL_PASSWORD')
+        smtp_sender = os.environ.get('SMTP_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER', 'digidokters@gmail.com')
         
         # 4. Verzenden via SMTP
         if not smtp_server:

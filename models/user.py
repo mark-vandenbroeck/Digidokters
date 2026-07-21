@@ -17,10 +17,15 @@ class User(UserMixin, db.Model):
     aangemaakt_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     laatste_login = db.Column(db.DateTime, nullable=True)
 
+    # Wachtwoord herstel
+    reset_code = db.Column(db.String(6), nullable=True)
+    reset_code_verloopt_op = db.Column(db.DateTime, nullable=True)
+
     # Relatie: registraties aangemaakt door deze gebruiker
     registraties = db.relationship('Registration', backref='aangemaakt_door_user', lazy=True,
                                    foreign_keys='Registration.aangemaakt_door_id')
     user_organisaties = db.relationship('UserOrganisatie', back_populates='user', cascade='all, delete-orphan')
+
 
     def is_beheerder(self):
         if self.rol == 'platformbeheerder':

@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Wachtwoord vergeten – Digidokters{% endblock %}
+
+{% block unauthenticated %}
+<div class="dd-login-bg">
+    <div class="dd-login-card">
+        <!-- Logo / Titel -->
+        <div class="text-center mb-4">
+            <div class="dd-logo-icon mx-auto mb-3" style="width:56px;height:56px;font-size:1.6rem;border-radius:16px;">
+                <i class="bi bi-key-fill"></i>
+            </div>
+            <h1 class="h4 fw-bold mb-1" style="color:#0f172a">Wachtwoord vergeten</h1>
+            <p class="text-muted small mb-0">Vul uw gebruikersnaam in om een herstelcode te ontvangen via e-mail.</p>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} py-2 small">
+                <i class="bi bi-exclamation-circle me-1"></i>{{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <!-- Formulier -->
+        <form method="POST" action="{{ url_for('auth.wachtwoord_vergeten') }}" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-4">
+                <label for="naam" class="form-label">Gebruikersnaam</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0">
+                        <i class="bi bi-person text-muted"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0 ps-0"
+                           id="naam" name="naam"
+                           placeholder="Voer uw gebruikersnaam in"
+                           autocomplete="username" required autofocus>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold mb-3">
+                <i class="bi bi-send me-2"></i>Herstelcode aanvragen
+            </button>
+            
+            <div class="text-center">
+                <a href="{{ url_for('auth.login') }}" class="small text-decoration-none d-inline-flex align-items-center gap-1">
+                    <i class="bi bi-arrow-left"></i>Terug naar inloggen
+                </a>
+            </div>
+        </form>
+
+        <p class="text-center text-muted mt-4 mb-0" style="font-size:0.75rem">
+            Digidokters v1.0 &nbsp;·&nbsp; De code is 30 minuten geldig
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -7,6 +7,7 @@ class ActivityType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     naam = db.Column(db.String(100), nullable=False)
     actief = db.Column(db.Boolean, default=True, nullable=False)
+    kleur = db.Column(db.String(20), nullable=True, default='blue')
     volgorde = db.Column(db.Integer, default=0, nullable=False)
     organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False)
 
@@ -16,3 +17,4 @@ class ActivityType(db.Model):
 
     def __repr__(self):
         return f'<ActivityType {self.naam}>'
+

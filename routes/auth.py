@@ -215,3 +215,126 @@ def switch_organisatie():
             flash('U heeft geen toegang tot deze organisatie.', 'danger')
         
     return redirect(url_for('reg.lijst'))
+
+
+@auth_bp.route('/wachtwoord-vergeten', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def wachtwoord_vergeten():
+    if current_user.is_authenticated:
+        return redirect(url_for('reg.lijst'))
+
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        if not naam:
+            flash('Vul uw gebruikersnaam in.', 'danger')
+            return render_template('auth/wachtwoord_vergeten.html')
+
+        user = User.query.filter(db.func.lower(User.naam) == naam.lower()).first()
+
+        if not user:
+            flash('Gebruikersnaam is niet bekend. Neem contact op met uw beheerder.', 'danger')
+            return render_template('auth/wachtwoord_vergeten.html')
+
+        if not user.email:
+            flash('Er is geen e-mailadres gekoppeld aan deze gebruiker. Neem contact op met uw beheerder.', 'danger')
+            return render_template('auth/wachtwoord_vergeten.html')
+
+        if not user.actief:
+            flash('Uw account is gedeactiveerd. Neem contact op met uw beheerder.', 'danger')
+            return render_template('auth/wachtwoord_vergeten.html')
+
+        # Code genereren
+        import random
+        from datetime import timedelta
+        from utils.mail import verstuur_email
+        from flask import current_app
+
+        code = f"{random.randint(100000, 999999):06d}"
+        user.reset_code = code
+        user.reset_code_verloopt_op = datetime.now(timezone.utc) + timedelta(minutes=30)
+        db.session.commit()
+
+        # E-mail versturen
+        onderwerp = "Herstelcode wachtwoord Digidokters"
+        vervaltijd_str = user.reset_code_verloopt_op.replace(tzinfo=timezone.utc).astimezone().strftime('%H:%M:%S')
+        inhoud = (
+            f"Beste {user.naam},\n\n"
+            f"U heeft een verzoek ingediend om uw wachtwoord voor Digidokters te herstellen.\n"
+            f"Gebruik de volgende 6-cijferige verificatiecode in de app:\n\n"
+            f"   {code}\n\n"
+            f"Deze code is 30 minuten geldig (tot {vervaltijd_str}).\n\n"
+            f"Als u dit verzoek niet heeft ingediend, kunt u deze e-mail veilig negeren.\n\n"
+            f"Met vriendelijke groet,\n"
+            f"Digidokters Systeem"
+        )
+        
+        try:
+            verstuur_email(user.email, onderwerp, inhoud)
+            session['reset_username'] = user.naam
+            flash('Er is een herstelcode verstuurd naar uw e-mailadres.', 'success')
+            return redirect(url_for('auth.wachtwoord_vergeten_verifieer'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Fout bij het versturen van herstelcode-mail: {str(e)}")
+            flash('Fout bij het versturen van de e-mail. Controleer de mailinstellingen of neem contact op met de beheerder.', 'danger')
+
+    return render_template('auth/wachtwoord_vergeten.html')
+
+
+@auth_bp.route('/wachtwoord-vergeten/verifieer', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def wachtwoord_vergeten_verifieer():
+    if current_user.is_authenticated:
+        return redirect(url_for('reg.lijst'))
+
+    naam = session.get('reset_username')
+    if not naam:
+        flash('Start de wachtwoord vergeten procedure opnieuw.', 'warning')
+        return redirect(url_for('auth.wachtwoord_vergeten'))
+
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+        nieuw_wachtwoord = request.form.get('nieuw_wachtwoord', '')
+        bevestig_wachtwoord = request.form.get('bevestig_wachtwoord', '')
+
+        if not code or not nieuw_wachtwoord or not bevestig_wachtwoord:
+            flash('Vul alle velden in.', 'danger')
+            return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)
+
+        if nieuw_wachtwoord != bevestig_wachtwoord:
+            flash('De nieuwe wachtwoorden komen niet overeen.', 'danger')
+            return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)
+
+        user = User.query.filter_by(naam=naam).first()
+        if not user:
+            flash('Gebruiker niet gevonden.', 'danger')
+            return redirect(url_for('auth.wachtwoord_vergeten'))
+
+        # Code controleren
+        if not user.reset_code or user.reset_code != code:
+            flash('Ongeldige herstelcode.', 'danger')
+            return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)
+
+        if not user.reset_code_verloopt_op or user.reset_code_verloopt_op.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+            flash('De herstelcode is verlopen. Vraag een nieuwe code aan.', 'danger')
+            return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)
+
+        # Wachtwoord validatie
+        fouten = _valideer_wachtwoord(nieuw_wachtwoord)
+        if fouten:
+            for f in fouten:
+                flash(f, 'danger')
+            return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)
+
+        # Resetten van wachtwoord
+        user.wachtwoord_hash = generate_password_hash(nieuw_wachtwoord)
+        user.reset_code = None
+        user.reset_code_verloopt_op = None
+        user.moet_wachtwoord_wijzigen = False
+        db.session.commit()
+
+        session.pop('reset_username', None)
+        flash('Uw wachtwoord is succesvol gewijzigd. U kunt nu inloggen.', 'success')
+        return redirect(url_for('auth.login'))
+
+    return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)

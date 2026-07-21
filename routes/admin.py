@@ -880,7 +880,9 @@ def activiteitstype_nieuw():
             return render_template('admin/item_form.html', titel='Activiteitstype', actie='Toevoegen', item=None, form_data=request.form, terug_url=url_for('admin.activiteitstypes'))
             
         max_volgorde = db.session.query(db.func.max(ActivityType.volgorde)).filter_by(organisatie_id=org_id).scalar() or 0
-        item = ActivityType(naam=naam, actief=True, volgorde=max_volgorde + 1)
+        actief = request.form.get('actief') == 'on' if 'actief' in request.form else True
+        kleur = request.form.get('kleur', 'blue')
+        item = ActivityType(naam=naam, actief=actief, kleur=kleur, volgorde=max_volgorde + 1)
         set_organisatie_id_op_model(item)
         db.session.add(item)
         db.session.commit()
@@ -905,11 +907,13 @@ def activiteitstype_wijzigen(item_id):
     if request.method == 'POST':
         item.naam = request.form.get('naam', item.naam).strip()
         item.actief = request.form.get('actief') == 'on'
+        item.kleur = request.form.get('kleur', 'blue')
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.activiteitstypes'))
     return render_template('admin/item_form.html', titel='Activiteitstype', actie='Wijzigen',
                            item=item, terug_url=url_for('admin.activiteitstypes'))
+
 
 
 @admin_bp.route('/activiteitstypes/<int:item_id>/toggle')

@@ -26,15 +26,28 @@
                            value="{{ item.naam if item else '' }}" placeholder="Voer naam in" required autofocus>
                 </div>
 
-                {% if titel == 'Digidokter' %}
-                <div class="form-check mb-4">
+                {% if titel == 'Digidokter' or titel == 'Activiteitstype' %}
+                <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="actief" name="actief" 
                            {% if item is none or item.actief %}checked{% endif %}>
-                    <label class="form-check-label" for="actief">
+                    <label class="form-check-label fw-semibold" for="actief">
                         Actief
                     </label>
                 </div>
                 {% endif %}
+
+                {% if titel == 'Activiteitstype' %}
+                <div class="mb-4">
+                    <label for="kleur" class="form-label fw-semibold">Badge kleur</label>
+                    <select class="form-select" id="kleur" name="kleur">
+                        <option value="blue" {% if item and item.kleur == 'blue' %}selected{% endif %}>Blauw (Standaard)</option>
+                        <option value="teal" {% if item and item.kleur == 'teal' %}selected{% endif %}>Teal / Groen-blauw</option>
+                        <option value="purple" {% if item and item.kleur == 'purple' %}selected{% endif %}>Paars</option>
+                        <option value="orange" {% if item and item.kleur == 'orange' %}selected{% endif %}>Oranje</option>
+                    </select>
+                </div>
+                {% endif %}
+
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">

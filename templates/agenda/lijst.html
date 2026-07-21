@@ -129,7 +129,7 @@
                         <td class="ps-3 fw-medium text-nowrap">{{ item.datum.strftime('%d/%m/%Y') }}</td>
                         <td class="text-nowrap">{{ item.uur_van }} - {{ item.uur_tot }}</td>
                         <td>
-                            <span class="badge bg-blue-soft text-blue">{{ item.type.naam }}</span>
+                            <span class="badge bg-{{ item.type.kleur or 'blue' }}-soft text-{{ item.type.kleur or 'blue' }}">{{ item.type.naam }}</span>
                             {% if item.is_terugkerend %}
                             <i class="bi bi-arrow-repeat ms-1 text-primary" title="Terugkerend ({{ item.interval }})"></i>
                             {% endif %}

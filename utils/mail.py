@@ -1,10 +1,85 @@
+import json
 import os
 import smtplib
 import traceback
+import urllib.request
 from datetime import datetime
 from email.mime.text import MIMEText
 from flask import current_app, request
 from flask_login import current_user
+
+def verstuur_email(ontvangers, onderwerp, inhoud_tekst):
+    """
+    Verstuurt een e-mail naar één of meerdere ontvangers.
+    Ondersteunt zowel de Brevo HTTPS REST API (werkt op Render.com poort 443) als SMTP fallback.
+    """
+    if isinstance(ontvangers, str):
+        ontvangers = [ontvangers]
+
+    smtp_sender = os.environ.get('SMTP_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER', 'digidokters@gmail.com')
+    brevo_api_key = os.environ.get('BREVO_API_KEY') or os.environ.get('BREVO_KEY')
+    
+    smtp_username = os.environ.get('SMTP_USERNAME') or os.environ.get('MAIL_USERNAME')
+    smtp_password = os.environ.get('SMTP_PASSWORD') or os.environ.get('MAIL_PASSWORD')
+    
+    # Als de wachtwoord of username een Brevo API sleutel is (begint met xkeysib-), gebruik die automatisch als API key
+    if not brevo_api_key and smtp_password and smtp_password.startswith('xkeysib-'):
+        brevo_api_key = smtp_password
+    elif not brevo_api_key and smtp_username and smtp_username.startswith('xkeysib-'):
+        brevo_api_key = smtp_username
+
+    # 1. Probeer Brevo HTTPS REST API (Poort 443 - immuun voor Render outbound port blocks)
+    if brevo_api_key:
+        try:
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "accept": "application/json",
+                "api-key": brevo_api_key,
+                "content-type": "application/json"
+            }
+            payload = {
+                "sender": {"email": smtp_sender, "name": "Digidokters"},
+                "to": [{"email": r} for r in ontvangers],
+                "subject": onderwerp,
+                "textContent": inhoud_tekst
+            }
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                res = json.loads(resp.read().decode('utf-8'))
+                msg_id = res.get('messageId', 'OK')
+                return True, f"Succesvol verzonden via Brevo HTTPS API! (ID: {msg_id})"
+        except urllib.error.HTTPError as http_err:
+            err_body = http_err.read().decode('utf-8')
+            raise Exception(f"Brevo API Fout ({http_err.code}): {err_body}")
+        except Exception as api_err:
+            # Als er geen SMTP server ingesteld is, gooi dan de API fout
+            if not (os.environ.get('SMTP_SERVER') or os.environ.get('MAIL_SERVER')):
+                raise Exception(f"Brevo HTTPS API Fout: {str(api_err)}")
+
+    # 2. SMTP Fallback
+    smtp_server = os.environ.get('SMTP_SERVER') or os.environ.get('MAIL_SERVER', 'smtp-relay.brevo.com')
+    smtp_port = int(os.environ.get('SMTP_PORT') or os.environ.get('MAIL_PORT', '587'))
+
+    if not smtp_username or not smtp_password:
+        raise Exception(f"Geen SMTP of Brevo API instellingen geconfigureerd (Server: {smtp_server}). Stel BREVO_API_KEY of SMTP_USERNAME/SMTP_PASSWORD in.")
+
+    msg = MIMEText(inhoud_tekst, 'plain', 'utf-8')
+    msg['Subject'] = onderwerp
+    msg['From'] = smtp_sender
+    msg['To'] = ", ".join(ontvangers)
+
+    if smtp_port == 465:
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
+    else:
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+        server.starttls()
+
+    server.login(smtp_username, smtp_password)
+    server.sendmail(smtp_sender, ontvangers, msg.as_string())
+    server.quit()
+    return True, f"Succesvol verzonden via SMTP ({smtp_server}:{smtp_port})!"
+
 
 def stuur_fout_email(error_code, error_message, exception=None):
     """
@@ -66,37 +141,8 @@ Met vriendelijke groet,
 Digidokters Systeem
 """
         
-        # 3. SMTP-instellingen inladen (ondersteunt zowel SMTP_ als MAIL_ namen)
-        smtp_server = os.environ.get('SMTP_SERVER') or os.environ.get('MAIL_SERVER')
-        smtp_port = int(os.environ.get('SMTP_PORT') or os.environ.get('MAIL_PORT', '587'))
-        smtp_username = os.environ.get('SMTP_USERNAME') or os.environ.get('MAIL_USERNAME')
-        smtp_password = os.environ.get('SMTP_PASSWORD') or os.environ.get('MAIL_PASSWORD')
-        smtp_sender = os.environ.get('SMTP_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER', 'digidokters@gmail.com')
-        
-        # 4. Verzenden via SMTP
-        if not smtp_server:
-            current_app.logger.warning(
-                f"SMTP_SERVER is niet geconfigureerd. Foutmail (fout {error_code}) zou verzonden worden naar {ontvangers}. "
-                f"Mail inhoud:\n{mail_body}"
-            )
-            return
-            
-        msg = MIMEText(mail_body, 'plain', 'utf-8')
-        msg['Subject'] = f"[Digidokters Alert] Fout {error_code} opgetreden"
-        msg['From'] = smtp_sender
-        msg['To'] = ", ".join(ontvangers)
-        
-        if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
-        else:
-            server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
-            server.starttls()
-            
-        if smtp_username and smtp_password:
-            server.login(smtp_username, smtp_password)
-            
-        server.sendmail(smtp_sender, ontvangers, msg.as_string())
-        server.quit()
-        current_app.logger.info(f"Foutmail succesvol verzonden naar {ontvangers}")
+        success, msg = verstuur_email(ontvangers, f"[Digidokters Alert] Fout {error_code} opgetreden", mail_body)
+        current_app.logger.info(f"Foutmail: {msg} (naar {ontvangers})")
     except Exception as mail_ex:
         current_app.logger.error(f"Fout bij het genereren of verzenden van de foutmail: {str(mail_ex)}")
+

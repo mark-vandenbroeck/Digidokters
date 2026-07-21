@@ -117,8 +117,7 @@ def create_app(config_class=Config):
     @app.route('/test-mail')
     def test_mail():
         from flask import request, jsonify
-        import smtplib
-        from email.mime.text import MIMEText
+        from utils.mail import verstuur_email
         
         recipient = request.args.get('to')
         if not recipient:
@@ -126,44 +125,21 @@ def create_app(config_class=Config):
                 'status': 'error',
                 'message': 'Geef een ontvanger op via ?to=jouw-email@domain.com'
             }), 400
-            
-        smtp_server = os.environ.get('SMTP_SERVER') or os.environ.get('MAIL_SERVER', 'smtp-relay.brevo.com')
-        smtp_port = int(os.environ.get('SMTP_PORT') or os.environ.get('MAIL_PORT', '587'))
-        smtp_username = os.environ.get('SMTP_USERNAME') or os.environ.get('MAIL_USERNAME')
-        smtp_password = os.environ.get('SMTP_PASSWORD') or os.environ.get('MAIL_PASSWORD')
-        smtp_sender = os.environ.get('SMTP_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER', 'digidokters@gmail.com')
-        
-        if not smtp_username or not smtp_password:
-            return jsonify({
-                'status': 'error',
-                'message': f'Geen SMTP/MAIL gebruikersnaam of wachtwoord ingesteld in de omgevingsvariabelen (Server: {smtp_server}).'
-            }), 400
 
         try:
-            msg = MIMEText('Hallo!\n\nDit is een test e-mail verstuurd vanuit de Digidokters applicatie via Brevo SMTP.', 'plain', 'utf-8')
-            msg['Subject'] = 'Test Mail Digidokters (Brevo)'
-            msg['From'] = smtp_sender
-            msg['To'] = recipient
-            
-            if smtp_port == 465:
-                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
-            else:
-                server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
-                server.starttls()
-                
-            server.login(smtp_username, smtp_password)
-            server.sendmail(smtp_sender, [recipient], msg.as_string())
-            server.quit()
+            body = 'Hallo!\n\nDit is een test e-mail verstuurd vanuit de Digidokters applicatie.'
+            success, msg = verstuur_email(recipient, 'Test Mail Digidokters', body)
             
             return jsonify({
                 'status': 'success',
-                'message': f'Test e-mail is succesvol verzonden naar {recipient}!'
+                'message': f'{msg} (naar {recipient})'
             })
         except Exception as e:
             return jsonify({
                 'status': 'error',
                 'message': f'Fout bij het verzenden van e-mail: {str(e)}'
             }), 500
+
 
     @app.after_request
     def add_security_headers(response):

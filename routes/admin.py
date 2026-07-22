@@ -110,7 +110,16 @@ def gebruiker_nieuw():
             
         db.session.commit()
         
-        flash(f'Gebruiker {naam} aangemaakt. Tijdelijk wachtwoord: {tijdelijk_ww}', 'success')
+        if user.email:
+            from utils.mail import stuur_welkomst_email
+            success, msg = stuur_welkomst_email(user.email, user.naam, tijdelijk_ww)
+            if success:
+                flash(f'Gebruiker {naam} aangemaakt. Welkomstmail succesvol verzonden naar {user.email}.', 'success')
+            else:
+                flash(f'Gebruiker {naam} aangemaakt, maar fout bij verzenden welkomstmail: {msg}', 'warning')
+        else:
+            flash(f'Gebruiker {naam} aangemaakt. Tijdelijk wachtwoord: {tijdelijk_ww}', 'success')
+            
         return redirect(url_for('admin.gebruikers'))
 
     return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None)

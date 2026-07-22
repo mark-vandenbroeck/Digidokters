@@ -8,11 +8,17 @@ from email.mime.text import MIMEText
 from flask import current_app, request
 from flask_login import current_user
 
-def verstuur_email(ontvangers, onderwerp, inhoud_tekst):
+def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
     """
     Verstuurt een e-mail naar één of meerdere ontvangers.
+    Ondersteunt optionele bijlagen (lijst van dicts met {'path': str, 'naam': str}).
     Ondersteunt zowel de Brevo HTTPS REST API (werkt op Render.com poort 443) als SMTP fallback.
     """
+    import base64
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.base import MIMEBase
+    from email import encoders
+
     if isinstance(ontvangers, str):
         ontvangers = [ontvangers]
 
@@ -43,6 +49,18 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst):
                 "subject": onderwerp,
                 "textContent": inhoud_tekst
             }
+            
+            if bijlagen:
+                payload["attachment"] = []
+                for b in bijlagen:
+                    if os.path.exists(b['path']):
+                        with open(b['path'], 'rb') as f:
+                            content_b64 = base64.b64encode(f.read()).decode('utf-8')
+                        payload["attachment"].append({
+                            "content": content_b64,
+                            "name": b['naam']
+                        })
+                        
             data = json.dumps(payload).encode('utf-8')
             req = urllib.request.Request(url, data=data, headers=headers, method='POST')
             with urllib.request.urlopen(req, timeout=10) as resp:
@@ -64,10 +82,27 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst):
     if not smtp_username or not smtp_password:
         raise Exception(f"Geen SMTP of Brevo API instellingen geconfigureerd (Server: {smtp_server}). Stel BREVO_API_KEY of SMTP_USERNAME/SMTP_PASSWORD in.")
 
-    msg = MIMEText(inhoud_tekst, 'plain', 'utf-8')
-    msg['Subject'] = onderwerp
-    msg['From'] = smtp_sender
-    msg['To'] = ", ".join(ontvangers)
+    if bijlagen:
+        msg = MIMEMultipart()
+        msg['Subject'] = onderwerp
+        msg['From'] = smtp_sender
+        msg['To'] = ", ".join(ontvangers)
+        
+        msg.attach(MIMEText(inhoud_tekst, 'plain', 'utf-8'))
+        
+        for b in bijlagen:
+            if os.path.exists(b['path']):
+                with open(b['path'], 'rb') as f:
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(f.read())
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f'attachment; filename="{b["naam"]}"')
+                    msg.attach(part)
+    else:
+        msg = MIMEText(inhoud_tekst, 'plain', 'utf-8')
+        msg['Subject'] = onderwerp
+        msg['From'] = smtp_sender
+        msg['To'] = ", ".join(ontvangers)
 
     if smtp_port == 465:
         server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
@@ -145,4 +180,60 @@ Digidokters Systeem
         current_app.logger.info(f"Foutmail: {msg} (naar {ontvangers})")
     except Exception as mail_ex:
         current_app.logger.error(f"Fout bij het genereren of verzenden van de foutmail: {str(mail_ex)}")
+
+
+def stuur_welkomst_email(gebruiker_email, gebruiker_naam, tijdelijk_wachtwoord=None):
+    """
+    Stuurt een welkomstmail naar een nieuwe gebruiker met link en de handleiding als bijlage.
+    """
+    if not gebruiker_email:
+        return False, "Geen e-mailadres opgegeven."
+        
+    wachtwoord_deel = ""
+    if tijdelijk_wachtwoord:
+        wachtwoord_deel = f"\nJe tijdelijke wachtwoord is: {tijdelijk_wachtwoord}\nJe dient dit wachtwoord bij de eerste login onmiddellijk te wijzigen.\n"
+    else:
+        wachtwoord_deel = "\nJe kunt inloggen met de inloggegevens die door je beheerder aan jou zijn verstrekt.\n"
+
+    inhoud = f"""Beste {gebruiker_naam},
+
+Welkom bij de Digidokters-applicatie!
+
+Er is een nieuw account voor jou aangemaakt. Je kunt de applicatie bereiken via onderstaande URL:
+https://digidokters.onrender.com
+
+Je inloggegevens:
+Gebruikersnaam: {gebruiker_naam}
+{wachtwoord_deel}
+Als bijlage sturen we je alvast de gebruikershandleiding mee. Hierin vind je een duidelijke uitleg over het gebruik van de applicatie (zoals het registreren van bezoeken, de agenda en documentbeheer).
+
+Mocht je vragen of problemen hebben, neem dan gerust contact op met de beheerder via digidokters.admin@gmail.com.
+
+Met vriendelijke groet,
+Digidokters Team
+"""
+    
+    # Bepaal het pad naar de handleiding
+    handleiding_pad = os.path.join(current_app.root_path, 'Digidokters_Gebruikershandleiding.docx')
+    bijlagen = []
+    if os.path.exists(handleiding_pad):
+        bijlagen.append({
+            'path': handleiding_pad,
+            'naam': 'Digidokters_Gebruikershandleiding.docx'
+        })
+    else:
+        current_app.logger.warning(f"Gebruikershandleiding niet gevonden op pad: {handleiding_pad}")
+        
+    try:
+        success, msg = verstuur_email(
+            ontvangers=[gebruiker_email],
+            onderwerp="Welkom bij Digidokters!",
+            inhoud_tekst=inhoud,
+            bijlagen=bijlagen
+        )
+        return success, msg
+    except Exception as e:
+        current_app.logger.error(f"Fout bij verzenden welkomstmail: {str(e)}")
+        return False, str(e)
+
 

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datastromen & Architectuur - Digidokters</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            themeVariables: {
+                fontFamily: 'Outfit, sans-serif',
+                primaryColor: '#3b82f6',
+                primaryTextColor: '#fff',
+                lineColor: '#64748b'
+            }
+        });
+    </script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        .title-section h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-section p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .btn-print {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn-print:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-print:active {
+            transform: scale(0.98);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .diagram-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: auto;
+            padding: 20px 0;
+        }
+
+        .mermaid {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .info-card {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .info-card h3 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-card h3 i {
+            color: var(--primary);
+        }
+
+        .info-card p {
+            margin: 0;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-muted);
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background-color: white;
+                color: black;
+                padding: 0;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
+            .btn-print {
+                display: none;
+            }
+
+            .card {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                margin-bottom: 20px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+                page-break-inside: avoid;
+            }
+
+            .info-card {
+                background: #fdfdfd;
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div class="title-section">
+            <h1>Datastromen & Architectuur</h1>
+            <p>Digidokters multi-tenant platform</p>
+        </div>
+        <button class="btn-print" onclick="window.print()">
+            <i class="bi bi-file-earmark-pdf-fill"></i> Opslaan als PDF
+        </button>
+    </div>
+
+    <!-- Diagram Kaart -->
+    <div class="card">
+        <div class="diagram-container">
+            <div class="mermaid">
+                graph TD
+                    %% Styling
+                    classDef client fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff;
+                    classDef backend fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff;
+                    classDef db fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff;
+                    classDef ext fill:#eab308,stroke:#ca8a04,stroke-width:2px,color:#fff;
+
+                    %% Nodes
+                    PWA["📱 PWA (Client Browser / App)<br/>- Gebruikersinterface (HTML/JS/CSS)<br/>- Service Worker (Offline-caching)<br/>- Bezoeken invoeren & documenten inzien"]:::client
+                    
+                    Render["⚙️ Render Hosting (Flask Backend)<br/>- Python WSGI Web Server<br/>- Applicatielogica & Tenant-isolatie<br/>- SQLAlchemy ORM & Audit Event Listeners"]:::backend
+                    
+                    Supabase[("🗄️ Supabase (PostgreSQL)<br/>- Gegevensopslag & Relaties<br/>- Row Level Security (RLS)<br/>- Tabellen: users, registrations, documents, audit_logs")]:::db
+                    
+                    Brevo["📧 Brevo API (Mail Server)<br/>- Externe e-mailprovider<br/>- HTTPS POST requests voor mailbezorging<br/>- Mailings: Wachtwoord herstel (OTP-codes)"]:::ext
+
+                    %% Connecties
+                    PWA -- "1. HTTPS Requests / Forms" --> Render
+                    Render -- "2. HTML / JSON Response" --> PWA
+                    
+                    Render -- "3. SQL queries / CRUD-operaties" --> Supabase
+                    Supabase -- "4. Data records & Document binaries" --> Render
+                    
+                    Render -- "5. HTTPS POST Mail-payload" --> Brevo
+                    Brevo -. "6. Herstelmail met OTP-code" .-> PWA
+            </div>
+        </div>
+    </div>
+
+    <!-- Uitleg Kaart -->
+    <div class="card">
+        <div class="info-grid">
+            <div class="info-card">
+                <h3><i class="bi bi-phone"></i> PWA & Client-zijde</h3>
+                <p>Gebruikers werken in de PWA. De <strong>Service Worker</strong> zorgt voor offline-beschikbaarheid van de interface. Invoer van bezoeken en documenten wordt via HTTPS-formulieren naar de server gestuurd.</p>
+            </div>
+            <div class="info-card">
+                <h3><i class="bi bi-cpu"></i> Flask Backend (Render)</h3>
+                <p>De backend verwerkt alle aanvragen, regelt multi-tenant data-scheiding op basis van de ingelogde organisatie en logt elke wijziging in de database automatisch via SQLAlchemy event-listeners.</p>
+            </div>
+            <div class="info-card">
+                <h3><i class="bi bi-database"></i> Database (Supabase)</h3>
+                <p>Gegevens worden geïsoleerd opgeslagen via <strong>Row Level Security (RLS)</strong> op PostgreSQL. Documenten worden als binaire data bewaard voor automatische backups.</p>
+            </div>
+            <div class="info-card">
+                <h3><i class="bi bi-envelope"></i> E-mail (Brevo)</h3>
+                <p>Render stuurt HTTPS POST-verzoeken naar de Brevo API om veilig transactie-mails (zoals verificatiecodes voor wachtwoordherstel) te verzenden naar gebruikers.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

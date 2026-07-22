@@ -1,21 +1,73 @@
 {% extends 'base.html' %}
 {% block title %}Statistieken – Digidokters{% endblock %}
 
+{% block extra_css %}
+<style>
+@media print {
+    /* Verberg elementen die niet geprint moeten worden */
+    .dd-sidebar, .dd-sidebar-overlay, .dd-topbar, .btn-no-print, #statsTabs, .alert {
+        display: none !important;
+    }
+    
+    /* Content over de volledige breedte */
+    .dd-wrapper, .dd-content, main, body, .container {
+        padding: 0 !important;
+        margin: 0 !important;
+        background: white !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    /* Forceer weergave van beide tab panes */
+    .tab-content > .tab-pane {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    
+    /* Forceer pagina-einde voor de tweede tab */
+    #volunteers-pane {
+        page-break-before: always;
+        padding-top: 30px;
+    }
+    
+    /* Kaartranden en schaduwen verbergen */
+    .card, .dd-stat-card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6 !important;
+        page-break-inside: avoid;
+    }
+    
+    /* Zorg dat grafieken de volledige breedte vullen */
+    canvas {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
     <div>
         <h1 class="dd-page-title mb-0"><i class="bi bi-graph-up me-2 text-primary"></i>Statistieken</h1>
         <p class="dd-page-subtitle mb-0">Rapportering en bezoekenanalyse</p>
     </div>
-    <!-- Jaar filter selector -->
-    <form method="GET" action="{{ url_for('stats.overzicht') }}" class="d-flex align-items-center gap-2">
-        <label class="text-nowrap small text-muted">Jaar selecteren:</label>
-        <select class="form-select form-select-sm" name="jaar" onchange="this.form.submit()">
-            {% for j in jaren %}
-            <option value="{{ j }}" {{ 'selected' if j == jaar }}>{{ j }}</option>
-            {% endfor %}
-        </select>
-    </form>
+    <div class="d-flex align-items-center gap-2 btn-no-print">
+        <!-- Exporteer naar PDF knop -->
+        <button onclick="prepareAndPrint()" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i>Exporteren naar PDF
+        </button>
+        <!-- Jaar filter selector -->
+        <form method="GET" action="{{ url_for('stats.overzicht') }}" class="d-flex align-items-center gap-2 mb-0">
+            <label class="text-nowrap small text-muted">Jaar selecteren:</label>
+            <select class="form-select form-select-sm" name="jaar" onchange="this.form.submit()">
+                {% for j in jaren %}
+                <option value="{{ j }}" {{ 'selected' if j == jaar }}>{{ j }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
 </div>
 
 </div>
@@ -514,5 +566,29 @@
             window.dispatchEvent(new Event('resize'));
         });
     });
+
+    window.prepareAndPrint = function() {
+        // 1. Toon alle tab-panes door de Bootstrap klassen tijdelijk aan te passen
+        const panes = document.querySelectorAll('.tab-pane');
+        panes.forEach(pane => {
+            pane.classList.add('show', 'active');
+        });
+        
+        // 2. Trigger een resize event zodat Chart.js de lay-out kan herberekenen en uittekenen voor de verborgen grafiek
+        window.dispatchEvent(new Event('resize'));
+        
+        // 3. Wacht een fractie van een seconde zodat Chart.js de lay-out kan verwerken en hertekenen
+        setTimeout(() => {
+            window.print();
+            
+            // 4. Herstel de originele tab-toestand na het printen
+            const activeTabId = document.querySelector('.nav-link.active').getAttribute('data-bs-target');
+            panes.forEach(pane => {
+                if ('#' + pane.id !== activeTabId) {
+                    pane.classList.remove('show', 'active');
+                }
+            });
+        }, 250);
+    };
 </script>
 {% endblock %}

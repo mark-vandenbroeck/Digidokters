@@ -222,7 +222,7 @@ def create_app(config_class=Config):
             print('Standaard organisatie bestaat al.')
 
         # 2. Seed Admin User
-        admin_email = 'mark.vandenbroeck@gmail.com'
+        admin_email = 'digidokters.admin@gmail.com'
         admin = User.query.filter((User.email == admin_email) | (User.naam == 'Mark')).first()
         if not admin:
             admin = User(

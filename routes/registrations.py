@@ -283,5 +283,15 @@ def verwijderen(reg_id):
 
     db.session.delete(reg)
     db.session.commit()
+    
+    # GDPR: Verwijder ook alle audit logs die gekoppeld zijn aan deze registratie
+    try:
+        from models.audit import AuditLog
+        AuditLog.query.filter_by(tabel='registrations', record_id=reg_id).delete()
+        db.session.commit()
+    except Exception as e:
+        # Mocht de audit log opschoning mislukken, loggen we het maar blokkeren we de redirects niet
+        current_app.logger.error(f"Fout bij het opschonen van audit logs voor registratie {reg_id}: {str(e)}")
+
     flash(f'Registratie {reg.registratienummer} is succesvol verwijderd.', 'success')
     return redirect(url_for('reg.lijst'))

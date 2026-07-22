@@ -40,9 +40,10 @@
                     </div>
 
                     <div class="col-12">
-                        <label for="client" class="form-label">Cliënt <span class="text-danger">*</span></label>
+                        <label for="client" class="form-label">Cliënt (Voornaam of initialen) <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="client" name="client"
-                               value="{{ reg.client }}" maxlength="150" required>
+                               value="{{ reg.client }}" placeholder="Bijv. Jan of J.P." maxlength="150" required>
+                        <div class="form-text text-muted small">Om privacyredenen (AVG/GDPR) gelieve geen volledige namen in te voeren. Voornaam of initialen volstaan.</div>
                     </div>
 
                     <div class="col-12 col-sm-6">
@@ -80,7 +81,8 @@
                     <div class="col-12">
                         <label for="onderwerp" class="form-label">Onderwerp <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="onderwerp" name="onderwerp"
-                               value="{{ reg.onderwerp }}" maxlength="500" required>
+                               value="{{ reg.onderwerp }}" placeholder="Bijv. e-mail instellen, wifi-problemen…" maxlength="500" required>
+                        <div class="form-text text-muted small">Beschrijf de vraag functioneel en algemeen. Voer geen medische details of gevoelige persoonsgegevens in (bijv. 'Hulp bij inloggen eHealth' in plaats van 'Hulp bij inloggen MyHealth vanwege ziekte X').</div>
                     </div>
 
                     <div class="col-12 col-sm-6">

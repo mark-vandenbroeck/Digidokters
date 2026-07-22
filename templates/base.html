@@ -215,6 +215,10 @@
                 <i class="bi bi-graph-up"></i>
                 <span>Statistieken</span>
             </a>
+            <a href="#" data-bs-toggle="modal" data-bs-target="#privacyModal" class="dd-nav-link">
+                <i class="bi bi-shield-lock"></i>
+                <span>Privacy & AVG</span>
+            </a>
         </nav>
 
         <!-- Sidebar footer -->
@@ -312,6 +316,54 @@ setTimeout(() => {
     });
 }, 5000);
 </script>
+<!-- Privacy & AVG Modal -->
+<div class="modal fade" id="privacyModal" tabindex="-1" aria-labelledby="privacyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content text-start">
+            <div class="modal-header">
+                <h5 class="modal-title" id="privacyModalLabel">
+                    <i class="bi bi-shield-lock-fill text-primary me-2"></i>Privacy & AVG Informatie
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+            </div>
+            <div class="modal-body p-4 text-dark" style="white-space: normal;">
+                <h6 class="fw-bold mb-3">Hoe gaan we binnen Digidokters om met privacy (AVG/GDPR)?</h6>
+                <p>Als vrijwilliger van Digidokters verwerkt u persoonsgegevens van bezoekers en van uzelf. Hieronder vindt u de belangrijkste regels en richtlijnen:</p>
+                
+                <div class="card bg-light border-0 mb-3">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle-fill text-info me-2"></i>Richtlijn voor Bezoekersregistratie (Dataminimalisatie)</h6>
+                        <ul class="mb-0 text-muted">
+                            <li><strong>Gebruik geen volledige namen:</strong> Noteer in het veld 'Cliënt' uitsluitend de voornaam of initialen (bijv. "Jan" of "J.P.").</li>
+                            <li><strong>Omschrijf de vraag anoniem en functioneel:</strong> Voer geen medische, politieke of andere gevoelige persoonsgegevens in het veld 'Onderwerp' in (schrijf dus: <em>"Hulp bij inloggen eHealth"</em> in plaats van <em>"Hulp bij inloggen MyHealth vanwege diabetesrapport"</em>).</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="card bg-light border-0 mb-3">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-shield-shaded text-warning me-2"></i>Uw gegevens als Vrijwilliger</h6>
+                        <ul class="mb-0 text-muted">
+                            <li><strong>Accountgegevens:</strong> Uw naam, rol en e-mailadres worden uitsluitend gebruikt voor accountbeheer, inloggen en systeemnotificaties (zoals wachtwoordherstel).</li>
+                            <li><strong>Database Auditing:</strong> Om veiligheidsredenen en ter voorkoming van dataverlies of misbruik, worden alle database-wijzigingen (toevoegen, aanpassen, verwijderen) inclusief uw gebruikersnaam geregistreerd in een beveiligd audit-logboek.</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="card bg-light border-0">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-trash3-fill text-danger me-2"></i>Recht op Vergetelheid (Verwijdering)</h6>
+                        <p class="mb-0 text-muted">Als een bezoeker vraagt om zijn of haar gegevens definitief te verwijderen, zal de beheerder de registratie wissen. Het systeem is zo geconfigureerd dat bij verwijdering van een registratie ook direct alle bijbehorende audit logs volledig worden gewist.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Sluiten</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block extra_js %}{% endblock %}
 </body>
 </html>

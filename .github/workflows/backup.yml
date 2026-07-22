@@ -33,3 +33,45 @@ jobs:
           name: digidokters-backup-${{ steps.datum.outputs.stamp }}
           path: digidokters_${{ steps.datum.outputs.stamp }}.dump
           retention-days: 90
+
+      - name: Stuur succes e-mail met backup bijlage
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp-relay.brevo.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "✓ Database Backup Succesvol - ${{ steps.datum.outputs.stamp }}"
+          to: digidokters.admin@gmail.com
+          from: Digidokters System <digidokters.admin@gmail.com>
+          body: |
+            Beste beheerder,
+            
+            De wekelijkse database-backup van de Digidokters-database is succesvol voltooid.
+            
+            Details:
+            - Tijdstip: ${{ steps.datum.outputs.stamp }} UTC
+            - Bestandsnaam: digidokters_${{ steps.datum.outputs.stamp }}.dump
+            
+            Het backup-bestand is als bijlage aan deze e-mail toegevoegd en is tevens gedurende 90 dagen beschikbaar als artifact in de GitHub Actions geschiedenis.
+          attachments: "digidokters_${{ steps.datum.outputs.stamp }}.dump"
+
+      - name: Stuur foutmelding e-mail
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp-relay.brevo.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "❌ FOUT: Database Backup Mislukt!"
+          to: digidokters.admin@gmail.com
+          from: Digidokters System <digidokters.admin@gmail.com>
+          body: |
+            Beste beheerder,
+            
+            De wekelijkse database-backup van de Digidokters-database is mislukt!
+            
+            Gelieve de logs in de GitHub Actions tab te controleren:
+            https://github.com/${{ github.repository }}/actions

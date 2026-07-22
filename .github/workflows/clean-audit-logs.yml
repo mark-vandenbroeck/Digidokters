@@ -21,3 +21,39 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           psql "$DATABASE_URL" -c "DELETE FROM public.audit_logs WHERE timestamp < NOW() - INTERVAL '365 days';"
+
+      - name: Stuur succes e-mail
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp-relay.brevo.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "✓ Clean Audit Logs Succesvol"
+          to: digidokters.admin@gmail.com
+          from: Digidokters System <digidokters.admin@gmail.com>
+          body: |
+            Beste beheerder,
+            
+            De periodieke opschoning van de audit logs in de Supabase-database is succesvol uitgevoerd. 
+            Alle logs ouder dan 365 dagen zijn definitief verwijderd.
+
+      - name: Stuur foutmelding e-mail
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp-relay.brevo.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "❌ FOUT: Clean Audit Logs Mislukt!"
+          to: digidokters.admin@gmail.com
+          from: Digidokters System <digidokters.admin@gmail.com>
+          body: |
+            Beste beheerder,
+            
+            Het opschonen van de audit logs in de Supabase-database is mislukt!
+            
+            Gelieve de logs in de GitHub Actions tab te controleren:
+            https://github.com/${{ github.repository }}/actions

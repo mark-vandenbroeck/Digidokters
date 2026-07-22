@@ -36,7 +36,7 @@ jobs:
 
       - name: Stuur succes e-mail met backup bijlage
         if: success()
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v4
         with:
           server_address: smtp-relay.brevo.com
           server_port: 587
@@ -59,7 +59,7 @@ jobs:
 
       - name: Stuur foutmelding e-mail
         if: failure()
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v4
         with:
           server_address: smtp-relay.brevo.com
           server_port: 587

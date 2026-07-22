@@ -1,0 +1,23 @@
+name: Clean Audit Logs
+
+on:
+  schedule:
+    # Draait elke 1e van de maand om 03:00 UTC
+    - cron: '0 3 1 * *'
+  workflow_dispatch: # Zorgt ervoor dat je de actie ook handmatig kunt starten via het GitHub Actions tabblad
+
+jobs:
+  clean-logs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Installeer PostgreSQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Schoon oude audit logs op in Supabase
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          psql "$DATABASE_URL" -c "DELETE FROM public.audit_logs WHERE timestamp < NOW() - INTERVAL '365 days';"

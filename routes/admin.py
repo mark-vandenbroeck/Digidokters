@@ -172,6 +172,8 @@ def gebruiker_wijzigen(user_id):
         if nieuw_ww:
             user.wachtwoord_hash = generate_password_hash(nieuw_ww)
             user.moet_wachtwoord_wijzigen = True
+        else:
+            user.moet_wachtwoord_wijzigen = request.form.get('moet_wachtwoord_wijzigen') == 'on'
             
         try:
             db.session.commit()
@@ -1100,3 +1102,22 @@ def audit_log():
         tabel=tabel,
         filter_organisatie_id=filter_org_id
     )
+
+
+@admin_bp.route('/audit-log/opschonen', methods=['POST'])
+@login_required
+@admin_required
+def audit_log_opschonen():
+    from models.audit import AuditLog
+    from datetime import datetime, timedelta, timezone
+    
+    grens = datetime.now(timezone.utc) - timedelta(days=365)
+    try:
+        aantal = AuditLog.query.filter(AuditLog.timestamp < grens).delete()
+        db.session.commit()
+        flash(f'Succesvol {aantal} oude audit logs (ouder dan 365 dagen) verwijderd.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Fout bij het opschonen van audit logs: {str(e)}', 'danger')
+        
+    return redirect(url_for('admin.audit_log'))

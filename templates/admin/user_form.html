@@ -67,6 +67,17 @@
                     {% endif %}
                 </div>
 
+                {% if actie == 'Wijzigen' %}
+                <div class="mb-3 form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="moet_wachtwoord_wijzigen" name="moet_wachtwoord_wijzigen"
+                           {% if (form_data.moet_wachtwoord_wijzigen if form_data else (user.moet_wachtwoord_wijzigen if user else False)) %}checked{% endif %}>
+                    <label class="form-check-label fw-semibold text-danger" for="moet_wachtwoord_wijzigen">
+                        Wachtwoordwijziging afdwingen bij volgende aanmelding
+                    </label>
+                    <div class="form-text text-muted small">Als dit is ingeschakeld, moet de medewerker na het inloggen direct een nieuw wachtwoord instellen.</div>
+                </div>
+                {% endif %}
+
                 <div class="mb-4 form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="actief" name="actief"
                            {% if (membership.actief if membership else True) %}checked{% endif %}

@@ -311,6 +311,20 @@ def create_app(config_class=Config):
         
         print(f'✓ Organisatie "{naam}" aangemaakt met slug "{slug}" (met standaard data)')
 
+    @app.cli.command('clean-audit-logs')
+    def clean_audit_logs():
+        """Verwijder audit logs ouder dan 365 dagen."""
+        from datetime import datetime, timedelta, timezone
+        from models.audit import AuditLog
+        grens = datetime.now(timezone.utc) - timedelta(days=365)
+        try:
+            aantal = AuditLog.query.filter(AuditLog.timestamp < grens).delete()
+            db.session.commit()
+            print(f'✓ Succesvol {aantal} oude audit logs verwijderd.')
+        except Exception as e:
+            db.session.rollback()
+            print(f'Fout bij verwijderen: {str(e)}')
+
     # Synchroniseer bestaande gebruikers als Digidokter op de achtergrond bij het opstarten
     with app.app_context():
         try:

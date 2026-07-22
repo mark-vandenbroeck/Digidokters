@@ -41,6 +41,7 @@
                             </div>
                         <td class="fw-medium">
                             <span class="badge bg-{{ item.kleur or 'blue' }}-soft text-{{ item.kleur or 'blue' }} fs-6 px-2.5 py-1.5">{{ item.naam }}</span>
+                            <span class="text-muted" style="font-size: 0.75rem; opacity: 0.6; font-weight: normal; margin-left: 4px;">#{{ item.id }}</span>
                         </td>
                         <td>
                             {% if item.actief %}

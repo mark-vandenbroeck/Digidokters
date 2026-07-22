@@ -31,6 +31,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 5.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
 6.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
 7.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering.
+8.  **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
 
 ---
 
@@ -65,7 +66,15 @@ Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 *   De code heeft een verlooptijd van exact 30 minuten.
 *   Bij invoer van de juiste code kan de gebruiker een nieuw wachtwoord instellen dat direct wordt gevalideerd op complexiteitseisen.
 
-### 6. CSV Import-script (`scripts/import_agenda.py`)
+### 6. Database Auditing & GUI
+*   Volledige auditing van alle CRUD-acties (Create, Update, Delete) via SQLAlchemy-sessielisteners.
+*   Opslag van gewijzigde gegevens (oude vs. nieuwe waarden) in JSON-formaat.
+*   GUI-pagina (`/beheer/audit-log`) exclusief toegankelijk voor beheerders en platformbeheerders.
+*   Interactieve details-modal met duidelijke vergelijkingstabel (groen/rood) van wijzigingen.
+*   Filters op datum (van-tot), gebruiker, operatie en tabel.
+*   Subtiele weergave van record-IDs in alle data-weergaven ter vereenvoudiging van auditing.
+
+### 7. CSV Import-script (`scripts/import_agenda.py`)
 Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezigheden te importeren:
 *   **Naam-opschoning:** Filtert achternamen en toevoegingen (zoals `(bib)` of `(eenmalig)`) weg, zodat enkel de voornaam wordt gebruikt.
 *   **LukS-regel:** Vervangt alle namen die beginnen met `LukS` (case-insensitive) automatisch door `Luk`.

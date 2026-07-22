@@ -1004,3 +1004,90 @@ def locatie_toggle(item_id):
 @admin_required
 def locatie_volgorde(item_id, richting):
     return _beheer_volgorde(Location, item_id, richting, 'admin.locaties')
+
+
+@admin_bp.route('/audit-log')
+@login_required
+@admin_required
+def audit_log():
+    from models.audit import AuditLog
+    from models.organisatie import Organisatie
+    from utils.tenant import get_huidige_organisatie_id
+    from datetime import datetime, time
+    
+    org_id = get_huidige_organisatie_id()
+    
+    page = request.args.get('page', 1, type=int)
+    datum_van_str = request.args.get('datum_van', '').strip()
+    datum_tot_str = request.args.get('datum_tot', '').strip()
+    gebruiker = request.args.get('gebruiker', '').strip()
+    operatie = request.args.get('operatie', '').strip()
+    tabel = request.args.get('tabel', '').strip()
+    filter_org_id = request.args.get('filter_organisatie_id', None, type=int)
+
+    query = AuditLog.query
+    
+    # Multi-tenancy filter
+    if current_user.rol == 'platformbeheerder':
+        if filter_org_id:
+            query = query.filter_by(organisatie_id=filter_org_id)
+    else:
+        query = query.filter_by(organisatie_id=org_id)
+        
+    # Filters
+    if datum_van_str:
+        try:
+            dt_van = datetime.strptime(datum_van_str, '%Y-%m-%d')
+            query = query.filter(AuditLog.timestamp >= dt_van)
+        except ValueError:
+            pass
+            
+    if datum_tot_str:
+        try:
+            dt_tot = datetime.strptime(datum_tot_str, '%Y-%m-%d')
+            dt_tot = datetime.combine(dt_tot, time.max)
+            query = query.filter(AuditLog.timestamp <= dt_tot)
+        except ValueError:
+            pass
+            
+    if gebruiker:
+        query = query.filter(AuditLog.gebruiker.ilike(f'%{gebruiker}%'))
+        
+    if operatie:
+        query = query.filter_by(operatie=operatie)
+        
+    if tabel:
+        query = query.filter(AuditLog.tabel.ilike(f'%{tabel}%'))
+        
+    # Sorteren op meest recent eerst
+    query = query.order_by(AuditLog.timestamp.desc())
+    
+    # Paginatie
+    pagination = query.paginate(page=page, per_page=50, error_out=False)
+    logs = pagination.items
+    
+    import json
+    for log in logs:
+        try:
+            log.parsed_details = json.loads(log.details) if log.details else {}
+        except Exception:
+            log.parsed_details = {}
+    
+    # Voor platformbeheerders, lijst met alle organisaties voor de filter-dropdown
+
+    organisaties = []
+    if current_user.rol == 'platformbeheerder':
+        organisaties = Organisatie.query.order_by(Organisatie.naam).all()
+        
+    return render_template(
+        'admin/audit_logs.html',
+        logs=logs,
+        pagination=pagination,
+        organisaties=organisaties,
+        datum_van=datum_van_str,
+        datum_tot=datum_tot_str,
+        gebruiker=gebruiker,
+        operatie=operatie,
+        tabel=tabel,
+        filter_organisatie_id=filter_org_id
+    )

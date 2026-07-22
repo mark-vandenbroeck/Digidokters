@@ -7,9 +7,11 @@
         <h1 class="dd-page-title mb-0"><i class="bi bi-clipboard2-pulse me-2 text-primary"></i>Registraties</h1>
         <p class="dd-page-subtitle mb-0">Overzicht van alle bezoeken</p>
     </div>
+    {% if not current_user.is_lezer() %}
     <a href="{{ url_for('reg.nieuw') }}" class="btn btn-primary">
         <i class="bi bi-plus-lg me-1"></i>Nieuw bezoek
     </a>
+    {% endif %}
 </div>
 
 <!-- Zoekbalk & filters -->
@@ -78,8 +80,9 @@
                 <tbody>
                     {% for r in registraties %}
                     <tr>
-                        <td class="ps-3">
+                        <td class="ps-3 text-nowrap">
                             <span class="badge bg-light text-dark border fw-normal">{{ r.registratienummer }}</span>
+                            <div class="text-muted" style="font-size: 0.7rem; opacity: 0.7;">ID: {{ r.id }}</div>
                         </td>
                         <td class="text-nowrap">{{ r.datum.strftime('%d/%m/%Y') }}</td>
                         <td>

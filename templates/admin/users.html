@@ -30,7 +30,10 @@
                     {% for m in memberships %}
                     {% set u = m.user %}
                     <tr>
-                        <td class="ps-3 fw-medium">{{ u.naam }}</td>
+                        <td class="ps-3 fw-medium">
+                            {{ u.naam }}
+                            <span class="text-muted" style="font-size: 0.75rem; opacity: 0.6; font-weight: normal; margin-left: 4px;">#{{ u.id }}</span>
+                        </td>
                         <td>
                             {% if u.email %}
                             {{ u.email }}

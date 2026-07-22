@@ -40,7 +40,10 @@
                                 </a>
                             </div>
                         </td>
-                        <td class="fw-medium">{{ item.naam }}</td>
+                        <td class="fw-medium">
+                            {{ item.naam }}
+                            <span class="text-muted" style="font-size: 0.75rem; opacity: 0.6; font-weight: normal; margin-left: 4px;">#{{ item.id }}</span>
+                        </td>
                         <td>
                             {% if item.actief %}
                             <span class="badge bg-success">Actief</span>

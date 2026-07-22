@@ -101,8 +101,10 @@
                                     <div class="p-2 rounded bg-primary-subtle text-primary fs-3">
                                         <i class="bi bi-folder-fill"></i>
                                     </div>
-                                    <div class="text-truncate">
-                                        <h3 class="h6 mb-0 fw-semibold text-truncate" title="{{ map.naam }}">{{ map.naam }}</h3>
+                                        <h3 class="h6 mb-0 fw-semibold text-truncate text-dark" title="{{ map.naam }}">
+                                            {{ map.naam }}
+                                            <span class="text-muted" style="font-size: 0.7rem; opacity: 0.6; font-weight: normal; margin-left: 2px;">#{{ map.id }}</span>
+                                        </h3>
                                         <small class="text-muted" style="font-size: 0.75rem;">
                                             <i class="bi bi-calendar3 me-1"></i>{{ map.aangemaakt_op.strftime('%d-%m-%Y') if map.aangemaakt_op else '-' }}
                                         </small>
@@ -184,9 +186,11 @@
                                         {% endif %}
                                     </td>
 
-                                    <!-- Bestandsnaam & Omschrijving -->
-                                    <td>
-                                        <div class="fw-semibold text-dark">{{ doc.bestandsnaam }}</div>
+                                     <td>
+                                        <div class="fw-semibold text-dark">
+                                            {{ doc.bestandsnaam }}
+                                            <span class="text-muted" style="font-size: 0.7rem; opacity: 0.6; font-weight: normal; margin-left: 2px;">#{{ doc.id }}</span>
+                                        </div>
                                         {% if doc.omschrijving %}
                                             <div class="small text-muted text-truncate" style="max-width: 350px;" title="{{ doc.omschrijving }}">
                                                 {{ doc.omschrijving }}

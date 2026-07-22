@@ -24,7 +24,11 @@ def create_app(config_class=Config):
 
     # Extensions
     db.init_app(app)
+    from utils.audit import register_audit_listeners
+    register_audit_listeners(db)
+    
     migrate.init_app(app, db)
+
     login_manager.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)

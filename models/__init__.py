@@ -9,10 +9,12 @@ from .activity_type import ActivityType
 from .location import Location
 from .agenda import AgendaItem
 from .document import Folder, Document
+from .audit import AuditLog
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
     'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem',
-    'Folder', 'Document'
+    'Folder', 'Document', 'AuditLog'
 ]
+
 

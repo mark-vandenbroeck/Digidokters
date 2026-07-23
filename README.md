@@ -71,7 +71,7 @@ Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 *   Opslag van gewijzigde gegevens (oude vs. nieuwe waarden) in JSON-formaat.
 *   GUI-pagina (`/beheer/audit-log`) exclusief toegankelijk voor beheerders en platformbeheerders.
 *   Interactieve details-modal met duidelijke vergelijkingstabel (groen/rood) van wijzigingen.
-*   Filters op datum (van-tot), gebruiker, operatie en tabel.
+*   Filters op datum (van-tot), gebruiker, operatie, tabel, en de switch "Toon ook logins" (inlogacties worden standaard verborgen om de loglijst overzichtelijk te houden).
 *   Subtiele weergave van record-IDs in alle data-weergaven ter vereenvoudiging van auditing.
 
 ### 7. CSV Import-script (`scripts/import_agenda.py`)
@@ -146,6 +146,17 @@ python scripts/import_agenda.py "pad/naar/bestand.csv" --organisatie digidokters
 ```
 
 Zie de volledige [Handleiding: Agenda Import Script](file:///Users/mark/Python/Digidokters/scripts/import_agenda.md) voor meer informatie over datum- en uurformaten.
+
+---
+
+## 🧪 Unit Tests Uitvoeren
+
+Het platform is uitgerust met een geautomatiseerde test-suite (gebaseerd op Python's ingebouwde `unittest` framework) die draait op een in-memory SQLite database.
+
+Om alle tests uit te voeren, run je het volgende commando vanuit de hoofdmap:
+```bash
+PYTHONPATH=. venv/bin/python -m unittest discover -s tests
+```
 
 ---
 

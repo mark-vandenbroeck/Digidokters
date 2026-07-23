@@ -1035,6 +1035,7 @@ def audit_log():
     operatie = request.args.get('operatie', '').strip()
     tabel = request.args.get('tabel', '').strip()
     filter_org_id = request.args.get('filter_organisatie_id', None, type=int)
+    toon_logins = request.args.get('toon_logins', '').strip().lower() == 'true'
 
     query = AuditLog.query
     
@@ -1046,6 +1047,18 @@ def audit_log():
         query = query.filter_by(organisatie_id=org_id)
         
     # Filters
+    if not toon_logins:
+        pattern = '{"oude_waarden": {"laatste_login": %}, "nieuwe_waarden": {"laatste_login": %}}'
+        query = query.filter(
+            db.not_(
+                db.and_(
+                    AuditLog.tabel == 'users',
+                    AuditLog.operatie == 'UPDATE',
+                    AuditLog.details.like(pattern)
+                )
+            )
+        )
+
     if datum_van_str:
         try:
             dt_van = datetime.strptime(datum_van_str, '%Y-%m-%d')
@@ -1100,7 +1113,8 @@ def audit_log():
         gebruiker=gebruiker,
         operatie=operatie,
         tabel=tabel,
-        filter_organisatie_id=filter_org_id
+        filter_organisatie_id=filter_org_id,
+        toon_logins=toon_logins
     )
 
 

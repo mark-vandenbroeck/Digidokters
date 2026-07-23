@@ -66,6 +66,14 @@
             </div>
             {% endif %}
             
+            <!-- Toon ook logins -->
+            <div class="col-6 col-sm-3 col-md-2 d-flex align-items-center pb-2" style="min-height: 54px;">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="toon_logins" name="toon_logins" value="true" {% if toon_logins %}checked{% endif %}>
+                    <label class="form-check-label small fw-semibold text-muted" for="toon_logins">Toon ook logins</label>
+                </div>
+            </div>
+            
             <!-- Actieknoppen -->
             <div class="col-12 col-md-2 d-flex gap-1 ms-auto">
                 <button type="submit" class="btn btn-sm btn-primary w-100">
@@ -140,21 +148,21 @@
         <nav class="d-flex justify-content-center p-3 border-top">
             <ul class="pagination pagination-sm mb-0">
                 <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('admin.audit_log', page=pagination.prev_num, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id) }}">
+                    <a class="page-link" href="{{ url_for('admin.audit_log', page=pagination.prev_num, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins) }}">
                         Vorige
                     </a>
                 </li>
                 {% for p in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
                     {% if p %}
                         <li class="page-item {% if p == pagination.page %}active{% endif %}">
-                            <a class="page-link" href="{{ url_for('admin.audit_log', page=p, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id) }}">{{ p }}</a>
+                            <a class="page-link" href="{{ url_for('admin.audit_log', page=p, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins) }}">{{ p }}</a>
                         </li>
                     {% else %}
                         <li class="page-item disabled"><span class="page-link">...</span></li>
                     {% endif %}
                 {% endfor %}
                 <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('admin.audit_log', page=pagination.next_num, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id) }}">
+                    <a class="page-link" href="{{ url_for('admin.audit_log', page=pagination.next_num, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins) }}">
                         Volgende
                     </a>
                 </li>

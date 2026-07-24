@@ -244,14 +244,15 @@ def wachtwoord_vergeten():
             return render_template('auth/wachtwoord_vergeten.html')
 
         # Code genereren
-        import random
+        import secrets
         from datetime import timedelta
         from utils.mail import verstuur_email
         from flask import current_app
-
-        code = f"{random.randint(100000, 999999):06d}"
+ 
+        code = f"{secrets.randbelow(900000) + 100000:06d}"
         user.reset_code = code
         user.reset_code_verloopt_op = datetime.now(timezone.utc) + timedelta(minutes=30)
+        user.reset_pogingen = 0
         db.session.commit()
 
         # E-mail versturen
@@ -311,13 +312,25 @@ def wachtwoord_vergeten_verifieer():
             return redirect(url_for('auth.wachtwoord_vergeten'))
 
         # Code controleren
-        if not user.reset_code or user.reset_code != code:
-            flash('Ongeldige herstelcode.', 'danger')
-            return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)
-
         if not user.reset_code_verloopt_op or user.reset_code_verloopt_op.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
             flash('De herstelcode is verlopen. Vraag een nieuwe code aan.', 'danger')
             return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)
+
+        if not user.reset_code or user.reset_code != code:
+            user.reset_pogingen += 1
+            if user.reset_pogingen >= 5:
+                user.reset_code = None
+                user.reset_code_verloopt_op = None
+                user.reset_pogingen = 0
+                db.session.commit()
+                session.pop('reset_username', None)
+                flash('Te veel mislukte pogingen. Vraag een nieuwe code aan.', 'danger')
+                return redirect(url_for('auth.wachtwoord_vergeten'))
+            else:
+                db.session.commit()
+                resterend = 5 - user.reset_pogingen
+                flash(f'Ongeldige herstelcode. Je hebt nog {resterend} pogingen over.', 'danger')
+                return render_template('auth/wachtwoord_vergeten_verifieer.html', naam=naam)
 
         # Wachtwoord validatie
         fouten = _valideer_wachtwoord(nieuw_wachtwoord)
@@ -330,6 +343,7 @@ def wachtwoord_vergeten_verifieer():
         user.wachtwoord_hash = generate_password_hash(nieuw_wachtwoord)
         user.reset_code = None
         user.reset_code_verloopt_op = None
+        user.reset_pogingen = 0
         user.moet_wachtwoord_wijzigen = False
         db.session.commit()
 

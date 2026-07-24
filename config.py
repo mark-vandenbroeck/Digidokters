@@ -43,6 +43,9 @@ class Config:
     # CSRF
     WTF_CSRF_ENABLED = True
     WTF_CSRF_TIME_LIMIT = 3600  # 1 uur
+    WTF_CSRF_SSL_STRICT = _IS_PRODUCTION
+    WTF_CSRF_COOKIE_SECURE = _IS_PRODUCTION
+    WTF_CSRF_COOKIE_HTTPONLY = True
 
     # App info
     APP_NAME = 'Digidokters'

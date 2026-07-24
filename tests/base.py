@@ -5,16 +5,20 @@ from models.user import User
 from models.organisatie import Organisatie, UserOrganisatie
 from werkzeug.security import generate_password_hash
 
+from config import Config
+
+class TestConfig(Config):
+    TESTING = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_ENGINE_OPTIONS = {}  # Override to prevent SQLite in-memory engine pool errors
+    WTF_CSRF_ENABLED = False
+    RATELIMIT_ENABLED = False
+    SECRET_KEY = 'test-secret-key'
+
 class BaseTestCase(unittest.TestCase):
     def setUp(self):
         # Create the app with testing configuration
-        self.app = create_app()
-        self.app.config.update({
-            'TESTING': True,
-            'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
-            'WTF_CSRF_ENABLED': False,
-            'SECRET_KEY': 'test-secret-key'
-        })
+        self.app = create_app(TestConfig)
         
         # Establish app context
         self.app_context = self.app.app_context()

@@ -45,3 +45,44 @@ class TestAuth(BaseTestCase):
         # Session should contain the organisation_id
         with self.client.session_transaction() as sess:
             self.assertEqual(sess.get('organisatie_id'), self.org.id)
+
+    def test_password_reset_lockout(self):
+        # 1. Request reset code for UserTim
+        response = self.client.post('/wachtwoord-vergeten', data={'naam': 'UserTim'}, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("herstelcode", response.data.decode('utf-8').lower())
+
+        # Retrieve user from DB to get the generated code
+        from extensions import db
+        user = User.query.filter_by(naam="UserTim").first()
+        self.assertIsNotNone(user.reset_code)
+        self.assertEqual(user.reset_pogingen, 0)
+
+        # 2. Try verifying with wrong code 4 times
+        for i in range(1, 5):
+            res_wrong = self.client.post('/wachtwoord-vergeten/verifieer', data={
+                'code': '000000', # wrong code
+                'nieuw_wachtwoord': 'Password123!',
+                'bevestig_wachtwoord': 'Password123!'
+            }, follow_redirects=True)
+            self.assertEqual(res_wrong.status_code, 200)
+            self.assertIn(f"nog {5 - i} pogingen", res_wrong.data.decode('utf-8').lower())
+            
+            db.session.refresh(user)
+            self.assertEqual(user.reset_pogingen, i)
+            self.assertIsNotNone(user.reset_code)
+
+        # 3. 5th failed attempt should trigger lockout
+        res_lockout = self.client.post('/wachtwoord-vergeten/verifieer', data={
+            'code': '000000', # wrong code
+            'nieuw_wachtwoord': 'Password123!',
+            'bevestig_wachtwoord': 'Password123!'
+        }, follow_redirects=True)
+        self.assertEqual(res_lockout.status_code, 200)
+        self.assertIn("te veel mislukte pogingen", res_lockout.data.decode('utf-8').lower())
+
+        # Refresh user from DB - code and attempts should be cleared
+        db.session.refresh(user)
+        self.assertIsNone(user.reset_code)
+        self.assertIsNone(user.reset_code_verloopt_op)
+        self.assertEqual(user.reset_pogingen, 0)

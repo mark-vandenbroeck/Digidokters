@@ -9,7 +9,7 @@ from models.age_category import AgeCategory
 from models.device import Device
 from models.activity_type import ActivityType
 from models.location import Location
-from utils.decorators import admin_required
+from utils.decorators import admin_required, platform_admin_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/beheer')
 
@@ -1120,7 +1120,7 @@ def audit_log():
 
 @admin_bp.route('/audit-log/opschonen', methods=['POST'])
 @login_required
-@admin_required
+@platform_admin_required
 def audit_log_opschonen():
     from models.audit import AuditLog
     from datetime import datetime, timedelta, timezone

@@ -20,6 +20,7 @@ class User(UserMixin, db.Model):
     # Wachtwoord herstel
     reset_code = db.Column(db.String(6), nullable=True)
     reset_code_verloopt_op = db.Column(db.DateTime, nullable=True)
+    reset_pogingen = db.Column(db.Integer, default=0, nullable=False)
 
     # Relatie: registraties aangemaakt door deze gebruiker
     registraties = db.relationship('Registration', backref='aangemaakt_door_user', lazy=True,

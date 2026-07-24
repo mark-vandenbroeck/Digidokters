@@ -235,12 +235,20 @@ def bekijken(doc_id):
     org_id = get_huidige_organisatie_id()
     doc = Document.query.filter_by(id=doc_id, organisatie_id=org_id).first_or_404()
     
+    # Whitelist safe file types for inline viewing. HTML/SVG/etc. will be forced as attachment download.
+    safe_mimetypes = {'image/png', 'image/jpeg', 'image/gif', 'application/pdf'}
+    mime = doc.mime_type or 'application/octet-stream'
+    as_attachment = mime.lower().strip() not in safe_mimetypes
+    
     response = send_file(
         io.BytesIO(doc.inhoud),
-        mimetype=doc.mime_type or 'application/octet-stream',
+        mimetype=mime,
         download_name=doc.bestandsnaam,
-        as_attachment=False
+        as_attachment=as_attachment
     )
+    if not as_attachment:
+        # Add strict Content-Security-Policy to block execution of script content
+        response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox;"
     return response
 
 

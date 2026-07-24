@@ -86,3 +86,15 @@ class TestAuth(BaseTestCase):
         self.assertIsNone(user.reset_code)
         self.assertIsNone(user.reset_code_verloopt_op)
         self.assertEqual(user.reset_pogingen, 0)
+
+    def test_csrf_error_redirects_to_login(self):
+        # Enable CSRF temporarily for this test
+        self.app.config['WTF_CSRF_ENABLED'] = True
+        
+        # Make a POST request without a CSRF token
+        response = self.client.post('/beheer/audit-log/opschonen', data={}, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify redirect to login page with warning message
+        self.assertIn("sessie is verlopen", response.data.decode('utf-8').lower())
+        self.assertIn("inloggen", response.data.decode('utf-8').lower())

@@ -166,6 +166,13 @@ def create_app(config_class=Config):
         return response
 
     # Foutafhandeling
+    from flask_wtf.csrf import CSRFError
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(e):
+        flash('Uw sessie is verlopen vanwege inactiviteit. Log opnieuw in.', 'warning')
+        return redirect(url_for('auth.login'))
+
     @app.errorhandler(403)
     def forbidden_error(e):
         return render_template('errors/403.html'), 403

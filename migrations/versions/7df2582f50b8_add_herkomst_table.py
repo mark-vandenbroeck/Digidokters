@@ -57,7 +57,7 @@ def upgrade():
             volgordes[org_id] = volgorde + 1
             connection.execute(
                 sa.text("INSERT INTO herkomst (organisatie_id, naam, actief, volgorde) VALUES (:org_id, :naam, :actief, :volgorde)"),
-                {"org_id": org_id, "naam": naam, "actief": 1, "volgorde": volgorde}
+                {"org_id": org_id, "naam": naam, "actief": True, "volgorde": volgorde}
             )
 
     # 4. Data Migration: Populate herkomst_id on registrations

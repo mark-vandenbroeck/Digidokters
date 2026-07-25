@@ -43,7 +43,7 @@ def create_app(config_class=Config):
     os.makedirs(app.config['IMPORT_LOG_FOLDER'], exist_ok=True)
 
     # Importeer modellen zodat Flask-Migrate ze detecteert
-    from models import user, digidokter, age_category, device, registration, organisatie, activity_type, location, agenda  # noqa: F401
+    from models import user, digidokter, age_category, device, registration, organisatie, activity_type, location, agenda, herkomst  # noqa: F401
 
     # Registreer blueprints
     from routes.auth import auth_bp
@@ -297,6 +297,14 @@ def create_app(config_class=Config):
                 db.session.add(Location(naam=name, actief=True, volgorde=i, organisatie_id=default_org.id))
             db.session.commit()
             print("✓ Locaties geïnitialiseerd voor standaard organisatie")
+
+        # 9. Seed Herkomsten
+        from models.herkomst import Herkomst
+        if not Herkomst.query.filter_by(organisatie_id=default_org.id).first():
+            for i, name in enumerate(['Mond-tot-mond', 'Website', 'Sociale media', 'Flyer/Affiche', 'Gemeenteblad', 'Andere']):
+                db.session.add(Herkomst(naam=name, actief=True, volgorde=i, organisatie_id=default_org.id))
+            db.session.commit()
+            print("✓ Herkomsten geïnitialiseerd voor standaard organisatie")
 
     # CLI-commando: flask create-org <naam> <slug>
     import click

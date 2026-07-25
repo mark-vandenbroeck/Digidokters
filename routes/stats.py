@@ -112,6 +112,24 @@ def overzicht():
         .all()
     )
 
+    # Per herkomst
+    from models.herkomst import Herkomst
+    per_herkomst_raw = (
+        jaar_filter(
+            db.session.query(
+                Herkomst.naam,
+                func.count(Registration.id).label('aantal')
+            ).outerjoin(Herkomst, Registration.herkomst_id == Herkomst.id)
+        )
+        .group_by(Herkomst.naam)
+        .all()
+    )
+    per_herkomst = []
+    for r in per_herkomst_raw:
+        naam = r.naam if r.naam else 'Niet gespecificeerd'
+        per_herkomst.append((naam, r.aantal))
+    per_herkomst = sorted(per_herkomst, key=lambda x: x[1], reverse=True)
+
     # Nieuwe vs terugkerende klanten
     nieuwe_klanten = jaar_filter(
         db.session.query(func.count(Registration.id)).filter(Registration.nieuwe_klant == True)
@@ -292,6 +310,7 @@ def overzicht():
         per_digidokter=per_digidokter,
         per_leeftijd=per_leeftijd,
         per_toestel=per_toestel,
+        per_herkomst=per_herkomst,
         per_geslacht=per_geslacht,
         nieuwe_klanten=nieuwe_klanten,
         terugkerende_klanten=totaal_jaar - nieuwe_klanten,

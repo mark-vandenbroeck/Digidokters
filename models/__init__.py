@@ -10,11 +10,12 @@ from .location import Location
 from .agenda import AgendaItem
 from .document import Folder, Document
 from .audit import AuditLog
+from .herkomst import Herkomst
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
     'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem',
-    'Folder', 'Document', 'AuditLog'
+    'Folder', 'Document', 'AuditLog', 'Herkomst'
 ]
 
 

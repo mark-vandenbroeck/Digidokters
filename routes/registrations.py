@@ -7,6 +7,7 @@ from models.registration import Registration
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
+from models.herkomst import Herkomst
 from sqlalchemy.orm import joinedload
 from utils.decorators import writer_required
 
@@ -22,6 +23,7 @@ def _keuzelijsten():
         'digidokters': filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.volgorde, Digidokter.naam).all(),
         'leeftijdscategorieën': filter_op_organisatie(AgeCategory.query.filter_by(actief=True), AgeCategory).order_by(AgeCategory.volgorde, AgeCategory.naam).all(),
         'toestellen': filter_op_organisatie(Device.query.filter_by(actief=True), Device).order_by(Device.volgorde, Device.naam).all(),
+        'herkomsten': filter_op_organisatie(Herkomst.query.filter_by(actief=True), Herkomst).order_by(Herkomst.volgorde, Herkomst.naam).all(),
     }
 
 
@@ -46,7 +48,8 @@ def lijst():
         .options(
             joinedload(Registration.digidokter),
             joinedload(Registration.leeftijdscategorie),
-            joinedload(Registration.toestel)
+            joinedload(Registration.toestel),
+            joinedload(Registration.herkomst)
         )
         .order_by(Registration.datum.desc(), Registration.id.desc())
     )
@@ -56,8 +59,8 @@ def lijst():
             db.or_(
                 Registration.client.ilike(f'%{zoek}%'),
                 Registration.onderwerp.ilike(f'%{zoek}%'),
-                Registration.herkomst.ilike(f'%{zoek}%'),
                 Registration.registratienummer.ilike(f'%{zoek}%'),
+                Registration.herkomst.has(Herkomst.naam.ilike(f'%{zoek}%')),
             )
         )
     if filter_digidokter:
@@ -105,7 +108,7 @@ def nieuw():
         client = request.form.get('client', '').strip()
         digidokter_id = request.form.get('digidokter_id', 0, type=int)
         nieuwe_klant = request.form.get('nieuwe_klant') == 'ja'
-        herkomst = request.form.get('herkomst', '').strip()
+        herkomst_id = request.form.get('herkomst_id', 0, type=int) or None
         geslacht = request.form.get('geslacht', '').strip() or None
         onderwerp = request.form.get('onderwerp', '').strip()
         leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', 0, type=int)
@@ -128,6 +131,11 @@ def nieuw():
                 
         if geslacht and geslacht not in ('man', 'vrouw'):
             fouten.append('Ongeldig geslacht geselecteerd.')
+
+        if herkomst_id:
+            h = db.session.get(Herkomst, herkomst_id)
+            if not h or h.organisatie_id != org_id:
+                fouten.append('Ongeldige herkomst geselecteerd.')
 
         if not onderwerp:
             fouten.append('Onderwerp is verplicht.')
@@ -158,7 +166,7 @@ def nieuw():
             client=client,
             digidokter_id=digidokter_id,
             nieuwe_klant=nieuwe_klant,
-            herkomst=herkomst,
+            herkomst_id=herkomst_id,
             geslacht=geslacht,
             onderwerp=onderwerp,
             leeftijdscategorie_id=leeftijdscategorie_id,
@@ -210,7 +218,7 @@ def wijzigen(reg_id):
         client = request.form.get('client', '').strip()
         digidokter_id = request.form.get('digidokter_id', 0, type=int)
         nieuwe_klant = request.form.get('nieuwe_klant') == 'ja'
-        herkomst = request.form.get('herkomst', '').strip()
+        herkomst_id = request.form.get('herkomst_id', 0, type=int) or None
         geslacht = request.form.get('geslacht', '').strip() or None
         onderwerp = request.form.get('onderwerp', '').strip()
         leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', 0, type=int)
@@ -230,6 +238,11 @@ def wijzigen(reg_id):
                 
         if geslacht and geslacht not in ('man', 'vrouw'):
             fouten.append('Ongeldig geslacht geselecteerd.')
+
+        if herkomst_id:
+            h = db.session.get(Herkomst, herkomst_id)
+            if not h or h.organisatie_id != org_id:
+                fouten.append('Ongeldige herkomst geselecteerd.')
 
         if not onderwerp:
             fouten.append('Onderwerp is verplicht.')
@@ -257,7 +270,7 @@ def wijzigen(reg_id):
         reg.client = client
         reg.digidokter_id = digidokter_id
         reg.nieuwe_klant = nieuwe_klant
-        reg.herkomst = herkomst
+        reg.herkomst_id = herkomst_id
         reg.geslacht = geslacht
         reg.onderwerp = onderwerp
         reg.leeftijdscategorie_id = leeftijdscategorie_id

@@ -9,6 +9,7 @@ from models.age_category import AgeCategory
 from models.device import Device
 from models.activity_type import ActivityType
 from models.location import Location
+from models.herkomst import Herkomst
 from utils.decorators import admin_required, platform_admin_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/beheer')
@@ -466,6 +467,74 @@ def toestel_volgorde(item_id, richting):
     return _beheer_volgorde(Device, item_id, richting, 'admin.toestellen')
 
 
+# ─── Herkomsten ──────────────────────────────────────────────────────────────
+
+@admin_bp.route('/herkomsten')
+@login_required
+@admin_required
+def herkomsten():
+    return _beheer_lijst(Herkomst, 'admin/herkomsten.html')
+
+
+@admin_bp.route('/herkomsten/nieuw', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def herkomst_nieuw():
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        if not naam:
+            flash('Naam is verplicht.', 'danger')
+            return render_template('admin/item_form.html', titel='Herkomst', actie='Nieuw',
+                                   item=None, terug_url=url_for('admin.herkomsten'))
+        max_volgorde = db.session.query(db.func.max(Herkomst.volgorde)).filter(Herkomst.organisatie_id == org_id).scalar() or 0
+        db.session.add(Herkomst(naam=naam, volgorde=max_volgorde + 1, organisatie_id=org_id,
+                               actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
+        db.session.commit()
+        flash(f'Herkomst {naam} toegevoegd.', 'success')
+        return redirect(url_for('admin.herkomsten'))
+    return render_template('admin/item_form.html', titel='Herkomst', actie='Nieuw',
+                           item=None, terug_url=url_for('admin.herkomsten'))
+
+
+@admin_bp.route('/herkomsten/<int:item_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def herkomst_wijzigen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Herkomst, item_id)
+    
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+        
+    if request.method == 'POST':
+        item.naam = request.form.get('naam', item.naam).strip()
+        item.actief = request.form.get('actief') == 'on'
+        db.session.commit()
+        flash(f'{item.naam} bijgewerkt.', 'success')
+        return redirect(url_for('admin.herkomsten'))
+    return render_template('admin/item_form.html', titel='Herkomst', actie='Wijzigen',
+                           item=item, terug_url=url_for('admin.herkomsten'))
+
+
+@admin_bp.route('/herkomsten/<int:item_id>/toggle')
+@login_required
+@admin_required
+def herkomst_toggle(item_id):
+    return _beheer_toggle(Herkomst, item_id, 'admin.herkomsten')
+
+
+@admin_bp.route('/herkomsten/<int:item_id>/volgorde/<richting>')
+@login_required
+@admin_required
+def herkomst_volgorde(item_id, richting):
+    return _beheer_volgorde(Herkomst, item_id, richting, 'admin.herkomsten')
+
+
 @admin_bp.route('/backup')
 @login_required
 @admin_required
@@ -479,6 +548,7 @@ def backup():
     from models.digidokter import Digidokter
     from models.age_category import AgeCategory
     from models.device import Device
+    from models.herkomst import Herkomst
     from models.registration import Registration
     from utils.tenant import get_huidige_organisatie_id
     
@@ -522,6 +592,14 @@ def backup():
             'actief': t.actief,
             'volgorde': t.volgorde
         })
+
+    herkomsten_data = []
+    for h in Herkomst.query.filter_by(organisatie_id=org_id).all():
+        herkomsten_data.append({
+            'naam': h.naam,
+            'actief': h.actief,
+            'volgorde': h.volgorde
+        })
         
     registrations_data = []
     for r in Registration.query.filter_by(organisatie_id=org_id).all():
@@ -530,7 +608,7 @@ def backup():
             'datum': r.datum.isoformat() if r.datum else None,
             'client': r.client,
             'nieuwe_klant': r.nieuwe_klant,
-            'herkomst': r.herkomst,
+            'herkomst': r.herkomst.naam if r.herkomst else '',
             'geslacht': r.geslacht,
             'onderwerp': r.onderwerp,
             'digidokter_naam': r.digidokter.naam if r.digidokter else '',
@@ -579,6 +657,7 @@ def backup():
         'digidokters': digidokters_data,
         'age_categories': age_cats_data,
         'devices': devices_data,
+        'herkomsten': herkomsten_data,
         'activity_types': activity_types_data,
         'locations': locations_data,
         'registrations': registrations_data,
@@ -637,11 +716,13 @@ def restore():
             with db.session.begin_nested():
                 # 1. Verwijder bestaande organisatiegegevens
                 from models.agenda import AgendaItem
+                from models.herkomst import Herkomst
                 Registration.query.filter_by(organisatie_id=org_id).delete()
                 AgendaItem.query.filter_by(organisatie_id=org_id).delete()
                 Digidokter.query.filter_by(organisatie_id=org_id).delete()
                 AgeCategory.query.filter_by(organisatie_id=org_id).delete()
                 Device.query.filter_by(organisatie_id=org_id).delete()
+                Herkomst.query.filter_by(organisatie_id=org_id).delete()
                 ActivityType.query.filter_by(organisatie_id=org_id).delete()
                 Location.query.filter_by(organisatie_id=org_id).delete()
                 
@@ -693,6 +774,37 @@ def restore():
                     db.session.flush()
                     devices_map[t.naam] = t.id
                     
+                # 5b. Herstel herkomsten
+                herkomsten_map = {}
+                if 'herkomsten' in data:
+                    for h_data in data['herkomsten']:
+                        h = Herkomst(
+                            naam=h_data['naam'],
+                            actief=h_data['actief'],
+                            volgorde=h_data['volgorde'],
+                            organisatie_id=org_id
+                        )
+                        db.session.add(h)
+                        db.session.flush()
+                        herkomsten_map[h.naam] = h.id
+                else:
+                    # Fallback voor oudere backups: haal unieke waarden uit registraties
+                    unique_origins = set()
+                    for r_data in data.get('registrations', []):
+                        h_val = r_data.get('herkomst')
+                        if h_val and h_val.strip() and h_val.strip().lower() != 'nan':
+                            unique_origins.add(h_val.strip())
+                    for idx, name in enumerate(sorted(unique_origins)):
+                        h = Herkomst(
+                            naam=name,
+                            actief=True,
+                            volgorde=idx,
+                            organisatie_id=org_id
+                        )
+                        db.session.add(h)
+                        db.session.flush()
+                        herkomsten_map[name] = h.id
+
                 # 6. Herstel gebruikers & lidmaatschappen
                 users_map = {}
                 for u_data in data['users']:
@@ -752,6 +864,9 @@ def restore():
                     if not t_id:
                         t_id = list(devices_map.values())[0] if devices_map else None
                         
+                    herkomst_naam = r_data.get('herkomst')
+                    h_id = herkomsten_map.get(herkomst_naam) if herkomst_naam else None
+
                     from datetime import datetime as dt
                     reg_datum = dt.fromisoformat(r_data['datum']).date() if r_data.get('datum') else None
                     created_at = dt.fromisoformat(r_data['aangemaakt_op']) if r_data.get('aangemaakt_op') else datetime.now(timezone.utc)
@@ -762,7 +877,7 @@ def restore():
                         datum=reg_datum,
                         client=r_data['client'],
                         nieuwe_klant=r_data['nieuwe_klant'],
-                        herkomst=r_data.get('herkomst'),
+                        herkomst_id=h_id,
                         geslacht=r_data.get('geslacht'),
                         onderwerp=r_data['onderwerp'],
                         digidokter_id=d_id,

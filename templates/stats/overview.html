@@ -215,6 +215,28 @@
                 </div>
             </div>
 
+            <!-- Per herkomst -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">Herkomst</div>
+                    <div class="card-body">
+                        {% if per_herkomst %}
+                        {% for hk, aantal in per_herkomst %}
+                        <div class="dd-progress-row">
+                            <div class="dd-progress-label">{{ hk }}</div>
+                            <div class="dd-progress-bar-wrap">
+                                <div class="dd-progress-fill bg-teal" style="width: {{ (aantal / totaal_jaar * 100)|round if totaal_jaar > 0 else 0 }}%"></div>
+                            </div>
+                            <div class="dd-progress-count">{{ aantal }}</div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted text-center py-4 mb-0">Geen data beschikbaar voor dit jaar.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
             <!-- Per geslacht -->
             <div class="col-12 col-md-6">
                 <div class="card h-100">

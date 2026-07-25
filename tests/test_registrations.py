@@ -19,7 +19,7 @@ class TestRegistrations(BaseTestCase):
             'client': "John Doe",
             'digidokter_id': str(self.digidokter.id),
             'nieuwe_klant': 'ja',
-            'herkomst': 'Mond tot mond',
+            'herkomst_id': str(self.herkomst.id),
             'geslacht': 'man',
             'onderwerp': 'Uitleg over whatsapp',
             'leeftijdscategorie_id': str(self.age_category.id),
@@ -36,6 +36,7 @@ class TestRegistrations(BaseTestCase):
         self.assertEqual(reg.organisatie_id, self.org.id)
         self.assertEqual(reg.onderwerp, "Uitleg over whatsapp")
         self.assertTrue(reg.nieuwe_klant)
+        self.assertEqual(reg.herkomst_id, self.herkomst.id)
 
     def test_delete_registration_and_clean_audit_logs(self):
         # 1. Create a registration manually

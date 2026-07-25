@@ -103,12 +103,19 @@ class BaseTestCase(unittest.TestCase):
             actief=True,
             organisatie_id=self.org.id
         )
+        from models.device import Device
         self.device = Device(
             naam="Test Toestel",
             actief=True,
             organisatie_id=self.org.id
         )
-        db.session.add_all([self.digidokter, self.age_category, self.device])
+        from models.herkomst import Herkomst
+        self.herkomst = Herkomst(
+            naam="Test Herkomst",
+            actief=True,
+            organisatie_id=self.org.id
+        )
+        db.session.add_all([self.digidokter, self.age_category, self.device, self.herkomst])
         db.session.commit()
 
     def login(self, username, password):

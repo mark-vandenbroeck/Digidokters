@@ -39,7 +39,7 @@ def _haal_registraties(
             'Cliënt': reg.client,
             'Digidokter': reg.digidokter.naam if reg.digidokter else '',
             'Nieuwe klant': 'Ja' if reg.nieuwe_klant else 'Nee',
-            'Herkomst': reg.herkomst or '',
+            'Herkomst': reg.herkomst.naam if reg.herkomst else '',
             'Geslacht': reg.geslacht or '',
             'Onderwerp': reg.onderwerp,
             'Leeftijdscategorie': reg.leeftijdscategorie.naam if reg.leeftijdscategorie else '',

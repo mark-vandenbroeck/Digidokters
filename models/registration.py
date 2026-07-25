@@ -12,7 +12,7 @@ class Registration(db.Model):
     client = db.Column(db.String(150), nullable=False)
     digidokter_id = db.Column(db.Integer, db.ForeignKey('digidokters.id'), nullable=False)
     nieuwe_klant = db.Column(db.Boolean, default=False, nullable=False)
-    herkomst = db.Column(db.String(200), nullable=True)
+    herkomst_id = db.Column(db.Integer, db.ForeignKey('herkomst.id'), nullable=True)
     geslacht = db.Column(db.String(10), nullable=True)
     onderwerp = db.Column(db.Text, nullable=False)
     leeftijdscategorie_id = db.Column(db.Integer, db.ForeignKey('age_categories.id'), nullable=False)

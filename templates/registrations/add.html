@@ -70,10 +70,16 @@
 
                     <!-- Herkomst -->
                     <div class="col-12 col-sm-6">
-                        <label for="herkomst" class="form-label">Herkomst</label>
-                        <input type="text" class="form-control" id="herkomst" name="herkomst"
-                               value="{{ form_data.herkomst if form_data else '' }}"
-                               placeholder="Bijv. doorverwijzing, zelf gekomen…" maxlength="200">
+                        <label for="herkomst_id" class="form-label">Herkomst</label>
+                        <select class="form-select" id="herkomst_id" name="herkomst_id">
+                            <option value="">— Kies herkomst —</option>
+                            {% for h in herkomsten %}
+                            <option value="{{ h.id }}"
+                                {{ 'selected' if form_data and form_data.herkomst_id == h.id|string }}>
+                                {{ h.naam }}
+                            </option>
+                            {% endfor %}
+                        </select>
                     </div>
 
                     <!-- Geslacht -->

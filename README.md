@@ -27,11 +27,12 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 1.  **Organisaties (`organisaties`):** Beheert de verschillende tenants (bijv. Londerzeel).
 2.  **Gebruikers (`users`):** Beheert beheerders en medewerkers. Gekoppeld aan organisaties via `user_organisaties`. Tevens voorzien van wachtwoord-resetkolommen (`reset_code`, `reset_code_verloopt_op`).
 3.  **Digidokters (`digidokters`):** Vrijwilligers binnen een specifieke organisatie.
-4.  **Registraties (`registrations`):** Registratie van een cliëntbezoek.
+4.  **Registraties (`registrations`):** Registratie van een cliëntbezoek met foreign keys naar digidokter, leeftijdscategorie, toestel en herkomst.
 5.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
 6.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
 7.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering.
-8.  **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
+8.  **Herkomst (`herkomst`):** Standaard keuzelijst met herkomstbronnen (bijv. website, mond-tot-mond) per organisatie.
+9.  **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
 
 ---
 

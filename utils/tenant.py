@@ -69,4 +69,10 @@ def seed_organisatie_defaults(org_id):
         for i, name in enumerate(['Bib Londerzeel', 'Buurttafel', 'Brouwerij De Palm']):
             db.session.add(Location(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
 
+    # Herkomsten
+    from models.herkomst import Herkomst
+    if not Herkomst.query.filter_by(organisatie_id=org_id).first():
+        for i, name in enumerate(['Mond-tot-mond', 'Website', 'Sociale media', 'Flyer/Affiche', 'Gemeenteblad', 'Andere']):
+            db.session.add(Herkomst(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+
     db.session.commit()

@@ -141,9 +141,11 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
     from utils.tenant import get_huidige_organisatie_id
     org_id = get_huidige_organisatie_id()
 
+    from models.herkomst import Herkomst
     digidokters = {d.naam.lower(): d for d in Digidokter.query.filter_by(actief=True, organisatie_id=org_id).all()}
     leeftijden = {l.naam.lower(): l for l in AgeCategory.query.filter_by(actief=True, organisatie_id=org_id).all()}
     toestellen = {t.naam.lower(): t for t in Device.query.filter_by(actief=True, organisatie_id=org_id).all()}
+    herkomsten = {h.naam.lower(): h for h in Herkomst.query.filter_by(actief=True, organisatie_id=org_id).all()}
 
     # Cacheer bestaande registraties (voor dubbele-detectie) en registratienummer-
     # tellers per jaar in telkens 1 query, zodat we niet per rij naar de database
@@ -240,6 +242,21 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
             toestellen[tst_naam_lower] = toestel
             logger.info(f'Nieuw toestel aangemaakt: {tst_naam_original}')
 
+        # Herkomst opzoeken of aanmaken
+        herkomst_naam_original = str(rij.get('herkomst', '') or '').strip()
+        herkomst_id = None
+        if herkomst_naam_original and herkomst_naam_original.lower() != 'nan':
+            h_naam_lower = herkomst_naam_original.lower()
+            herkomst_obj = herkomsten.get(h_naam_lower)
+            if herkomst_obj is None:
+                max_volgorde = db.session.query(db.func.max(Herkomst.volgorde)).filter(Herkomst.organisatie_id == org_id).scalar() or 0
+                herkomst_obj = Herkomst(naam=herkomst_naam_original, actief=True, volgorde=max_volgorde + 1, organisatie_id=org_id)
+                db.session.add(herkomst_obj)
+                db.session.flush()
+                herkomsten[h_naam_lower] = herkomst_obj
+                logger.info(f'Nieuwe herkomst aangemaakt: {herkomst_naam_original}')
+            herkomst_id = herkomst_obj.id
+
         # Dubbele detectie (in-memory, geen query per rij)
         sleutel = (datum, client, digidokter.id)
         if sleutel in bestaande_registraties:
@@ -264,7 +281,7 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
                     client=client,
                     digidokter_id=digidokter.id,
                     nieuwe_klant=_parse_nieuwe_klant(rij.get('nieuwe_klant', False)),
-                    herkomst=str(rij.get('herkomst', '') or '').strip(),
+                    herkomst_id=herkomst_id,
                     geslacht=_parse_geslacht(rij.get('geslacht')),
                     onderwerp=onderwerp,
                     leeftijdscategorie_id=leeftijdscategorie.id,

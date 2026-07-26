@@ -10,18 +10,18 @@ class Registration(db.Model):
     registratienummer = db.Column(db.String(20), nullable=False, index=True)
     datum = db.Column(db.Date, nullable=False, default=date.today)
     client = db.Column(db.String(150), nullable=False)
-    digidokter_id = db.Column(db.Integer, db.ForeignKey('digidokters.id'), nullable=False)
+    digidokter_id = db.Column(db.Integer, db.ForeignKey('digidokters.id'), nullable=False, index=True)
     nieuwe_klant = db.Column(db.Boolean, default=False, nullable=False)
-    herkomst_id = db.Column(db.Integer, db.ForeignKey('herkomst.id'), nullable=True)
+    herkomst_id = db.Column(db.Integer, db.ForeignKey('herkomst.id'), nullable=True, index=True)
     geslacht = db.Column(db.String(10), nullable=True)
     onderwerp = db.Column(db.Text, nullable=False)
-    leeftijdscategorie_id = db.Column(db.Integer, db.ForeignKey('age_categories.id'), nullable=False)
-    toestel_id = db.Column(db.Integer, db.ForeignKey('devices.id'), nullable=False)
+    leeftijdscategorie_id = db.Column(db.Integer, db.ForeignKey('age_categories.id'), nullable=False, index=True)
+    toestel_id = db.Column(db.Integer, db.ForeignKey('devices.id'), nullable=False, index=True)
     aangemaakt_door_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     aangemaakt_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     gewijzigd_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                              onupdate=lambda: datetime.now(timezone.utc), nullable=False)
-    organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False)
+    organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False, index=True)
 
     __table_args__ = (
         db.UniqueConstraint('organisatie_id', 'registratienummer', name='uq_registration_org_num'),

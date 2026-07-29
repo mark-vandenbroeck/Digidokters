@@ -22,6 +22,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   Elke tabel (behalve het globale platformbeheer) bevat een kolom `organisatie_id` om data tussen verschillende steden/organisaties te isoleren.
 *   Bij het inloggen of via een subdomein-resolver wordt de actieve organisatie vastgesteld en in de Flask-sessie opgeslagen.
 *   Alle database-queries worden gefilterd op basis van de actieve `organisatie_id` om strikte data-isolatie te garanderen.
+*   Bestandsopslagen (zoals documenten en importlogbestanden) zijn eveneens gescopeerd aan de actieve `organisatie_id` om cross-tenant toegang (IDOR) te voorkomen.
 
 ### Belangrijkste tabellen en datamodel:
 1.  **Organisaties (`organisaties`):** Beheert de verschillende tenants (bijv. Londerzeel).

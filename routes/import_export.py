@@ -67,6 +67,13 @@ def importeer():
 @admin_required
 def import_log(bestandsnaam):
     """Download een importlogbestand."""
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
+    # IDOR protection: ensure the log file belongs to the current user's organization.
+    if not bestandsnaam.startswith(f"import_{org_id}_"):
+        abort(403)
+
     log_pad = os.path.join(current_app.config['IMPORT_LOG_FOLDER'], secure_filename(bestandsnaam))
     if not os.path.exists(log_pad):
         abort(404)

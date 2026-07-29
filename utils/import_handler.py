@@ -95,8 +95,11 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
     Lees een CSV of XLSX bestand in en importeer in de database.
     Geeft een dict terug met: totaal, toegevoegd, overgeslagen, fouten, log_bestand.
     """
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_bestand = f"import_{timestamp}.log"
+    log_bestand = f"import_{org_id}_{timestamp}.log"
     log_pad = os.path.join(log_map, log_bestand)
     logger = _setup_logger(log_pad)
 

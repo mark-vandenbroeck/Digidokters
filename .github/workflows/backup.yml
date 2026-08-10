@@ -1,11 +1,9 @@
 name: Wekelijkse database-backup
-
 on:
   schedule:
     # Elke zondag om 03:00 UTC (04:00/05:00 Brusselse tijd, afhankelijk van zomer-/wintertijd)
     - cron: '0 3 * * 0'
   workflow_dispatch: {}  # laat toe om ook manueel een backup te maken via GitHub
-
 jobs:
   backup:
     runs-on: ubuntu-latest
@@ -16,25 +14,21 @@ jobs:
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-17
-
       - name: Bestandsnaam met datum bepalen
         id: datum
         run: echo "stamp=$(date -u +%Y-%m-%d_%H%M)" >> "$GITHUB_OUTPUT"
-
       - name: Database dumpen
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" -F c -f "digidokters_${{ steps.datum.outputs.stamp }}.dump"
-
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" -F c -Z 9 -f "digidokters_${{ steps.datum.outputs.stamp }}.dump"
       - name: Dump als artifact bewaren
         uses: actions/upload-artifact@v4
         with:
           name: digidokters-backup-${{ steps.datum.outputs.stamp }}
           path: digidokters_${{ steps.datum.outputs.stamp }}.dump
           retention-days: 90
-
-      - name: Stuur succes e-mail met backup bijlage
+      - name: Stuur succes e-mail (zonder bijlage)
         if: success()
         uses: dawidd6/action-send-mail@v4
         with:
@@ -47,16 +41,16 @@ jobs:
           from: Digidokters System <digidokters.admin@gmail.com>
           body: |
             Beste beheerder,
-            
+
             De wekelijkse database-backup van de Digidokters-database is succesvol voltooid.
-            
+
             Details:
             - Tijdstip: ${{ steps.datum.outputs.stamp }} UTC
             - Bestandsnaam: digidokters_${{ steps.datum.outputs.stamp }}.dump
-            
-            Het backup-bestand is als bijlage aan deze e-mail toegevoegd en is tevens gedurende 90 dagen beschikbaar als artifact in de GitHub Actions geschiedenis.
-          attachments: "digidokters_${{ steps.datum.outputs.stamp }}.dump"
 
+            Het backup-bestand is NIET bijgevoegd (te groot voor e-mail) maar is 90 dagen
+            beschikbaar als artifact in de GitHub Actions geschiedenis:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Stuur foutmelding e-mail
         if: failure()
         uses: dawidd6/action-send-mail@v4
@@ -70,8 +64,8 @@ jobs:
           from: Digidokters System <digidokters.admin@gmail.com>
           body: |
             Beste beheerder,
-            
+
             De wekelijkse database-backup van de Digidokters-database is mislukt!
-            
+
             Gelieve de logs in de GitHub Actions tab te controleren:
             https://github.com/${{ github.repository }}/actions

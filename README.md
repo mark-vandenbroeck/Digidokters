@@ -83,6 +83,11 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
 *   **Case-insensitive matching:** Voorkomt duplicaten in de database door hoofdletterongevoelig te zoeken naar bestaande digidokters (bijv. `daniël` wordt gekoppeld aan de bestaande `Daniël`).
 *   **Duplicatenpreventie:** Slaat rijen met identieke combinaties van `(datum, uur_van, uur_tot, type_id)` automatisch over.
 
+### 8. Keep-alive & Health Check (`/ping`)
+*   **Health Check Endpoint:** Het endpoint `/ping` geeft simpelweg de tekst `'OK'` terug en dient om te verifiëren of de applicatie actief is.
+*   **Bypass:** Dit endpoint omzeilt alle authenticatie-, autorisatie- en multi-tenancy-controles, waardoor externe monitoringtools of keep-alive scripts de app snel en zonder database-overhead kunnen controleren.
+*   **Keep-alive Workflow:** Een GitHub Actions-workflow (`.github/workflows/keep-alive.yml`) roept dit endpoint elke 10 minuten aan (tussen 8u en 22u Brusselse tijd) om te voorkomen dat de gratis Render.com-instantie in slaap valt.
+
 ---
 
 ## 💻 Lokale Installatie & Setup

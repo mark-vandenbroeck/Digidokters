@@ -77,6 +77,7 @@ def create_app(config_class=Config):
                 'static',
                 'service_worker',
                 'test_mail',
+                'ping',
                 'auth.login',
                 'auth.logout',
                 'auth.select_org',
@@ -146,6 +147,11 @@ def create_app(config_class=Config):
                 'status': 'error',
                 'message': f'Fout bij het verzenden van e-mail: {str(e)}'
             }), 500
+
+
+    @app.route('/ping')
+    def ping():
+        return 'OK'
 
 
     @app.after_request

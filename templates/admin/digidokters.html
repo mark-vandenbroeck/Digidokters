@@ -21,6 +21,7 @@
                     <tr>
                         <th class="ps-3" style="width:60px">Sortering</th>
                         <th>Naam</th>
+                        <th>E-mailadres</th>
                         <th>Status</th>
                         <th class="pe-3 text-end">Acties</th>
                     </tr>
@@ -45,6 +46,13 @@
                             <span class="text-muted" style="font-size: 0.75rem; opacity: 0.6; font-weight: normal; margin-left: 4px;">#{{ item.id }}</span>
                         </td>
                         <td>
+                            {% if item.email %}
+                            {{ item.email }}
+                            {% else %}
+                            <span class="text-muted fst-italic">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
                             {% if item.actief %}
                             <span class="badge bg-success">Actief</span>
                             {% else %}
@@ -61,6 +69,18 @@
                                title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
                                 <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
                             </a>
+                            {% if item.registraties|length == 0 %}
+                            <form action="{{ url_for('admin.digidokter_verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u digidokter {{ item.naam }} wilt verwijderen?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: er staan nog {{ item.registraties|length }} registratie(s) op deze naam">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

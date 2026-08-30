@@ -118,9 +118,14 @@ class BaseTestCase(unittest.TestCase):
         db.session.add_all([self.digidokter, self.age_category, self.device, self.herkomst])
         db.session.commit()
 
-    def login(self, username, password):
+    def login(self, identifier, password):
+        if '@' in identifier:
+            email = identifier
+        else:
+            u = User.query.filter(db.func.lower(User.naam) == identifier.lower()).first()
+            email = u.email if u and u.email else 'admin@test.com'
         return self.client.post('/login', data={
-            'naam': username,
+            'email': email,
             'wachtwoord': password
         }, follow_redirects=True)
 

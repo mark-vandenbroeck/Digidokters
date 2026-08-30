@@ -64,7 +64,7 @@ Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 
 ### 5. Wachtwoord Vergeten & Herstelprocedure
 *   Ingebouwde herstelprocedure via het inlogscherm.
-*   Gebruikers voeren hun gebruikersnaam in en ontvangen een 6-cijferige verificatiecode op hun geregistreerde e-mailadres via de Brevo HTTPS REST API.
+*   Gebruikers voeren hun e-mailadres in en ontvangen een 6-cijferige verificatiecode op hun e-mailadres via de Brevo HTTPS REST API.
 *   De code heeft een verlooptijd van exact 30 minuten.
 *   Bij invoer van de juiste code kan de gebruiker een nieuw wachtwoord instellen dat direct wordt gevalideerd op complexiteitseisen.
 
@@ -126,8 +126,8 @@ flask seed
 ```
 
 *De standaard admin-inloggegevens na seeding zijn:*
-*   **Gebruikersnaam:** `PlatformAdmin`
-*   **Wachtwoord:** `PlatformAdmin123!`
+*   **E-mailadres:** `digidokters.admin@gmail.com`
+*   **Wachtwoord:** `Digidokter2024!`
 
 ### 4. Applicatie starten
 Start de lokale ontwikkelserver:

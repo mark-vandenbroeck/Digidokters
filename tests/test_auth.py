@@ -12,9 +12,9 @@ class TestAuth(BaseTestCase):
 
     def test_login_invalid_password(self):
         # Test login with invalid password
-        response = self.login("UserTim", "wrongpassword")
+        response = self.login("tim@test.com", "wrongpassword")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("ongeldige naam of wachtwoord", response.data.decode('utf-8').lower())
+        self.assertIn("ongeldig e-mailadres of wachtwoord", response.data.decode('utf-8').lower())
 
     def test_login_inactive_user(self):
         # Deactivate user and attempt login
@@ -22,13 +22,13 @@ class TestAuth(BaseTestCase):
         self.medewerker_user.actief = False
         db.session.commit()
 
-        response = self.login("UserTim", "password123")
+        response = self.login("tim@test.com", "password123")
         self.assertEqual(response.status_code, 200)
         self.assertIn("gedeactiveerd", response.data.decode('utf-8').lower())
 
     def test_logout(self):
         # Log in first
-        self.login("UserTim", "password123")
+        self.login("tim@test.com", "password123")
         
         # Log out
         response = self.logout()
@@ -38,7 +38,7 @@ class TestAuth(BaseTestCase):
 
     def test_select_organisatie_success(self):
         # Log in and select organization
-        self.login("AdminMark", "password123")
+        self.login("admin@test.com", "password123")
         response = self.select_organisatie(self.org.id)
         self.assertEqual(response.status_code, 200)
         
@@ -47,8 +47,8 @@ class TestAuth(BaseTestCase):
             self.assertEqual(sess.get('organisatie_id'), self.org.id)
 
     def test_password_reset_lockout(self):
-        # 1. Request reset code for UserTim
-        response = self.client.post('/wachtwoord-vergeten', data={'naam': 'UserTim'}, follow_redirects=True)
+        # 1. Request reset code for tim@test.com
+        response = self.client.post('/wachtwoord-vergeten', data={'email': 'tim@test.com'}, follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         self.assertIn("herstelcode", response.data.decode('utf-8').lower())
 

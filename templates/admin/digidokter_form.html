@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}{{ actie }} Digidokter – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-12 col-md-8 col-lg-6">
+
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <a href="{{ url_for('admin.digidokters') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="dd-page-title mb-0">
+            <i class="bi bi-person-badge me-2 text-primary"></i>{{ actie }} Digidokter
+        </h1>
+    </div>
+    <p class="dd-page-subtitle mb-3">
+        Koppel een vrijwilliger (Digidokter) aan een bestaand gebruikersaccount op basis van e-mailadres.
+    </p>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form method="POST" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="mb-4">
+                    <label for="naam" class="form-label fw-semibold">Naam Digidokter</label>
+                    <input type="text" class="form-control" id="naam" name="naam"
+                           value="{{ form_data.naam if form_data else (item.naam if item else '') }}"
+                           placeholder="Voer optioneel een specifieke naam in (bijv. Briek)">
+                    <div class="form-text">
+                        De weergavenaam van de vrijwilliger. Indien leeg gelaten bij een nieuwe digidokter, wordt de naam van de gebruiker gebruikt. Bestaande namen (zoals Briek) blijven behouden.
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="email" class="form-label fw-semibold">E-mailadres gebruiker <span class="text-danger">*</span></label>
+                    <input type="email" class="form-control" id="email" name="email"
+                           list="gebruikers_lijst"
+                           value="{{ form_data.email if form_data else (item.email if item and item.email else '') }}"
+                           placeholder="naam@voorbeeld.be" required autofocus>
+                    <datalist id="gebruikers_lijst">
+                        {% for u in gebruikers %}
+                        {% if u.email %}
+                        <option value="{{ u.email }}">{{ u.naam }} ({{ u.email }})</option>
+                        {% endif %}
+                        {% endfor %}
+                    </datalist>
+                    <div class="form-text">
+                        Voer het e-mailadres in van een bestaande gebruiker binnen deze organisatie. (Nog geen account? Maak deze eerst aan via <a href="{{ url_for('admin.gebruiker_nieuw') }}" target="_blank">Gebruikersbeheer</a>).
+                    </div>
+                </div>
+
+                <div class="form-check mb-4">
+                    <input class="form-check-input" type="checkbox" id="actief" name="actief"
+                           {% if item is none or item.actief %}checked{% endif %}>
+                    <label class="form-check-label fw-semibold" for="actief">
+                        Actief als Digidokter
+                    </label>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Opslaan
+                    </button>
+                    <a href="{{ url_for('admin.digidokters') }}" class="btn btn-outline-secondary">Annuleren</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}

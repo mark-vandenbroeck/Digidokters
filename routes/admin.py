@@ -23,10 +23,40 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/beheer')
 def gebruikers():
     from utils.tenant import get_huidige_organisatie_id
     from models.organisatie import UserOrganisatie
+    from models.registration import Registration
     org_id = get_huidige_organisatie_id()
-    memberships = UserOrganisatie.query.filter_by(organisatie_id=org_id).all()
-    memberships = sorted(memberships, key=lambda x: x.user.naam.lower())
-    return render_template('admin/users.html', memberships=memberships)
+
+    sort_by = request.args.get('sort_by', 'naam').strip()
+    direction = request.args.get('direction', 'asc').strip()
+
+    query = UserOrganisatie.query.join(User, UserOrganisatie.user_id == User.id).filter(UserOrganisatie.organisatie_id == org_id)
+
+    if sort_by == 'email':
+        order_col = User.email.desc() if direction == 'desc' else User.email.asc()
+    elif sort_by == 'rol':
+        order_col = UserOrganisatie.rol.desc() if direction == 'desc' else UserOrganisatie.rol.asc()
+    elif sort_by == 'status':
+        order_col = UserOrganisatie.actief.desc() if direction == 'desc' else UserOrganisatie.actief.asc()
+    elif sort_by == 'laatste_login':
+        order_col = User.laatste_login.desc() if direction == 'desc' else User.laatste_login.asc()
+    else:  # sort_by == 'naam'
+        order_col = User.naam.desc() if direction == 'desc' else User.naam.asc()
+
+    memberships = query.order_by(order_col).all()
+
+    digidokter_counts = {}
+    for m in memberships:
+        u = m.user
+        count = Digidokter.query.filter_by(user_id=u.id).count()
+        digidokter_counts[u.id] = count
+
+    return render_template(
+        'admin/users.html',
+        memberships=memberships,
+        digidokter_counts=digidokter_counts,
+        sort_by=sort_by,
+        direction=direction
+    )
 
 
 @admin_bp.route('/gebruikers/nieuw', methods=['GET', 'POST'])
@@ -48,16 +78,16 @@ def gebruiker_nieuw():
             flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
             return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
 
-        if not naam or not tijdelijk_ww:
-            flash('Naam en wachtwoord zijn verplicht.', 'danger')
-            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None)
+        if not naam or not email or not tijdelijk_ww:
+            flash('Naam, e-mailadres en wachtwoord zijn verplicht.', 'danger')
+            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
 
-        # Check of gebruiker al bestaat globally
-        user = User.query.filter(db.func.lower(User.naam) == naam.lower()).first()
+        # Check of gebruiker al bestaat globally op e-mailadres
+        user = User.query.filter(db.func.lower(User.email) == email).first()
         if user:
             uo_existing = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first()
             if uo_existing:
-                flash('Er bestaat al een gebruiker met deze naam in deze organisatie.', 'danger')
+                flash('Er bestaat al een gebruiker met dit e-mailadres in deze organisatie.', 'danger')
                 return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
             
             uo = UserOrganisatie(
@@ -76,12 +106,8 @@ def gebruiker_nieuw():
                 db.session.add(dd)
                 
             db.session.commit()
-            flash(f'Bestaande gebruiker {user.naam} gekoppeld aan de organisatie.', 'success')
+            flash(f'Bestaande gebruiker {user.naam} ({user.email}) gekoppeld aan de organisatie.', 'success')
             return redirect(url_for('admin.gebruikers'))
-
-        if email and User.query.filter(db.func.lower(User.email) == email).first():
-            flash('Dit e-mailadres is al in gebruik.', 'danger')
-            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
 
         user = User(
             naam=naam,
@@ -209,6 +235,38 @@ def gebruiker_toggle(user_id):
     return redirect(url_for('admin.gebruikers'))
 
 
+@admin_bp.route('/gebruikers/<int:user_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def gebruiker_verwijderen(user_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from models.organisatie import UserOrganisatie
+    from models.registration import Registration
+    org_id = get_huidige_organisatie_id()
+
+    user = db.get_or_404(User, user_id)
+    if user.id == current_user.id:
+        flash('U kunt uw eigen account niet verwijderen.', 'danger')
+        return redirect(url_for('admin.gebruikers'))
+
+    if user.id == 1:
+        flash('De hoofdbeheerder kan niet worden verwijderd.', 'danger')
+        return redirect(url_for('admin.gebruikers'))
+
+    # Controleer of er een Digidokter gekoppeld is aan dit gebruikersaccount
+    dd_count = Digidokter.query.filter_by(user_id=user.id).count()
+    if dd_count > 0:
+        flash(f'Gebruiker {user.naam} ({user.email}) kan niet worden verwijderd omdat er nog een Digidokter aan dit account is gekoppeld. Verwijder of ontkoppel eerst de Digidokter.', 'danger')
+        return redirect(url_for('admin.gebruikers'))
+
+    naam = user.naam
+    db.session.delete(user)
+    db.session.commit()
+
+    flash(f'Gebruiker {naam} is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.gebruikers'))
+
+
 # ─── Generieke beheer helper ─────────────────────────────────────────────────
 
 def _beheer_lijst(model, template, naam_veld='naam'):
@@ -277,22 +335,59 @@ def digidokters():
 @admin_required
 def digidokter_nieuw():
     from utils.tenant import get_huidige_organisatie_id
+    from models.organisatie import UserOrganisatie
+    from models.user import User
     org_id = get_huidige_organisatie_id()
 
+    org_users = UserOrganisatie.query.filter_by(organisatie_id=org_id).all()
+    beschikbare_gebruikers = [uo.user for uo in org_users if uo.user]
+
     if request.method == 'POST':
-        naam = request.form.get('naam', '').strip()
-        if not naam:
-            flash('Naam is verplicht.', 'danger')
-            return render_template('admin/item_form.html', titel='Digidokter', actie='Nieuw',
-                                   item=None, terug_url=url_for('admin.digidokters'))
+        email = request.form.get('email', '').strip().lower()
+        actief = request.form.get('actief') == 'on'
+
+        if not email:
+            flash('E-mailadres is verplicht.', 'danger')
+            return render_template('admin/digidokter_form.html', actie='Nieuw', item=None, gebruikers=beschikbare_gebruikers, form_data=request.form)
+
+        user = User.query.filter(db.func.lower(User.email) == email).first()
+        if not user:
+            flash(f'Er bestaat geen gebruiker met e-mailadres "{email}". Maak deze gebruiker eerst aan in Gebruikersbeheer.', 'danger')
+            return render_template('admin/digidokter_form.html', actie='Nieuw', item=None, gebruikers=beschikbare_gebruikers, form_data=request.form)
+
+        uo = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first()
+        if not uo:
+            flash(f'Gebruiker {user.naam} ({user.email}) is nog niet gekoppeld aan deze organisatie.', 'danger')
+            return render_template('admin/digidokter_form.html', actie='Nieuw', item=None, gebruikers=beschikbare_gebruikers, form_data=request.form)
+
+        naam_invoer = request.form.get('naam', '').strip()
+        naam = naam_invoer if naam_invoer else user.naam
+
+        bestaande_dd = Digidokter.query.filter(
+            Digidokter.organisatie_id == org_id,
+            db.or_(
+                Digidokter.user_id == user.id,
+                db.func.lower(Digidokter.naam) == db.func.lower(naam)
+            )
+        ).first()
+        if bestaande_dd:
+            flash(f'Er bestaat in deze organisatie al een Digidokter genaamd "{naam}" of gekoppeld aan e-mailadres {user.email}.', 'danger')
+            return render_template('admin/digidokter_form.html', actie='Nieuw', item=None, gebruikers=beschikbare_gebruikers, form_data=request.form)
+
         max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).filter(Digidokter.organisatie_id == org_id).scalar() or 0
-        db.session.add(Digidokter(naam=naam, volgorde=max_volgorde + 1, organisatie_id=org_id,
-                                  actief=request.form.get('actief') == 'on'))
+        dd = Digidokter(
+            naam=naam,
+            user_id=user.id,
+            volgorde=max_volgorde + 1,
+            organisatie_id=org_id,
+            actief=actief
+        )
+        db.session.add(dd)
         db.session.commit()
-        flash(f'Digidokter {naam} toegevoegd.', 'success')
+        flash(f'Digidokter {naam} ({user.email}) succesvol toegevoegd.', 'success')
         return redirect(url_for('admin.digidokters'))
-    return render_template('admin/item_form.html', titel='Digidokter', actie='Nieuw',
-                           item=None, terug_url=url_for('admin.digidokters'))
+
+    return render_template('admin/digidokter_form.html', actie='Nieuw', item=None, gebruikers=beschikbare_gebruikers)
 
 
 @admin_bp.route('/digidokters/<int:item_id>/wijzig', methods=['GET', 'POST'])
@@ -300,21 +395,58 @@ def digidokter_nieuw():
 @admin_required
 def digidokter_wijzigen(item_id):
     from utils.tenant import get_huidige_organisatie_id
+    from models.organisatie import UserOrganisatie
+    from models.user import User
     org_id = get_huidige_organisatie_id()
     item = db.get_or_404(Digidokter, item_id)
     
     if item.organisatie_id != org_id:
         from flask import abort
         abort(403)
+
+    org_users = UserOrganisatie.query.filter_by(organisatie_id=org_id).all()
+    beschikbare_gebruikers = [uo.user for uo in org_users if uo.user]
         
     if request.method == 'POST':
-        item.naam = request.form.get('naam', item.naam).strip()
-        item.actief = request.form.get('actief') == 'on'
+        email = request.form.get('email', '').strip().lower()
+        actief = request.form.get('actief') == 'on'
+        naam_invoer = request.form.get('naam', '').strip()
+        doel_naam = naam_invoer if naam_invoer else item.naam
+
+        if not email:
+            flash('E-mailadres is verplicht.', 'danger')
+            return render_template('admin/digidokter_form.html', actie='Wijzigen', item=item, gebruikers=beschikbare_gebruikers, form_data=request.form)
+
+        user = User.query.filter(db.func.lower(User.email) == email).first()
+        if not user:
+            flash(f'Er bestaat geen gebruiker met e-mailadres "{email}". Maak deze gebruiker eerst aan in Gebruikersbeheer.', 'danger')
+            return render_template('admin/digidokter_form.html', actie='Wijzigen', item=item, gebruikers=beschikbare_gebruikers, form_data=request.form)
+
+        uo = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first()
+        if not uo:
+            flash(f'Gebruiker {user.naam} ({user.email}) is niet gekoppeld aan deze organisatie.', 'danger')
+            return render_template('admin/digidokter_form.html', actie='Wijzigen', item=item, gebruikers=beschikbare_gebruikers, form_data=request.form)
+
+        bestaande_dd = Digidokter.query.filter(
+            Digidokter.organisatie_id == org_id,
+            Digidokter.id != item.id,
+            db.or_(
+                Digidokter.user_id == user.id,
+                db.func.lower(Digidokter.naam) == db.func.lower(doel_naam)
+            )
+        ).first()
+        if bestaande_dd:
+            flash(f'Er bestaat in deze organisatie al een andere Digidokter genaamd "{doel_naam}" of gekoppeld aan e-mailadres {user.email}.', 'danger')
+            return render_template('admin/digidokter_form.html', actie='Wijzigen', item=item, gebruikers=beschikbare_gebruikers, form_data=request.form)
+
+        item.user_id = user.id
+        item.naam = doel_naam
+        item.actief = actief
         db.session.commit()
-        flash(f'{item.naam} bijgewerkt.', 'success')
+        flash(f'Digidokter {item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.digidokters'))
-    return render_template('admin/item_form.html', titel='Digidokter', actie='Wijzigen',
-                           item=item, terug_url=url_for('admin.digidokters'))
+
+    return render_template('admin/digidokter_form.html', actie='Wijzigen', item=item, gebruikers=beschikbare_gebruikers)
 
 
 @admin_bp.route('/digidokters/<int:item_id>/toggle')
@@ -322,6 +454,29 @@ def digidokter_wijzigen(item_id):
 @admin_required
 def digidokter_toggle(item_id):
     return _beheer_toggle(Digidokter, item_id, 'admin.digidokters')
+
+
+@admin_bp.route('/digidokters/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def digidokter_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    dd = db.get_or_404(Digidokter, item_id)
+
+    if dd.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    if len(dd.registraties) > 0:
+        flash(f'Digidokter {dd.naam} kan niet worden verwijderd omdat er nog {len(dd.registraties)} registratie(s) op zijn/haar naam staan. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.digidokters'))
+
+    naam = dd.naam
+    db.session.delete(dd)
+    db.session.commit()
+    flash(f'Digidokter {naam} is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.digidokters'))
 
 
 @admin_bp.route('/digidokters/<int:item_id>/volgorde/<richting>')

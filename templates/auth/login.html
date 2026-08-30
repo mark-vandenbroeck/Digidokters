@@ -30,15 +30,15 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="mb-3">
-                <label for="naam" class="form-label">Naam</label>
+                <label for="email" class="form-label">E-mailadres</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light border-end-0">
-                        <i class="bi bi-person text-muted"></i>
+                        <i class="bi bi-envelope text-muted"></i>
                     </span>
-                    <input type="text" class="form-control border-start-0 ps-0"
-                           id="naam" name="naam"
-                           placeholder="Gebruikersnaam"
-                           autocomplete="username" required autofocus>
+                    <input type="email" class="form-control border-start-0 ps-0"
+                           id="email" name="email"
+                           placeholder="naam@voorbeeld.be"
+                           autocomplete="email" required autofocus>
                 </div>
             </div>
 

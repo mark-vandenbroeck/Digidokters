@@ -7,6 +7,22 @@
     <p class="dd-page-subtitle mb-0">Beheer de toegang van gebruikers tot de verschillende organisaties</p>
 </div>
 
+{% macro sort_link(col_name, display_text) %}
+    {% set target_dir = 'desc' if sort_by == col_name and direction == 'asc' else 'asc' %}
+    <a href="{{ url_for('platform.koppelingen', sort_by=col_name, direction=target_dir) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+        {{ display_text }}
+        {% if sort_by == col_name %}
+            {% if direction == 'asc' %}
+                <i class="bi bi-arrow-up-short"></i>
+            {% else %}
+                <i class="bi bi-arrow-down-short"></i>
+            {% endif %}
+        {% else %}
+            <i class="bi bi-arrow-down-up text-muted" style="font-size: 0.8em; opacity: 0.4;"></i>
+        {% endif %}
+    </a>
+{% endmacro %}
+
 <div class="row g-4">
     <!-- Lijst van koppelingen -->
     <div class="col-12 col-lg-8">
@@ -18,10 +34,10 @@
                     <table class="table table-hover mb-0">
                         <thead>
                             <tr>
-                                <th class="ps-3">Gebruiker</th>
-                                <th>Organisatie</th>
-                                <th>Rol</th>
-                                <th>Status</th>
+                                <th class="ps-3">{{ sort_link('gebruiker', 'Gebruiker') }}</th>
+                                <th>{{ sort_link('organisatie', 'Organisatie') }}</th>
+                                <th>{{ sort_link('rol', 'Rol') }}</th>
+                                <th>{{ sort_link('status', 'Status') }}</th>
                                 <th class="pe-3 text-end">Acties</th>
                             </tr>
                         </thead>

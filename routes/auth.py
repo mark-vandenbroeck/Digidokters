@@ -43,13 +43,13 @@ def login():
         return redirect(url_for('reg.lijst'))
 
     if request.method == 'POST':
-        naam = request.form.get('naam', '').strip()
+        email = request.form.get('email', '').strip().lower()
         wachtwoord = request.form.get('wachtwoord', '')
 
-        gebruiker = User.query.filter(db.func.lower(User.naam) == naam.lower()).first()
+        gebruiker = User.query.filter(db.func.lower(User.email) == email).first()
 
         if not gebruiker or not check_password_hash(gebruiker.wachtwoord_hash, wachtwoord):
-            flash('Ongeldige naam of wachtwoord.', 'danger')
+            flash('Ongeldig e-mailadres of wachtwoord.', 'danger')
             return render_template('auth/login.html')
 
         if not gebruiker.actief:
@@ -224,19 +224,15 @@ def wachtwoord_vergeten():
         return redirect(url_for('reg.lijst'))
 
     if request.method == 'POST':
-        naam = request.form.get('naam', '').strip()
-        if not naam:
-            flash('Vul uw gebruikersnaam in.', 'danger')
+        email = request.form.get('email', '').strip().lower()
+        if not email:
+            flash('Vul uw e-mailadres in.', 'danger')
             return render_template('auth/wachtwoord_vergeten.html')
 
-        user = User.query.filter(db.func.lower(User.naam) == naam.lower()).first()
+        user = User.query.filter(db.func.lower(User.email) == email).first()
 
         if not user:
-            flash('Gebruikersnaam is niet bekend. Neem contact op met uw beheerder.', 'danger')
-            return render_template('auth/wachtwoord_vergeten.html')
-
-        if not user.email:
-            flash('Er is geen e-mailadres gekoppeld aan deze gebruiker. Neem contact op met uw beheerder.', 'danger')
+            flash('E-mailadres is niet bekend. Neem contact op met uw beheerder.', 'danger')
             return render_template('auth/wachtwoord_vergeten.html')
 
         if not user.actief:

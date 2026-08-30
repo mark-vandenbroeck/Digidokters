@@ -41,6 +41,8 @@ def lijst():
     filter_digidokter = request.args.get('digidokter', 0, type=int)
     filter_datum_van = request.args.get('datum_van', '')
     filter_datum_tot = request.args.get('datum_tot', '')
+    sort_by = request.args.get('sort_by', 'datum').strip()
+    direction = request.args.get('direction', 'desc').strip()
 
     from utils.tenant import filter_op_organisatie
     query = (
@@ -51,7 +53,6 @@ def lijst():
             joinedload(Registration.toestel),
             joinedload(Registration.herkomst)
         )
-        .order_by(Registration.datum.desc(), Registration.id.desc())
     )
 
     if zoek:
@@ -76,6 +77,36 @@ def lijst():
         except ValueError:
             pass
 
+    # Sortering toepassen
+    if sort_by == 'nummer':
+        order_col = Registration.registratienummer.desc() if direction == 'desc' else Registration.registratienummer.asc()
+        query = query.order_by(order_col)
+    elif sort_by == 'client':
+        order_col = Registration.client.desc() if direction == 'desc' else Registration.client.asc()
+        query = query.order_by(order_col)
+    elif sort_by == 'digidokter':
+        query = query.outerjoin(Digidokter, Registration.digidokter_id == Digidokter.id)
+        order_col = Digidokter.naam.desc() if direction == 'desc' else Digidokter.naam.asc()
+        query = query.order_by(order_col)
+    elif sort_by == 'leeftijd':
+        query = query.outerjoin(AgeCategory, Registration.leeftijdscategorie_id == AgeCategory.id)
+        if direction == 'desc':
+            query = query.order_by(AgeCategory.volgorde.desc(), AgeCategory.naam.desc())
+        else:
+            query = query.order_by(AgeCategory.volgorde.asc(), AgeCategory.naam.asc())
+    elif sort_by == 'toestel':
+        query = query.outerjoin(Device, Registration.toestel_id == Device.id)
+        order_col = Device.naam.desc() if direction == 'desc' else Device.naam.asc()
+        query = query.order_by(order_col)
+    elif sort_by == 'nieuw':
+        order_col = Registration.nieuwe_klant.desc() if direction == 'desc' else Registration.nieuwe_klant.asc()
+        query = query.order_by(order_col)
+    else:  # sort_by == 'datum'
+        if direction == 'asc':
+            query = query.order_by(Registration.datum.asc(), Registration.id.asc())
+        else:
+            query = query.order_by(Registration.datum.desc(), Registration.id.desc())
+
     paginatie = query.paginate(page=pagina, per_page=PAGINA_GROOTTE, error_out=False)
     digidokters = filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.naam).all()
 
@@ -88,6 +119,8 @@ def lijst():
         filter_datum_van=filter_datum_van,
         filter_datum_tot=filter_datum_tot,
         digidokters=digidokters,
+        sort_by=sort_by,
+        direction=direction,
     )
 
 

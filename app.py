@@ -349,19 +349,40 @@ def create_app(config_class=Config):
     # Synchroniseer bestaande gebruikers als Digidokter op de achtergrond bij het opstarten
     with app.app_context():
         try:
+            try:
+                db.session.execute(db.text("ALTER TABLE digidokters ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
             from models.organisatie import UserOrganisatie
             from models.digidokter import Digidokter
+            from models.user import User
+            unlinked_dds = Digidokter.query.filter(Digidokter.user_id == None).all()
+            for dd in unlinked_dds:
+                u = User.query.filter(
+                    db.func.lower(User.naam) == db.func.lower(dd.naam),
+                    User.email != None,
+                    User.email != ''
+                ).first()
+                if u:
+                    dd.user_id = u.id
+
             memberships = UserOrganisatie.query.all()
             synced = 0
             for m in memberships:
-                existing = Digidokter.query.filter_by(organisatie_id=m.organisatie_id, naam=m.user.naam).first()
+                existing = Digidokter.query.filter_by(organisatie_id=m.organisatie_id, user_id=m.user_id).first()
                 if not existing:
-                    max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).filter_by(organisatie_id=m.organisatie_id).scalar() or 0
-                    dd = Digidokter(naam=m.user.naam, actief=True, volgorde=max_volgorde + 1, organisatie_id=m.organisatie_id)
-                    db.session.add(dd)
-                    synced += 1
+                    existing_by_name = Digidokter.query.filter_by(organisatie_id=m.organisatie_id, naam=m.user.naam).first()
+                    if existing_by_name:
+                        existing_by_name.user_id = m.user_id
+                    else:
+                        max_volgorde = db.session.query(db.func.max(Digidokter.volgorde)).filter_by(organisatie_id=m.organisatie_id).scalar() or 0
+                        dd = Digidokter(naam=m.user.naam, user_id=m.user_id, actief=True, volgorde=max_volgorde + 1, organisatie_id=m.organisatie_id)
+                        db.session.add(dd)
+                        synced += 1
+            db.session.commit()
             if synced > 0:
-                db.session.commit()
                 print(f"✓ Synchronisatie: {synced} gebruikers gesynchroniseerd als Digidokter")
         except Exception:
             pass
@@ -372,4 +393,5 @@ def create_app(config_class=Config):
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5050, debug=True)
+    port = int(os.environ.get('PORT', 5051))
+    app.run(host='0.0.0.0', port=port, debug=True)

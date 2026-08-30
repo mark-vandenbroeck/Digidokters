@@ -30,13 +30,13 @@
                     <label for="naam" class="form-label">Volledige naam <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="naam" name="naam"
                            value="{{ form_data.naam if form_data else (user.naam if user else '') }}" required>
-                    <div class="form-text">Deze naam wordt gebruikt om in te loggen — moet uniek zijn.</div>
                 </div>
 
                 <div class="mb-3">
-                    <label for="email" class="form-label">E-mailadres</label>
+                    <label for="email" class="form-label">E-mailadres <span class="text-danger">*</span></label>
                     <input type="email" class="form-control" id="email" name="email"
-                           value="{{ form_data.email if form_data else (user.email if user else '') }}">
+                           value="{{ form_data.email if form_data else (user.email if user else '') }}" required>
+                    <div class="form-text">Dit e-mailadres wordt gebruikt om in te loggen — moet uniek zijn.</div>
                 </div>
 
                 <div class="mb-3">

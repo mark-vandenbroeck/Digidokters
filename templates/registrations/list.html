@@ -14,10 +14,28 @@
     {% endif %}
 </div>
 
+{% macro sort_link(col_name, display_text) %}
+    {% set target_dir = 'desc' if sort_by == col_name and direction == 'asc' else 'asc' %}
+    <a href="{{ url_for('reg.lijst', sort_by=col_name, direction=target_dir, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+        {{ display_text }}
+        {% if sort_by == col_name %}
+            {% if direction == 'asc' %}
+                <i class="bi bi-arrow-up-short"></i>
+            {% else %}
+                <i class="bi bi-arrow-down-short"></i>
+            {% endif %}
+        {% else %}
+            <i class="bi bi-arrow-down-up text-muted" style="font-size: 0.8em; opacity: 0.4;"></i>
+        {% endif %}
+    </a>
+{% endmacro %}
+
 <!-- Zoekbalk & filters -->
 <div class="card mb-3">
     <div class="card-body py-3">
         <form method="GET" action="{{ url_for('reg.lijst') }}" id="zoekForm">
+            <input type="hidden" name="sort_by" value="{{ sort_by }}">
+            <input type="hidden" name="direction" value="{{ direction }}">
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-sm-6 col-lg-3">
                     <label class="form-label mb-1">Zoeken</label>
@@ -67,13 +85,13 @@
             <table class="table table-hover mb-0">
                 <thead>
                     <tr>
-                        <th class="ps-3">Nr.</th>
-                        <th>Datum</th>
-                        <th>Cliënt</th>
-                        <th class="d-none d-md-table-cell">Digidokter</th>
-                        <th class="d-none d-lg-table-cell">Leeftijd</th>
-                        <th class="d-none d-lg-table-cell">Toestel</th>
-                        <th class="d-none d-md-table-cell">Nieuw</th>
+                        <th class="ps-3">{{ sort_link('nummer', 'Nr.') }}</th>
+                        <th>{{ sort_link('datum', 'Datum') }}</th>
+                        <th>{{ sort_link('client', 'Cliënt') }}</th>
+                        <th class="d-none d-md-table-cell">{{ sort_link('digidokter', 'Digidokter') }}</th>
+                        <th class="d-none d-lg-table-cell">{{ sort_link('leeftijd', 'Leeftijd') }}</th>
+                        <th class="d-none d-lg-table-cell">{{ sort_link('toestel', 'Toestel') }}</th>
+                        <th class="d-none d-md-table-cell">{{ sort_link('nieuw', 'Nieuw') }}</th>
                         <th class="pe-3 text-end">Acties</th>
                     </tr>
                 </thead>
@@ -134,7 +152,7 @@
                 <ul class="pagination pagination-sm mb-0">
                     {% if paginatie.has_prev %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.prev_num, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}">
+                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.prev_num, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     </li>
@@ -142,7 +160,7 @@
                     {% for p in paginatie.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
                         {% if p %}
                         <li class="page-item {{ 'active' if p == paginatie.page }}">
-                            <a class="page-link" href="{{ url_for('reg.lijst', pagina=p, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}">{{ p }}</a>
+                            <a class="page-link" href="{{ url_for('reg.lijst', pagina=p, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">{{ p }}</a>
                         </li>
                         {% else %}
                         <li class="page-item disabled"><span class="page-link">…</span></li>
@@ -150,7 +168,7 @@
                     {% endfor %}
                     {% if paginatie.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.next_num, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}">
+                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.next_num, zoek=zoek, digidokter=filter_digidokter, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">
                             <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>

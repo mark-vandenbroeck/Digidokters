@@ -144,14 +144,30 @@ def koppelingen():
         flash(f'Gebruiker {user.naam} succesvol gekoppeld aan {org.naam}.', 'success')
         return redirect(url_for('platform.koppelingen'))
 
-    links = UserOrganisatie.query.join(User).order_by(User.naam).all()
+    sort_by = request.args.get('sort_by', 'gebruiker').strip()
+    direction = request.args.get('direction', 'asc').strip()
+
+    query = UserOrganisatie.query.join(User, UserOrganisatie.user_id == User.id).join(Organisatie, UserOrganisatie.organisatie_id == Organisatie.id)
+
+    if sort_by == 'organisatie':
+        order_col = Organisatie.naam.desc() if direction == 'desc' else Organisatie.naam.asc()
+    elif sort_by == 'rol':
+        order_col = UserOrganisatie.rol.desc() if direction == 'desc' else UserOrganisatie.rol.asc()
+    elif sort_by == 'status':
+        order_col = UserOrganisatie.actief.desc() if direction == 'desc' else UserOrganisatie.actief.asc()
+    else:  # sort_by == 'gebruiker'
+        order_col = User.naam.desc() if direction == 'desc' else User.naam.asc()
+
+    links = query.order_by(order_col).all()
     all_users = User.query.order_by(User.naam).all()
     all_orgs = Organisatie.query.order_by(Organisatie.naam).all()
     return render_template(
         'platform/koppelingen.html',
         links=links,
         users=all_users,
-        organisaties=all_orgs
+        organisaties=all_orgs,
+        sort_by=sort_by,
+        direction=direction
     )
 
 @platform_bp.route('/koppelingen/<int:link_id>/toggle')

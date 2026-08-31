@@ -30,6 +30,11 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* ── Utilities ──────────────────────────────────────────────── */
+.min-w-0 {
+    min-width: 0 !important;
+}
+
 /* ── Layout wrapper ─────────────────────────────────────────── */
 .dd-wrapper {
     display: flex;

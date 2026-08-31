@@ -93,12 +93,11 @@ def upgrade():
 
     op.add_column('activity_types', sa.Column('heeft_evaluatie', sa.Boolean(), server_default=sa.false(), nullable=False))
 
-    # Data Seed: configureer Digicafé evaluatieformulier en vragen
-    import json
+    # Data Seed: configureer Digicafé evaluatieformulier en vragen cross-database compatibel
     from datetime import datetime
 
     connection = op.get_bind()
-    now_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    now_dt = datetime.utcnow()
 
     digicafe_vragen = [
         {
@@ -187,61 +186,95 @@ def upgrade():
         }
     ]
 
-    try:
-        # Zet heeft_evaluatie = 1 voor Digicafé types
-        connection.execute(sa.text("UPDATE activity_types SET heeft_evaluatie = 1 WHERE lower(naam) LIKE '%digicaf%'"))
-        
-        # Haal alle Digicafé types op
-        digicafe_types = connection.execute(sa.text("SELECT id, organisatie_id, naam FROM activity_types WHERE lower(naam) LIKE '%digicaf%'")).fetchall()
-        for at_row in digicafe_types:
-            at_id = at_row[0]
-            org_id = at_row[1]
-            at_naam = at_row[2]
+    act_types_table = sa.table(
+        'activity_types',
+        sa.column('id', sa.Integer),
+        sa.column('organisatie_id', sa.Integer),
+        sa.column('naam', sa.String),
+        sa.column('heeft_evaluatie', sa.Boolean)
+    )
 
-            # Check of formulier al bestaat
-            existing_form = connection.execute(
-                sa.text("SELECT id FROM evaluatie_formulieren WHERE activity_type_id = :at_id AND organisatie_id = :org_id"),
-                {"at_id": at_id, "org_id": org_id}
-            ).fetchone()
+    eval_forms_table = sa.table(
+        'evaluatie_formulieren',
+        sa.column('id', sa.Integer),
+        sa.column('organisatie_id', sa.Integer),
+        sa.column('activity_type_id', sa.Integer),
+        sa.column('titel', sa.String),
+        sa.column('toelichting', sa.Text),
+        sa.column('actief', sa.Boolean),
+        sa.column('aangemaakt_op', sa.DateTime),
+        sa.column('gewijzigd_op', sa.DateTime)
+    )
 
-            if not existing_form:
-                connection.execute(
-                    sa.text("""
-                        INSERT INTO evaluatie_formulieren (organisatie_id, activity_type_id, titel, toelichting, actief, aangemaakt_op, gewijzigd_op)
-                        VALUES (:org_id, :at_id, :titel, :toelichting, :actief, :now_str, :now_str)
-                    """),
-                    {
-                        "org_id": org_id,
-                        "at_id": at_id,
-                        "titel": f"Evaluatie {at_naam}",
-                        "toelichting": f"Vul na afloop van het {at_naam} deze korte evaluatie in.",
-                        "actief": True,
-                        "now_str": now_str
-                    }
+    eval_vragen_table = sa.table(
+        'evaluatie_vragen',
+        sa.column('id', sa.Integer),
+        sa.column('form_id', sa.Integer),
+        sa.column('vraag_tekst', sa.Text),
+        sa.column('type', sa.String),
+        sa.column('opties', sa.JSON),
+        sa.column('volgorde', sa.Integer),
+        sa.column('verplicht', sa.Boolean)
+    )
+
+    # Zet heeft_evaluatie = True voor Digicafé types
+    connection.execute(
+        act_types_table.update()
+        .where(sa.func.lower(act_types_table.c.naam).like('%digicaf%'))
+        .values(heeft_evaluatie=True)
+    )
+    
+    # Haal alle Digicafé types op
+    digicafe_types = connection.execute(
+        sa.select(act_types_table.c.id, act_types_table.c.organisatie_id, act_types_table.c.naam)
+        .where(sa.func.lower(act_types_table.c.naam).like('%digicaf%'))
+    ).fetchall()
+
+    for at_row in digicafe_types:
+        at_id = at_row[0]
+        org_id = at_row[1]
+        at_naam = at_row[2]
+
+        existing_form = connection.execute(
+            sa.select(eval_forms_table.c.id)
+            .where(
+                eval_forms_table.c.activity_type_id == at_id,
+                eval_forms_table.c.organisatie_id == org_id
+            )
+        ).fetchone()
+
+        if not existing_form:
+            connection.execute(
+                eval_forms_table.insert().values(
+                    organisatie_id=org_id,
+                    activity_type_id=at_id,
+                    titel=f"Evaluatie {at_naam}",
+                    toelichting=f"Vul na afloop van het {at_naam} deze korte evaluatie in.",
+                    actief=True,
+                    aangemaakt_op=now_dt,
+                    gewijzigd_op=now_dt
                 )
-                form_id = connection.execute(
-                    sa.text("SELECT id FROM evaluatie_formulieren WHERE activity_type_id = :at_id AND organisatie_id = :org_id"),
-                    {"at_id": at_id, "org_id": org_id}
-                ).fetchone()[0]
+            )
+            form_row = connection.execute(
+                sa.select(eval_forms_table.c.id)
+                .where(
+                    eval_forms_table.c.activity_type_id == at_id,
+                    eval_forms_table.c.organisatie_id == org_id
+                )
+            ).fetchone()
+            form_id = form_row[0]
 
-                # Voeg alle 12 vragen toe
-                for v in digicafe_vragen:
-                    connection.execute(
-                        sa.text("""
-                            INSERT INTO evaluatie_vragen (form_id, vraag_tekst, type, opties, volgorde, verplicht)
-                            VALUES (:form_id, :vraag_tekst, :type, :opties, :volgorde, :verplicht)
-                        """),
-                        {
-                            "form_id": form_id,
-                            "vraag_tekst": v['vraag_tekst'],
-                            "type": v['type'],
-                            "opties": json.dumps(v['opties']),
-                            "volgorde": v['volgorde'],
-                            "verplicht": v['verplicht']
-                        }
+            for v in digicafe_vragen:
+                connection.execute(
+                    eval_vragen_table.insert().values(
+                        form_id=form_id,
+                        vraag_tekst=v['vraag_tekst'],
+                        type=v['type'],
+                        opties=v['opties'],
+                        volgorde=v['volgorde'],
+                        verplicht=v['verplicht']
                     )
-    except Exception as e:
-        print(f"Seed warning: {e}")
+                )
 
     # ### end Alembic commands ###
 

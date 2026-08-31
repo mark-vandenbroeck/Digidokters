@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+{% block title %}Evaluatieformulier Configureren – {{ act_type.naam }} – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('eval.overzicht') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div>
+            <h1 class="dd-page-title mb-0">
+                <i class="bi bi-ui-checks me-2 text-primary"></i>Evaluatieformulier: {{ act_type.naam }}
+            </h1>
+            <p class="dd-page-subtitle mb-0">Beheer de vragen en instellingen voor dit formulier</p>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#nieuweVraagModal">
+            <i class="bi bi-plus-lg me-1"></i>Nieuwe vraag toevoegen
+        </button>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Linkerkolom: Formulier Instellingen -->
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm sticky-top" style="top: 80px; z-index: 10;">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0 fw-bold text-dark">
+                    <i class="bi bi-gear me-2 text-primary"></i>Formulierinstellingen
+                </h2>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('eval.formulier_bewerken', type_id=act_type.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="mb-3">
+                        <label for="titel" class="form-label fw-semibold">Formuliertitel <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="titel" name="titel" value="{{ form.titel }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="toelichting" class="form-label fw-semibold">Toelichting voor de digidokter</label>
+                        <textarea class="form-control" id="toelichting" name="toelichting" rows="3" placeholder="Korte instructie...">{{ form.toelichting or '' }}</textarea>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="actief" name="actief" {% if form.actief %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="actief">
+                            Formulier actief
+                        </label>
+                        <div class="form-text text-muted small">Wanneer uitgeschakeld kunnen er geen nieuwe reacties worden ingestuurd.</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg me-1"></i>Instellingen opslaan
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechterkolom: Vragenlijst -->
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0 fw-bold text-dark">
+                    <i class="bi bi-question-circle me-2 text-primary"></i>Vragen in dit formulier ({{ form.vragen|length }})
+                </h2>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#nieuweVraagModal">
+                    <i class="bi bi-plus-lg me-1"></i>Vraag toevoegen
+                </button>
+            </div>
+            <div class="card-body p-3">
+                {% if form.vragen %}
+                <div class="d-flex flex-column gap-3">
+                    {% for vraag in form.vragen %}
+                    <div class="card border border-light-subtle shadow-sm bg-white">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-start justify-content-between gap-3">
+                                <div class="d-flex align-items-start gap-2 flex-grow-1">
+                                    <div class="badge bg-secondary-subtle text-secondary px-2.5 py-1.5 mt-1 fs-6">
+                                        #{{ loop.index }}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            {% if vraag.type == 'multiple_choice' %}
+                                                <span class="badge bg-info-subtle text-info border border-info-subtle">
+                                                    <i class="bi bi-ui-radios me-1"></i>Multiple Choice
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                                    <i class="bi bi-fonts me-1"></i>Open Tekstveld
+                                                </span>
+                                            {% endif %}
+
+                                            {% if vraag.verplicht %}
+                                                <span class="badge bg-danger-subtle text-danger">Verplicht</span>
+                                            {% else %}
+                                                <span class="badge bg-light text-muted border">Optioneel</span>
+                                            {% endif %}
+                                        </div>
+
+                                        <h3 class="h6 fw-bold text-dark mb-2">{{ vraag.vraag_tekst }}</h3>
+
+                                        {% if vraag.type == 'multiple_choice' and vraag.opties_lijst %}
+                                        <div class="bg-light p-2 rounded-2 small text-muted">
+                                            <div class="fw-semibold text-secondary mb-1">Keuzemogelijkheden:</div>
+                                            <div class="d-flex flex-wrap gap-1.5">
+                                                {% for opt in vraag.opties_lijst %}
+                                                    <span class="badge bg-white text-dark border px-2 py-1">
+                                                        <i class="bi bi-circle me-1 opacity-50"></i>{{ opt }}
+                                                    </span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        {% elif vraag.type == 'open_tekst' %}
+                                        <div class="bg-light p-2 rounded-2 small text-muted fst-italic">
+                                            <i class="bi bi-textarea-t me-1"></i>Vrij tekstinvoerveld voor de digidokter
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Knoppen voor volgorde & bewerken -->
+                                <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('eval.vraag_volgorde', vraag_id=vraag.id, richting='omhoog') }}" 
+                                           class="btn btn-light {% if loop.first %}disabled{% endif %}" title="Vraag omhoog">
+                                            <i class="bi bi-chevron-up"></i>
+                                        </a>
+                                        <a href="{{ url_for('eval.vraag_volgorde', vraag_id=vraag.id, richting='omlaag') }}" 
+                                           class="btn btn-light {% if loop.last %}disabled{% endif %}" title="Vraag omlaag">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </a>
+                                    </div>
+                                    <div class="d-flex gap-1 mt-1">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                data-bs-toggle="modal" data-bs-target="#bewerkVraagModal{{ vraag.id }}" title="Vraag bewerken">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form action="{{ url_for('eval.vraag_verwijderen', vraag_id=vraag.id) }}" method="POST" 
+                                              onsubmit="return confirm('Weet je zeker dat je deze vraag wilt verwijderen?');" class="m-0">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Vraag verwijderen">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Vraag Bewerken -->
+                    <div class="modal fade" id="bewerkVraagModal{{ vraag.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow">
+                                <form action="{{ url_for('eval.vraag_bewerken', vraag_id=vraag.id) }}" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold">
+                                            <i class="bi bi-pencil text-primary me-2"></i>Vraag bewerken
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Vraagtekst <span class="text-danger">*</span></label>
+                                            <input type="text" name="vraag_tekst" class="form-control" value="{{ vraag.vraag_tekst }}" required>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Type vraag</label>
+                                            <select name="type" class="form-select vraag-type-select" data-target="optiesEdit{{ vraag.id }}">
+                                                <option value="multiple_choice" {% if vraag.type == 'multiple_choice' %}selected{% endif %}>Multiple Choice (Keuzerondjes)</option>
+                                                <option value="open_tekst" {% if vraag.type == 'open_tekst' %}selected{% endif %}>Vrij Tekstveld</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-3 opties-container" id="optiesEdit{{ vraag.id }}" style="{% if vraag.type == 'open_tekst' %}display: none;{% endif %}">
+                                            <label class="form-label fw-semibold">Keuzemogelijkheden (één per regel)</label>
+                                            <textarea name="opties" class="form-control" rows="4" placeholder="Optie 1&#10;Optie 2&#10;Optie 3">{{ '\n'.join(vraag.opties_lijst) }}</textarea>
+                                            <div class="form-text text-muted small">Typ elke mogelijke antwoordoptie op een nieuwe regel.</div>
+                                        </div>
+
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="verplichtEdit{{ vraag.id }}" name="verplicht" {% if vraag.verplicht %}checked{% endif %}>
+                                            <label class="form-check-label fw-semibold" for="verplichtEdit{{ vraag.id }}">
+                                                Verplicht invullen
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
+                                        <button type="submit" class="btn btn-primary">Wijzigingen opslaan</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-question-square fs-1 mb-2 d-block opacity-50"></i>
+                    <p class="mb-2">Er zijn nog geen vragen toegevoegd aan dit evaluatieformulier.</p>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#nieuweVraagModal">
+                        <i class="bi bi-plus-lg me-1"></i>Eerste vraag toevoegen
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Nieuwe Vraag Toevoegen -->
+<div class="modal fade" id="nieuweVraagModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form action="{{ url_for('eval.vraag_toevoegen', form_id=form.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-plus-circle text-primary me-2"></i>Nieuwe vraag toevoegen
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Vraagtekst <span class="text-danger">*</span></label>
+                        <input type="text" name="vraag_tekst" class="form-control" placeholder="Bijv. Hebben de deelnemers iets geleerd vandaag?" required autofocus>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Type vraag</label>
+                        <select name="type" class="form-select vraag-type-select" data-target="optiesNieuw">
+                            <option value="multiple_choice" selected>Multiple Choice (Keuzerondjes)</option>
+                            <option value="open_tekst">Vrij Tekstveld</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 opties-container" id="optiesNieuw">
+                        <label class="form-label fw-semibold">Keuzemogelijkheden (één per regel)</label>
+                        <textarea name="opties" class="form-control" rows="4" placeholder="Niet veel&#10;Een beetje&#10;Redelijk wat&#10;Veel&#10;Heel veel"></textarea>
+                        <div class="form-text text-muted small">Typ elke mogelijke antwoordoptie op een nieuwe regel.</div>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="verplichtNieuw" name="verplicht" checked>
+                        <label class="form-check-label fw-semibold" for="verplichtNieuw">
+                            Verplicht invullen
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i>Toevoegen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Dynamic toggle for multiple choice options container
+    document.querySelectorAll('.vraag-type-select').forEach(function(select) {
+        select.addEventListener('change', function() {
+            var targetId = this.getAttribute('data-target');
+            var container = document.getElementById(targetId);
+            if (container) {
+                if (this.value === 'multiple_choice') {
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

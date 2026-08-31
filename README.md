@@ -33,7 +33,9 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 6.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
 7.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering.
 8.  **Herkomst (`herkomst`):** Standaard keuzelijst met herkomstbronnen (bijv. website, mond-tot-mond) per organisatie.
-9.  **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
+9.  **Evaluatieformulieren & Vragen (`evaluatie_formulieren`, `evaluatie_vragen`):** Configureerbare evaluatievragenlijsten gekoppeld aan specifieke activiteitstypes (zoals Digicafé).
+10. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
+11. **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
 
 ---
 
@@ -62,13 +64,21 @@ Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 *   **Versiebeheer:** Mogelijkheid om bestaande documenten te overschrijven, waarbij het versienummer automatisch wordt verhoogd (v1, v2, v3...).
 *   Toegang is afgeschermd voor gebruikers met de rol `lezer`.
 
-### 5. Wachtwoord Vergeten & Herstelprocedure
+### 5. Evaluatieformulieren voor Activiteiten & Digicafés
+*   **Activiteitstype-integratie:** Activiteitstypes kunnen worden gemarkeerd met de vlag `"Evaluatieformulier gewenst"` (`heeft_evaluatie`), standaard actief voor **Digicafé**.
+*   **Dynamische Vragenlijst-editor:** Beheerders kunnen per activiteitstype dynamisch een onbeperkt aantal vragen toevoegen, bewerken, van volgorde wisselen of verwijderen.
+*   **Ondersteunde Vraagtypes:** Multiple choice (met configureerbare opties horizontaal gerangschikt) en vrije open tekstvelden, met optionele verplichting.
+*   **Geautomatiseerde E-mailuitnodigingen:** Na afloop van een sessie worden gekoppelde digidokters automatisch uitgenodigd via een unieke, beveiligde token-URL (`/evaluaties/invullen/<token>`). Beheerders kunnen uitnodigingen ook handmatig verzenden.
+*   **Registratie:** Inzendingen registreren de specifieke digidokter, de timestamp (`ingediend_op`) en de antwoorden als JSON data, met bescherming tegen dubbel invullen.
+*   **Resultatenoverzicht & Filter:** Inzage in alle reacties per activiteit met filter *"Enkel activiteiten met minstens 1 ingevulde evaluatie"* en detailinzage per sessie.
+
+### 6. Wachtwoord Vergeten & Herstelprocedure
 *   Ingebouwde herstelprocedure via het inlogscherm.
 *   Gebruikers voeren hun e-mailadres in en ontvangen een 6-cijferige verificatiecode op hun e-mailadres via de Brevo HTTPS REST API.
 *   De code heeft een verlooptijd van exact 30 minuten.
 *   Bij invoer van de juiste code kan de gebruiker een nieuw wachtwoord instellen dat direct wordt gevalideerd op complexiteitseisen.
 
-### 6. Database Auditing & GUI
+### 7. Database Auditing & GUI
 *   Volledige auditing van alle CRUD-acties (Create, Update, Delete) via SQLAlchemy-sessielisteners.
 *   Opslag van gewijzigde gegevens (oude vs. nieuwe waarden) in JSON-formaat.
 *   GUI-pagina (`/beheer/audit-log`) exclusief toegankelijk voor beheerders en platformbeheerders.
@@ -76,14 +86,14 @@ Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 *   Filters op datum (van-tot), gebruiker, operatie, tabel, en de switch "Toon ook logins" (inlogacties worden standaard verborgen om de loglijst overzichtelijk te houden).
 *   Subtiele weergave van record-IDs in alle data-weergaven ter vereenvoudiging van auditing.
 
-### 7. CSV Import-script (`scripts/import_agenda.py`)
+### 8. CSV Import-script (`scripts/import_agenda.py`)
 Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezigheden te importeren:
 *   **Naam-opschoning:** Filtert achternamen en toevoegingen (zoals `(bib)` of `(eenmalig)`) weg, zodat enkel de voornaam wordt gebruikt.
 *   **LukS-regel:** Vervangt alle namen die beginnen met `LukS` (case-insensitive) automatisch door `Luk`.
 *   **Case-insensitive matching:** Voorkomt duplicaten in de database door hoofdletterongevoelig te zoeken naar bestaande digidokters (bijv. `daniël` wordt gekoppeld aan de bestaande `Daniël`).
 *   **Duplicatenpreventie:** Slaat rijen met identieke combinaties van `(datum, uur_van, uur_tot, type_id)` automatisch over.
 
-### 8. Keep-alive & Health Check (`/ping`)
+### 9. Keep-alive & Health Check (`/ping`)
 *   **Health Check Endpoint:** Het endpoint `/ping` geeft simpelweg de tekst `'OK'` terug en dient om te verifiëren of de applicatie actief is.
 *   **Bypass:** Dit endpoint omzeilt alle authenticatie-, autorisatie- en multi-tenancy-controles, waardoor externe monitoringtools of keep-alive scripts de app snel en zonder database-overhead kunnen controleren.
 *   **Keep-alive Workflow:** Een GitHub Actions-workflow (`.github/workflows/keep-alive.yml`) roept dit endpoint elke 10 minuten aan (tussen 8u en 22u Brusselse tijd) om te voorkomen dat de gratis Render.com-instantie in slaap valt.

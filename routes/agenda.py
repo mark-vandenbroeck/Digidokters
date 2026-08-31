@@ -25,6 +25,13 @@ def _keuzelijsten():
 def lijst():
     org_id = get_huidige_organisatie_id()
     
+    # Automatisch uitnodigingen controleren en versturen voor afgelopen sessies
+    try:
+        from routes.evaluations import controleer_en_verstuur_afgelopen_evaluaties
+        controleer_en_verstuur_afgelopen_evaluaties(org_id, request.host_url.rstrip('/'))
+    except Exception:
+        pass
+    
     # Haal filter parameters op
     toon_verleden = request.args.get('toon_verleden') == 'on'
     datum_van = request.args.get('datum_van', '').strip()

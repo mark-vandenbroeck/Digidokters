@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block title %}Evaluatiedetails: {{ item.type.naam }} op {{ item.datum.strftime('%d-%m-%Y') }} – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('eval.resultaten') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div>
+            <h1 class="dd-page-title mb-0">
+                <i class="bi bi-chat-square-quote text-primary me-2"></i>Evaluatieresultaten: {{ item.type.naam }}
+            </h1>
+            <p class="dd-page-subtitle mb-0">
+                {{ item.datum.strftime('%d-%m-%Y') }} van {{ item.uur_van }} tot {{ item.uur_tot }} &bull; {{ item.locatie.naam if item.locatie else 'Onbekende locatie' }}
+            </p>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil-square me-1"></i>Evaluatie zelf invullen
+        </a>
+        <form action="{{ url_for('eval.verstuur_uitnodigingen', agenda_id=item.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Wil je de evaluatie-uitnodigingen nu opnieuw per e-mail versturen naar alle gekoppelde digidokters?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-info">
+                <i class="bi bi-envelope me-1"></i>Uitnodigingen verzenden
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Info kaart over de sessie -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-3">
+        <div class="row g-3 align-items-center">
+            <div class="col-12 col-md-3">
+                <div class="text-muted small">Activiteit</div>
+                <div class="fw-bold fs-6">
+                    <span class="badge bg-{{ item.type.kleur or 'blue' }}-soft text-{{ item.type.kleur or 'blue' }}">
+                        {{ item.type.naam }}
+                    </span>
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="text-muted small">Locatie</div>
+                <div class="fw-semibold text-dark">{{ item.locatie.naam if item.locatie else '—' }}</div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="text-muted small">Aanwezige Digidokters</div>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% for dd in item.digidokters %}
+                        <span class="badge bg-light text-dark border">{{ dd.naam }}</span>
+                    {% else %}
+                        <span class="text-muted small">—</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="text-muted small">Aantal Ingevuld</div>
+                <div class="fw-bold text-primary fs-5">
+                    {{ reacties|length }} / {{ item.digidokters|length }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ingevulde Reacties -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
+            <i class="bi bi-chat-dots me-2"></i>Ingezonden Evaluaties ({{ reacties|length }})
+        </h2>
+    </div>
+    <div class="card-body p-4">
+        {% if reacties %}
+        <div class="d-flex flex-column gap-4">
+            {% for reactie in reacties %}
+            <div class="card border border-light-subtle shadow-sm bg-white">
+                <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-person-circle fs-5 text-primary"></i>
+                        <span class="fw-bold text-dark">{{ reactie.digidokter.naam if reactie.digidokter else (reactie.user.naam if reactie.user else 'Onbekende digidokter') }}</span>
+                    </div>
+                    <small class="text-muted">
+                        <i class="bi bi-clock me-1"></i>Ingevuld op {{ reactie.ingediend_op.strftime('%d-%m-%Y om %H:%M') }}
+                    </small>
+                </div>
+                <div class="card-body p-3">
+                    <div class="d-flex flex-column gap-3">
+                        {% if form and form.vragen %}
+                            {% for vraag in form.vragen %}
+                            {% set antw = reactie.antwoorden.get(vraag.id|string) %}
+                            <div>
+                                <div class="small fw-semibold text-secondary mb-1">
+                                    {{ loop.index }}. {{ vraag.vraag_tekst }}
+                                </div>
+                                <div class="p-2 rounded bg-light text-dark">
+                                    {% if antw %}
+                                        <span class="fw-medium">{{ antw }}</span>
+                                    {% else %}
+                                        <span class="text-muted fst-italic">Niet beantwoord</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <!-- Fallback ruwe weergave -->
+                            {% for v_id, val in reactie.antwoorden.items() %}
+                            <div>
+                                <div class="small fw-semibold text-secondary mb-1">Vraag #{{ v_id }}</div>
+                                <div class="p-2 rounded bg-light text-dark">{{ val }}</div>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-chat-square-dots fs-1 mb-2 d-block opacity-50"></i>
+            <p class="mb-2">Nog geen evaluatiereacties ontvangen voor deze sessie.</p>
+            <form action="{{ url_for('eval.verstuur_uitnodigingen', agenda_id=item.id) }}" method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-envelope me-1"></i>Nu uitnodigingen per mail verzenden
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -84,10 +84,11 @@ def seed_organisatie_defaults(org_id):
         
         if active_types:
             for i, at in enumerate(active_types):
-                db.session.add(ActivityType(naam=at.naam, actief=True, kleur=at.kleur, volgorde=i, organisatie_id=org_id))
+                db.session.add(ActivityType(naam=at.naam, actief=True, heeft_evaluatie=getattr(at, 'heeft_evaluatie', False), kleur=at.kleur, volgorde=i, organisatie_id=org_id))
         else:
             for i, name in enumerate(['Digidokters', 'Digicafé', 'Lunchvergadering']):
-                db.session.add(ActivityType(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+                heeft_eval = (name.lower() == 'digicafé')
+                db.session.add(ActivityType(naam=name, actief=True, heeft_evaluatie=heeft_eval, volgorde=i, organisatie_id=org_id))
 
     # Locaties
     if not Location.query.filter_by(organisatie_id=org_id).first():
@@ -116,3 +117,12 @@ def seed_organisatie_defaults(org_id):
                 db.session.add(Herkomst(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
 
     db.session.commit()
+
+    # Evaluatieformulieren seeden voor activiteitstypes met evaluatieplicht
+    from models.evaluation import EvaluationForm, EvaluationQuestion
+    eval_types = ActivityType.query.filter_by(organisatie_id=org_id, heeft_evaluatie=True).all()
+    for at in eval_types:
+        if not EvaluationForm.query.filter_by(activity_type_id=at.id, organisatie_id=org_id).first():
+            # Kopieer van org 1 of gebruik standaard Digicafé configuratie
+            from routes.evaluations import get_or_create_evaluation_form
+            get_or_create_evaluation_form(at.id, org_id)

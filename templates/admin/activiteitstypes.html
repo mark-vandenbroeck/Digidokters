@@ -22,6 +22,7 @@
                         <th class="ps-3" style="width:60px">Sortering</th>
                         <th>Naam</th>
                         <th>Status</th>
+                        <th>Evaluatieformulier</th>
                         <th class="pe-3 text-end">Acties</th>
                     </tr>
                 </thead>
@@ -48,6 +49,20 @@
                             <span class="badge bg-success">Actief</span>
                             {% else %}
                             <span class="badge bg-dark">Gedeactiveerd</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.heeft_evaluatie %}
+                            <div class="d-inline-flex align-items-center gap-2">
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                    <i class="bi bi-clipboard-check me-1"></i>Ingeschakeld
+                                </span>
+                                <a href="{{ url_for('eval.formulier_bewerken', type_id=item.id) }}" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 0.78rem;">
+                                    <i class="bi bi-gear me-1"></i>Configureren
+                                </a>
+                            </div>
+                            {% else %}
+                            <span class="text-muted small">—</span>
                             {% endif %}
                         </td>
                         <td class="pe-3 text-end text-nowrap">

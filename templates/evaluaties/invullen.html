@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block title %}{{ form.titel }} – {{ item.type.naam }} – Digidokters{% endblock %}
+
+{% macro form_body() %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-10 col-lg-8">
+        
+        <!-- Header -->
+        <div class="mb-4">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-{{ item.type.kleur or 'blue' }}-soft text-{{ item.type.kleur or 'blue' }} fs-6 px-3 py-1.5">
+                    {{ item.type.naam }}
+                </span>
+                <span class="text-muted small">
+                    <i class="bi bi-calendar3 me-1"></i>{{ item.datum.strftime('%d-%m-%Y') }} ({{ item.uur_van }} - {{ item.uur_tot }})
+                </span>
+            </div>
+            <h1 class="h3 fw-bold text-dark mb-1">{{ form.titel }}</h1>
+            {% if form.toelichting %}
+                <p class="text-muted mb-0">{{ form.toelichting }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show py-2 mb-3">
+                <i class="bi bi-info-circle me-1"></i>{{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <!-- Sessie Samenvatting -->
+        <div class="card border-0 shadow-sm mb-4 bg-primary-subtle border-start border-primary border-4">
+            <div class="card-body p-3">
+                <div class="row g-2">
+                    <div class="col-12 col-sm-6">
+                        <div class="small text-muted">Locatie:</div>
+                        <div class="fw-semibold text-dark">{{ item.locatie.naam if item.locatie else 'Onbekende locatie' }}</div>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <div class="small text-muted">Aanwezige Digidokters:</div>
+                        <div class="fw-semibold text-dark">
+                            {% for dd in item.digidokters %}
+                                {{ dd.naam }}{% if not loop.last %}, {% endif %}
+                            {% else %}
+                                <em>Geen gekoppeld</em>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Het Formulier -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- Digidokter Selectie -->
+                    <div class="mb-4 p-3 bg-light rounded-3 border">
+                        <label for="digidokter_id" class="form-label fw-bold text-dark mb-1">
+                            <i class="bi bi-person-badge text-primary me-1"></i>Wie vult deze evaluatie in? <span class="text-danger">*</span>
+                        </label>
+                        {% if token and huidige_dd %}
+                            <div class="fw-bold text-dark fs-6">{{ huidige_dd.naam }}</div>
+                            <input type="hidden" name="digidokter_id" value="{{ huidige_dd.id }}">
+                        {% elif item.digidokters %}
+                            <select class="form-select" id="digidokter_id" name="digidokter_id" required>
+                                {% if not huidige_dd %}
+                                    <option value="">— Selecteer jouw naam —</option>
+                                {% endif %}
+                                {% for dd in item.digidokters %}
+                                    <option value="{{ dd.id }}" {% if huidige_dd and huidige_dd.id == dd.id %}selected{% endif %}>
+                                        {{ dd.naam }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        {% else %}
+                            <input type="text" class="form-control" value="{{ current_user.naam if current_user.is_authenticated else '' }}" readonly>
+                        {% endif %}
+                    </div>
+
+                    <hr class="my-4 text-muted opacity-25">
+
+                    <!-- Vragen -->
+                    {% if form.vragen %}
+                        <div class="d-flex flex-column gap-4">
+                            {% for vraag in form.vragen %}
+                            <div class="vraag-item">
+                                <label class="form-label fw-bold text-dark fs-6 mb-2">
+                                    {{ loop.index }}. {{ vraag.vraag_tekst }}
+                                    {% if vraag.verplicht %}
+                                        <span class="text-danger" title="Verplicht">*</span>
+                                    {% endif %}
+                                </label>
+
+                                {% if vraag.type == 'multiple_choice' %}
+                                    <div class="d-flex flex-wrap gap-2 ps-1">
+                                        {% for opt in vraag.opties_lijst %}
+                                        {% set is_checked = (antwoorden.get(vraag.id|string) == opt) %}
+                                        <div class="form-check form-check-inline m-0 p-2 px-3 rounded border bg-white hover-bg-light transition-all d-inline-flex align-items-center">
+                                            <input class="form-check-input me-2 mt-0" type="radio" 
+                                                   name="vraag_{{ vraag.id }}" 
+                                                   id="vraag_{{ vraag.id }}_{{ loop.index }}" 
+                                                   value="{{ opt }}" 
+                                                   {% if is_checked %}checked{% endif %}
+                                                   {% if vraag.verplicht %}required{% endif %}>
+                                            <label class="form-check-label text-dark fw-medium cursor-pointer mb-0 text-nowrap" for="vraag_{{ vraag.id }}_{{ loop.index }}">
+                                                {{ opt }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <!-- Open Tekstveld -->
+                                    <textarea name="vraag_{{ vraag.id }}" class="form-control" rows="3" 
+                                              placeholder="Typ hier je antwoord of opmerkingen..." 
+                                              {% if vraag.verplicht %}required{% endif %}>{{ antwoorden.get(vraag.id|string, '') }}</textarea>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning py-3">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>Er zijn nog geen vragen geconfigureerd voor dit formulier.
+                        </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between align-items-center mt-5 pt-3 border-top">
+                        {% if current_user.is_authenticated %}
+                            <a href="{{ url_for('agenda.lijst') }}" class="btn btn-outline-secondary">Annuleren</a>
+                        {% else %}
+                            <span></span>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary px-4 py-2 fw-semibold">
+                            <i class="bi bi-send-fill me-2"></i>Evaluatie verzenden
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+{{ form_body() }}
+{% endblock %}
+
+{% block unauthenticated %}
+<div class="container py-5">
+    <div class="text-center mb-4">
+        <div class="dd-logo-icon mx-auto mb-2" style="width:48px;height:48px;font-size:1.4rem;border-radius:14px;">
+            <i class="bi bi-heart-pulse-fill"></i>
+        </div>
+        <h2 class="h5 fw-bold text-dark mb-0">Digidokters</h2>
+    </div>
+    {{ form_body() }}
+</div>
+{% endblock %}

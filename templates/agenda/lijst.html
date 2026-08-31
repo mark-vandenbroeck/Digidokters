@@ -136,6 +136,22 @@
                             {% if item.is_terugkerend %}
                             <i class="bi bi-arrow-repeat ms-1 text-primary" title="Terugkerend ({{ item.interval }})"></i>
                             {% endif %}
+                            {% if item.type.heeft_evaluatie %}
+                            <div class="mt-1">
+                                {% set resp_count = item.evaluatie_reacties|length %}
+                                {% if resp_count > 0 %}
+                                    <a href="{{ url_for('eval.sessie_detail', agenda_id=item.id) if current_user.is_beheerder() else url_for('eval.invullen_sessie', agenda_id=item.id) }}" 
+                                       class="badge bg-success-subtle text-success text-decoration-none border border-success-subtle" title="Evaluaties bekijken">
+                                        <i class="bi bi-clipboard-check me-1"></i>{{ resp_count }} ingevuld
+                                    </a>
+                                {% else %}
+                                    <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" 
+                                       class="badge bg-info-subtle text-info text-decoration-none border border-info-subtle" title="Evaluatieformulier invullen">
+                                        <i class="bi bi-clipboard-pulse me-1"></i>Evaluatie
+                                    </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         </td>
                         <td>{{ item.locatie.naam }}</td>
                         <td>{{ item.omschrijving or '<span class="text-muted fst-italic">Geen</span>'|safe }}</td>
@@ -148,6 +164,12 @@
                         </td>
                         {% if kan_schrijven %}
                         <td class="pe-3 text-end text-nowrap">
+                            {% if item.type.heeft_evaluatie %}
+                            <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}"
+                               class="btn btn-sm btn-outline-info me-1" title="Evaluatieformulier invullen">
+                                <i class="bi bi-clipboard-check"></i>
+                            </a>
+                            {% endif %}
                             <a href="{{ url_for('agenda.wijzigen', item_id=item.id) }}"
                                class="btn btn-sm btn-outline-primary" title="Wijzigen">
                                 <i class="bi bi-pencil"></i>

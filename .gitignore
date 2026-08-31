@@ -29,9 +29,10 @@ import_logs/
 *.swp
 *.swo
 
-# macOS
+# macOS & Office temporary files
 .DS_Store
 Thumbs.db
+~$*
 
 # Migrations (optioneel: verwijder als u migraties in git wilt bijhouden)
 # migrations/

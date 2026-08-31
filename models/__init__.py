@@ -11,11 +11,13 @@ from .agenda import AgendaItem
 from .document import Folder, Document
 from .audit import AuditLog
 from .herkomst import Herkomst
+from .evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
     'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem',
-    'Folder', 'Document', 'AuditLog', 'Herkomst'
+    'Folder', 'Document', 'AuditLog', 'Herkomst',
+    'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation'
 ]
 
 

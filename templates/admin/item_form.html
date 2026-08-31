@@ -35,6 +35,17 @@
                 </div>
 
                 {% if titel == 'Activiteitstype' %}
+                <div class="form-check mb-3 p-3 bg-light rounded border">
+                    <input class="form-check-input" type="checkbox" id="heeft_evaluatie" name="heeft_evaluatie" 
+                           {% if item and item.heeft_evaluatie %}checked{% endif %}>
+                    <label class="form-check-label fw-semibold text-dark" for="heeft_evaluatie">
+                        <i class="bi bi-clipboard-check text-primary me-1"></i>Evaluatieformulier gewenst
+                    </label>
+                    <div class="form-text text-muted mt-1 small">
+                        Wanneer ingeschakeld, ontvangen aanwezige digidokters na afloop van een sessie van dit type automatisch een uitnodiging om een evaluatieformulier in te vullen.
+                    </div>
+                </div>
+
                 <div class="mb-4">
                     <label for="kleur" class="form-label fw-semibold">Badge kleur</label>
                     <select class="form-select" id="kleur" name="kleur">

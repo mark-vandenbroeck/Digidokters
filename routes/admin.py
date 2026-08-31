@@ -1162,8 +1162,9 @@ def activiteitstype_nieuw():
             
         max_volgorde = db.session.query(db.func.max(ActivityType.volgorde)).filter_by(organisatie_id=org_id).scalar() or 0
         actief = request.form.get('actief') == 'on' if 'actief' in request.form else True
+        heeft_evaluatie = request.form.get('heeft_evaluatie') == 'on'
         kleur = request.form.get('kleur', 'blue')
-        item = ActivityType(naam=naam, actief=actief, kleur=kleur, volgorde=max_volgorde + 1)
+        item = ActivityType(naam=naam, actief=actief, heeft_evaluatie=heeft_evaluatie, kleur=kleur, volgorde=max_volgorde + 1)
         set_organisatie_id_op_model(item)
         db.session.add(item)
         db.session.commit()
@@ -1188,6 +1189,7 @@ def activiteitstype_wijzigen(item_id):
     if request.method == 'POST':
         item.naam = request.form.get('naam', item.naam).strip()
         item.actief = request.form.get('actief') == 'on'
+        item.heeft_evaluatie = request.form.get('heeft_evaluatie') == 'on'
         item.kleur = request.form.get('kleur', 'blue')
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')

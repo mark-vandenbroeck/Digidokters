@@ -151,54 +151,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Modal Vraag Bewerken -->
-                    <div class="modal fade" id="bewerkVraagModal{{ vraag.id }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content border-0 shadow">
-                                <form action="{{ url_for('eval.vraag_bewerken', vraag_id=vraag.id) }}" method="POST">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title fw-bold">
-                                            <i class="bi bi-pencil text-primary me-2"></i>Vraag bewerken
-                                        </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="mb-3">
-                                            <label class="form-label fw-semibold">Vraagtekst <span class="text-danger">*</span></label>
-                                            <input type="text" name="vraag_tekst" class="form-control" value="{{ vraag.vraag_tekst }}" required>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label fw-semibold">Type vraag</label>
-                                            <select name="type" class="form-select vraag-type-select" data-target="optiesEdit{{ vraag.id }}">
-                                                <option value="multiple_choice" {% if vraag.type == 'multiple_choice' %}selected{% endif %}>Multiple Choice (Keuzerondjes)</option>
-                                                <option value="open_tekst" {% if vraag.type == 'open_tekst' %}selected{% endif %}>Vrij Tekstveld</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="mb-3 opties-container" id="optiesEdit{{ vraag.id }}" style="{% if vraag.type == 'open_tekst' %}display: none;{% endif %}">
-                                            <label class="form-label fw-semibold">Keuzemogelijkheden (één per regel)</label>
-                                            <textarea name="opties" class="form-control" rows="4" placeholder="Optie 1&#10;Optie 2&#10;Optie 3">{{ '\n'.join(vraag.opties_lijst) }}</textarea>
-                                            <div class="form-text text-muted small">Typ elke mogelijke antwoordoptie op een nieuwe regel.</div>
-                                        </div>
-
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="verplichtEdit{{ vraag.id }}" name="verplicht" {% if vraag.verplicht %}checked{% endif %}>
-                                            <label class="form-check-label fw-semibold" for="verplichtEdit{{ vraag.id }}">
-                                                Verplicht invullen
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
-                                        <button type="submit" class="btn btn-primary">Wijzigingen opslaan</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
                     {% endfor %}
                 </div>
                 {% else %}
@@ -215,14 +167,66 @@
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════ MODALS (BUITEN DE GRID) -->
+
+<!-- Modals: Vraag Bewerken per Vraag -->
+{% for vraag in form.vragen %}
+<div class="modal fade" id="bewerkVraagModal{{ vraag.id }}" tabindex="-1" aria-labelledby="bewerkVraagModalLabel{{ vraag.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form action="{{ url_for('eval.vraag_bewerken', vraag_id=vraag.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="bewerkVraagModalLabel{{ vraag.id }}">
+                        <i class="bi bi-pencil text-primary me-2"></i>Vraag bewerken
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Vraagtekst <span class="text-danger">*</span></label>
+                        <input type="text" name="vraag_tekst" class="form-control" value="{{ vraag.vraag_tekst }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Type vraag</label>
+                        <select name="type" class="form-select vraag-type-select" data-target="optiesEdit{{ vraag.id }}">
+                            <option value="multiple_choice" {% if vraag.type == 'multiple_choice' %}selected{% endif %}>Multiple Choice (Keuzerondjes)</option>
+                            <option value="open_tekst" {% if vraag.type == 'open_tekst' %}selected{% endif %}>Vrij Tekstveld</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 opties-container" id="optiesEdit{{ vraag.id }}" style="{% if vraag.type == 'open_tekst' %}display: none;{% endif %}">
+                        <label class="form-label fw-semibold">Keuzemogelijkheden (één per regel)</label>
+                        <textarea name="opties" class="form-control" rows="4" placeholder="Optie 1&#10;Optie 2&#10;Optie 3">{{ '\n'.join(vraag.opties_lijst) }}</textarea>
+                        <div class="form-text text-muted small">Typ elke mogelijke antwoordoptie op een nieuwe regel.</div>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="verplichtEdit{{ vraag.id }}" name="verplicht" {% if vraag.verplicht %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="verplichtEdit{{ vraag.id }}">
+                            Verplicht invullen
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
+                    <button type="submit" class="btn btn-primary">Wijzigingen opslaan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
 <!-- Modal: Nieuwe Vraag Toevoegen -->
-<div class="modal fade" id="nieuweVraagModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="nieuweVraagModal" tabindex="-1" aria-labelledby="nieuweVraagModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <form action="{{ url_for('eval.vraag_toevoegen', form_id=form.id) }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold">
+                    <h5 class="modal-title fw-bold" id="nieuweVraagModalLabel">
                         <i class="bi bi-plus-circle text-primary me-2"></i>Nieuwe vraag toevoegen
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>

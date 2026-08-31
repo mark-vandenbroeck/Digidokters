@@ -141,6 +141,9 @@ def map_hernoemen(map_id):
         db.session.commit()
         flash(f'Map "{oude_naam}" is hernoemd naar "{nieuwe_naam}".', 'success')
         
+    return_to = request.form.get('return_to')
+    if return_to == 'self':
+        return redirect(url_for('doc.index', map_id=folder.id))
     return redirect(url_for('doc.index', map_id=folder.parent_id))
 
 

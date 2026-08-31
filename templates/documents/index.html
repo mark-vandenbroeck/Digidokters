@@ -18,6 +18,11 @@
             </p>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            {% if huidige_map %}
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#hernoemHuidigeMapModal" title="Huidige map hernoemen">
+                    <i class="bi bi-pencil me-1"></i>Map hernoemen
+                </button>
+            {% endif %}
             <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#nieuweMapModal">
                 <i class="bi bi-folder-plus me-1"></i>Nieuwe map
             </button>
@@ -37,8 +42,13 @@
                         <ol class="breadcrumb mb-0 py-1 px-2 rounded bg-light">
                             {% for crumb in breadcrumbs %}
                                 {% if loop.last %}
-                                    <li class="breadcrumb-item active fw-semibold text-primary" aria-current="page">
-                                        <i class="bi bi-folder2-open me-1"></i>{{ crumb.naam }}
+                                    <li class="breadcrumb-item active fw-semibold text-primary d-inline-flex align-items-center gap-1" aria-current="page">
+                                        <span><i class="bi bi-folder2-open me-1"></i>{{ crumb.naam }}</span>
+                                        {% if huidige_map %}
+                                            <button type="button" class="btn btn-link text-warning p-0 ms-1" data-bs-toggle="modal" data-bs-target="#hernoemHuidigeMapModal" title="Hernoem '{{ crumb.naam }}'">
+                                                <i class="bi bi-pencil-square" style="font-size: 0.9rem;"></i>
+                                            </button>
+                                        {% endif %}
                                     </li>
                                 {% else %}
                                     <li class="breadcrumb-item">
@@ -92,17 +102,17 @@
             <h2 class="h6 fw-bold text-uppercase text-muted tracking-wider mb-3">
                 <i class="bi bi-folder me-1"></i>Mappen ({{ mappen|length }})
             </h2>
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xxl-4 gx-4 gy-3">
                 {% for map in mappen %}
                     <div class="col">
                         <div class="card h-100 border-0 shadow-sm hover-shadow transition-all position-relative">
-                            <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                                <a href="{{ url_for('doc.index', map_id=map.id) }}" class="d-flex align-items-center gap-3 text-decoration-none text-dark flex-grow-1 min-w-0">
+                            <div class="card-body p-3 d-flex align-items-center justify-content-between min-w-0">
+                                <a href="{{ url_for('doc.index', map_id=map.id) }}" class="d-flex align-items-center gap-3 text-decoration-none text-dark flex-grow-1 min-w-0 me-2" title="{{ map.naam }}">
                                     <div class="p-2 rounded bg-primary-subtle text-primary fs-3 flex-shrink-0">
                                         <i class="bi bi-folder-fill"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
-                                        <h3 class="h6 mb-0 fw-semibold text-truncate text-dark" title="{{ map.naam }}">
+                                        <h3 class="h6 mb-0 fw-semibold text-truncate text-dark">
                                             {{ map.naam }}
                                             <span class="text-muted" style="font-size: 0.7rem; opacity: 0.6; font-weight: normal; margin-left: 2px;">#{{ map.id }}</span>
                                         </h3>
@@ -111,9 +121,9 @@
                                         </small>
                                     </div>
                                 </a>
-                                <div class="dropdown ms-2">
-                                    <button class="btn btn-link text-muted p-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Opties">
-                                        <i class="bi bi-three-dots-vertical fs-5"></i>
+                                <div class="dropdown flex-shrink-0">
+                                    <button class="btn btn-sm btn-light border-0 text-muted rounded-circle shadow-none" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Opties voor {{ map.naam }}" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                        <i class="bi bi-three-dots-vertical fs-6"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
                                         <li>
@@ -260,6 +270,36 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ ALL MODALS (TOP-LEVEL) -->
+
+<!-- Modal voor Huidige Map Hernoemen -->
+{% if huidige_map %}
+    <div class="modal fade" id="hernoemHuidigeMapModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form action="{{ url_for('doc.map_hernoemen', map_id=huidige_map.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="return_to" value="self">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">
+                            <i class="bi bi-pencil text-warning me-2"></i>Map hernoemen
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Nieuwe naam</label>
+                            <input type="text" name="naam" class="form-control" value="{{ huidige_map.naam }}" required autofocus>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
+                        <button type="submit" class="btn btn-primary">Opslaan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endif %}
 
 <!-- Modals voor Mappen Hernoemen -->
 {% for map in mappen %}

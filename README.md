@@ -86,17 +86,35 @@ Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 *   Filters op datum (van-tot), gebruiker, operatie, tabel, en de switch "Toon ook logins" (inlogacties worden standaard verborgen om de loglijst overzichtelijk te houden).
 *   Subtiele weergave van record-IDs in alle data-weergaven ter vereenvoudiging van auditing.
 
-### 8. CSV Import-script (`scripts/import_agenda.py`)
+### 8. Stamgegevensbeheer & Veilig Wissen
+*   **Volledig beheer van keuzelijsten:** Beheerders en platformbeheerders kunnen binnen hun organisatie locaties, activiteitstypes, leeftijdscategorieën, toestellen en herkomstbronnen aanmaken, bewerken, activeren/deactiveren en handmatig van volgorde veranderen.
+*   **Referentiecontroles bij wissen:** Stamgegevens kunnen uitsluitend permanent gewist worden als er **geen enkele andere data naar verwijst**:
+    *   *Locaties:* Mag niet gewist worden zolang er nog gekoppelde agenda-activiteiten zijn.
+    *   *Activiteitstypes:* Mag niet gewist worden zolang er gekoppelde agenda-activiteiten of ingevulde evaluaties zijn.
+    *   *Leeftijdscategorieën, Toestellen & Herkomst:* Mogen niet gewist worden zolang er nog geregistreerde consultaties aan gekoppeld zijn.
+*   **Duidelijke gebruikersfeedback:** Indien een item nog in gebruik is, wordt de verwijderknop automatisch gedeactiveerd met een tooltip die het aantal gekoppelde records vermeldt. Indien ongebruikt, kan het item met één klik en bevestiging definitief worden verwijderd.
+
+### 9. CSV Import-script (`scripts/import_agenda.py`)
 Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezigheden te importeren:
 *   **Naam-opschoning:** Filtert achternamen en toevoegingen (zoals `(bib)` of `(eenmalig)`) weg, zodat enkel de voornaam wordt gebruikt.
 *   **LukS-regel:** Vervangt alle namen die beginnen met `LukS` (case-insensitive) automatisch door `Luk`.
 *   **Case-insensitive matching:** Voorkomt duplicaten in de database door hoofdletterongevoelig te zoeken naar bestaande digidokters (bijv. `daniël` wordt gekoppeld aan de bestaande `Daniël`).
 *   **Duplicatenpreventie:** Slaat rijen met identieke combinaties van `(datum, uur_van, uur_tot, type_id)` automatisch over.
 
-### 9. Keep-alive & Health Check (`/ping`)
+### 10. Keep-alive & Health Check (`/ping`)
 *   **Health Check Endpoint:** Het endpoint `/ping` geeft simpelweg de tekst `'OK'` terug en dient om te verifiëren of de applicatie actief is.
 *   **Bypass:** Dit endpoint omzeilt alle authenticatie-, autorisatie- en multi-tenancy-controles, waardoor externe monitoringtools of keep-alive scripts de app snel en zonder database-overhead kunnen controleren.
 *   **Keep-alive Workflow:** Een GitHub Actions-workflow (`.github/workflows/keep-alive.yml`) roept dit endpoint elke 10 minuten aan (tussen 8u en 22u Brusselse tijd) om te voorkomen dat de gratis Render.com-instantie in slaap valt.
+
+### 11. Platformbeheer & Organisatiebeheer
+*   **Multi-tenant Organisatiebeheer:** Platformbeheerders kunnen nieuwe organisaties toevoegen, bewerken, en gebruikers koppelen aan organisaties met specifieke rollen.
+*   **Centrale Sjabloon-organisatie (`Sjabloon`):** Een speciale beschermde tenant met slug `sjabloon` dient als referentie-blauwdruk voor het hele platform.
+    *   Wanneer een platformbeheerder een nieuwe gemeente of organisatie aanmaakt, worden alle actieve stamgegevens (leeftijdscategorieën, toestellen, activiteitstypes, evaluatieformulieren & vragen, locaties, herkomsten) automatisch gekopieerd uit deze Sjabloon-organisatie.
+    *   Aanpassingen die de beheerder in de stamgegevens van de Sjabloon-organisatie maakt, gelden direct als de nieuwe standaard voor alle toekomstige organisaties.
+*   **Organisaties Wissen met Cascading Cleanup:** Mogelijkheid om overbodige organisaties permanent te wissen (`/platform/organisaties/<id>/verwijderen`).
+    *   **Veiligheid:** De hoofdorganisatie (ID 1) en de template-organisatie (`Sjabloon`) zijn permanent beschermd tegen wissen.
+    *   **Volledige Cleanup:** Alle bijbehorende data (registraties, agenda-items, evaluaties, documenten, mappen, stamgegevens en gebruikerskoppelingen) wordt automatisch en geordend verwijderd.
+    *   **Duidelijke Waarschuwing:** De interface toont een rode modal die expliciet waarschuwt voor de onomkeerbaarheid en de lijst van alle data die permanent verloren gaat.
 
 ---
 

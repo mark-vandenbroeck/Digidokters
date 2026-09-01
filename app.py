@@ -108,11 +108,11 @@ def create_app(config_class=Config):
                 if not org_id:
                     return redirect(url_for('auth.select_org', next=request.full_path))
                 
-                # Controleer of de gebruiker nog een actief lidmaatschap heeft
-                membership = next((uo for uo in current_user.user_organisaties if uo.organisatie_id == org_id and uo.actief and uo.organisatie.actief), None)
+                # Controleer of de gebruiker nog een actief lidmaatschap heeft (en geen Sjabloon-organisatie is)
+                membership = next((uo for uo in current_user.user_organisaties if uo.organisatie_id == org_id and uo.actief and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon'), None)
                 if not membership:
                     session.pop('organisatie_id', None)
-                    flash('Uw toegang tot deze organisatie is niet langer geldig.', 'warning')
+                    flash('Uw toegang tot deze organisatie is niet geldig.', 'warning')
                     return redirect(url_for('auth.select_org'))
 
     # Service worker moet op root-niveau staan (niet /static/sw.js) zodat

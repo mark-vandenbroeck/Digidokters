@@ -30,7 +30,14 @@
                     {% for org in organisaties %}
                     <tr>
                         <td class="ps-3 text-muted">{{ org.id }}</td>
-                        <td class="fw-semibold">{{ org.naam }}</td>
+                        <td class="fw-semibold">
+                            {{ org.naam }}
+                            {% if org.slug == 'sjabloon' %}
+                            <span class="badge bg-info-subtle text-info border border-info-subtle ms-1">Template</span>
+                            {% elif org.id == 1 %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1">Hoofd</span>
+                            {% endif %}
+                        </td>
                         <td><code>{{ org.slug }}</code></td>
                         <td>
                             {% if org.actief %}
@@ -45,12 +52,17 @@
                                class="btn btn-sm btn-outline-primary" title="Wijzigen">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            {% if org.id != 1 %}
+                            {% if org.id != 1 and org.slug != 'sjabloon' %}
                             <a href="{{ url_for('platform.organisatie_toggle', org_id=org.id) }}"
-                               class="btn btn-sm {% if org.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
+                               class="btn btn-sm {% if org.actief %}btn-outline-warning{% else %}btn-outline-success{% endif %} ms-1"
                                title="{% if org.actief %}Deactiveren{% else %}Activeren{% endif %}">
                                 <i class="bi {% if org.actief %}bi-lock{% else %}bi-unlock{% endif %}"></i>
                             </a>
+                            <button type="button" class="btn btn-sm btn-outline-danger ms-1" 
+                                    data-bs-toggle="modal" data-bs-target="#verwijderOrgModal{{ org.id }}" 
+                                    title="Organisatie wissen">
+                                <i class="bi bi-trash"></i>
+                            </button>
                             {% endif %}
                         </td>
                     </tr>
@@ -60,4 +72,53 @@
         </div>
     </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════ MODALS VOOR VERWIJDEREN -->
+{% for org in organisaties %}
+{% if org.id != 1 and org.slug != 'sjabloon' %}
+<div class="modal fade" id="verwijderOrgModal{{ org.id }}" tabindex="-1" aria-labelledby="verwijderOrgModalLabel{{ org.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form action="{{ url_for('platform.organisatie_verwijderen', org_id=org.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold" id="verwijderOrgModalLabel{{ org.id }}">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Organisatie definitief wissen
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger d-flex align-items-start gap-2 mb-3">
+                        <i class="bi bi-exclamation-octagon-fill fs-4 flex-shrink-0 text-danger"></i>
+                        <div>
+                            <div class="fw-bold">Waarschuwing: Deze actie is onomkeerbaar!</div>
+                            <div class="small mt-1">
+                                Als u organisatie <strong>"{{ org.naam }}"</strong> wist, worden <strong>ALLE</strong> geassocieerde gegevens permanent verwijderd:
+                            </div>
+                            <ul class="small mb-0 mt-2 ps-3">
+                                <li>Alle geregistreerde bezoeken en consultaties</li>
+                                <li>Alle agenda-items en geplande sessies</li>
+                                <li>Alle evaluatieformulieren, vragen en ingediende antwoorden</li>
+                                <li>Alle documenten en mappen</li>
+                                <li>Alle stamgegevens (digidokters, activiteitstypes, locaties, etc.)</li>
+                                <li>Alle gebruikerskoppelingen</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="text-dark mb-0">
+                        Weet u zeker dat u de organisatie <strong>"{{ org.naam }}"</strong> (<code>{{ org.slug }}</code>) en alle bijbehorende data definitief wilt wissen?
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i>Definitief wissen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
 {% endblock %}

@@ -547,6 +547,31 @@ def leeftijdscategorie_toggle(item_id):
     return _beheer_toggle(AgeCategory, item_id, 'admin.leeftijdscategorieën')
 
 
+@admin_bp.route('/leeftijdscategorieën/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def leeftijdscategorie_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from models.registration import Registration
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(AgeCategory, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    count = Registration.query.filter_by(leeftijdscategorie_id=item.id).count()
+    if count > 0:
+        flash(f'Leeftijdscategorie "{item.naam}" kan niet worden verwijderd omdat er nog {count} registratie(s) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.leeftijdscategorieën'))
+
+    naam = item.naam
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Leeftijdscategorie "{naam}" is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.leeftijdscategorieën'))
+
+
 @admin_bp.route('/leeftijdscategorieën/<int:item_id>/volgorde/<richting>')
 @login_required
 @admin_required
@@ -615,6 +640,31 @@ def toestel_toggle(item_id):
     return _beheer_toggle(Device, item_id, 'admin.toestellen')
 
 
+@admin_bp.route('/toestellen/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def toestel_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from models.registration import Registration
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Device, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    count = Registration.query.filter_by(toestel_id=item.id).count()
+    if count > 0:
+        flash(f'Toestel "{item.naam}" kan niet worden verwijderd omdat er nog {count} registratie(s) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.toestellen'))
+
+    naam = item.naam
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Toestel "{naam}" is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.toestellen'))
+
+
 @admin_bp.route('/toestellen/<int:item_id>/volgorde/<richting>')
 @login_required
 @admin_required
@@ -681,6 +731,31 @@ def herkomst_wijzigen(item_id):
 @admin_required
 def herkomst_toggle(item_id):
     return _beheer_toggle(Herkomst, item_id, 'admin.herkomsten')
+
+
+@admin_bp.route('/herkomsten/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def herkomst_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from models.registration import Registration
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Herkomst, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    count = Registration.query.filter_by(herkomst_id=item.id).count()
+    if count > 0:
+        flash(f'Herkomst "{item.naam}" kan niet worden verwijderd omdat er nog {count} registratie(s) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.herkomsten'))
+
+    naam = item.naam
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Herkomst "{naam}" is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.herkomsten'))
 
 
 @admin_bp.route('/herkomsten/<int:item_id>/volgorde/<richting>')
@@ -1206,6 +1281,42 @@ def activiteitstype_toggle(item_id):
     return _beheer_toggle(ActivityType, item_id, 'admin.activiteitstypes')
 
 
+@admin_bp.route('/activiteitstypes/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def activiteitstype_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from models.agenda import AgendaItem
+    from models.evaluation import EvaluationForm, EvaluationResponse
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(ActivityType, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    agenda_count = AgendaItem.query.filter_by(type_id=item.id).count()
+    if agenda_count > 0:
+        flash(f'Activiteitstype "{item.naam}" kan niet worden verwijderd omdat er nog {agenda_count} agenda-activiteit(en) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.activiteitstypes'))
+
+    eval_form = EvaluationForm.query.filter_by(activity_type_id=item.id, organisatie_id=org_id).first()
+    if eval_form:
+        resp_count = EvaluationResponse.query.filter_by(form_id=eval_form.id).count()
+        if resp_count > 0:
+            flash(f'Activiteitstype "{item.naam}" kan niet worden verwijderd omdat er al {resp_count} ingevulde evaluatie(s) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+            return redirect(url_for('admin.activiteitstypes'))
+        # Als er een evaluatieformulier is zonder reacties: ruim het formulier en de vragen op
+        db.session.delete(eval_form)
+        db.session.flush()
+
+    naam = item.naam
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Activiteitstype "{naam}" is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.activiteitstypes'))
+
+
 @admin_bp.route('/activiteitstypes/<int:item_id>/volgorde/<richting>')
 @login_required
 @admin_required
@@ -1280,6 +1391,31 @@ def locatie_wijzigen(item_id):
 @admin_required
 def locatie_toggle(item_id):
     return _beheer_toggle(Location, item_id, 'admin.locaties')
+
+
+@admin_bp.route('/locaties/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def locatie_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from models.agenda import AgendaItem
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Location, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    agenda_count = AgendaItem.query.filter_by(locatie_id=item.id).count()
+    if agenda_count > 0:
+        flash(f'Locatie "{item.naam}" kan niet worden verwijderd omdat er nog {agenda_count} agenda-activiteit(en) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.locaties'))
+
+    naam = item.naam
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Locatie "{naam}" is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.locaties'))
 
 
 @admin_bp.route('/locaties/<int:item_id>/volgorde/<richting>')

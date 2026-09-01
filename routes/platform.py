@@ -104,6 +104,102 @@ def organisatie_toggle(org_id):
     flash(f'Organisatie {org.naam} {status}.', 'info')
     return redirect(url_for('platform.organisaties'))
 
+
+@platform_bp.route('/organisaties/<int:org_id>/verwijderen', methods=['POST'])
+@login_required
+@platform_admin_required
+def organisatie_verwijderen(org_id):
+    """Wist een organisatie en alle geassocieerde data permanent."""
+    org = db.get_or_404(Organisatie, org_id)
+    if org.id == 1 or org.slug == 'sjabloon':
+        flash(f'De organisatie "{org.naam}" is een beschermde systeemorganisatie en kan niet worden gewist.', 'danger')
+        return redirect(url_for('platform.organisaties'))
+
+    org_naam = org.naam
+
+    from flask import session
+    from models.registration import Registration
+    from models.agenda import AgendaItem, agenda_digidokters
+    from models.digidokter import Digidokter
+    from models.activity_type import ActivityType
+    from models.location import Location
+    from models.device import Device
+    from models.age_category import AgeCategory
+    from models.herkomst import Herkomst
+    from models.document import Document, Folder
+    from models.evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
+    from models.audit import AuditLog
+
+    # 1. Evaluatiedata
+    EvaluationResponse.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+
+    agenda_ids = [item.id for item in AgendaItem.query.filter_by(organisatie_id=org_id).all()]
+    if agenda_ids:
+        EvaluationInvitation.query.filter(EvaluationInvitation.agenda_item_id.in_(agenda_ids)).delete(synchronize_session=False)
+
+    form_ids = [f.id for f in EvaluationForm.query.filter_by(organisatie_id=org_id).all()]
+    if form_ids:
+        EvaluationQuestion.query.filter(EvaluationQuestion.form_id.in_(form_ids)).delete(synchronize_session=False)
+
+    EvaluationForm.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+
+    # 2. Agenda-items en aanwezigheden
+    if agenda_ids:
+        db.session.execute(
+            agenda_digidokters.delete().where(agenda_digidokters.c.agenda_item_id.in_(agenda_ids))
+        )
+    AgendaItem.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+
+    # 3. Registraties
+    Registration.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+
+    # 4. Documenten en Mappen
+    Document.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    folders = Folder.query.filter_by(organisatie_id=org_id).all()
+    for f in folders:
+        f.parent_id = None
+    db.session.flush()
+    Folder.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+
+    # 5. Stamgegevens
+    Digidokter.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    ActivityType.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    Location.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    Device.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    AgeCategory.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    Herkomst.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+
+    # 6. Audit Logs
+    AuditLog.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+
+    # 7. Gebruikerskoppelingen & Wees-gebruikers opruimen
+    user_links = UserOrganisatie.query.filter_by(organisatie_id=org_id).all()
+    user_ids_to_check = [link.user_id for link in user_links]
+    UserOrganisatie.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    db.session.flush()
+
+    for uid in user_ids_to_check:
+        u = db.session.get(User, uid)
+        if u and u.rol != 'platformbeheerder':
+            other_links = UserOrganisatie.query.filter_by(user_id=uid).count()
+            if other_links == 0:
+                db.session.delete(u)
+
+    # 8. Sessie herstel
+    if session.get('organisatie_id') == org_id:
+        default_org = db.session.get(Organisatie, 1)
+        if default_org:
+            session['organisatie_id'] = default_org.id
+            session['organisatie_naam'] = default_org.naam
+
+    # 9. Organisatie zelf verwijderen
+    db.session.delete(org)
+    db.session.commit()
+
+    flash(f'Organisatie "{org_naam}" en alle bijbehorende gegevens zijn definitief gewist.', 'success')
+    return redirect(url_for('platform.organisaties'))
+
+
 # --- Koppelingen ---
 
 @platform_bp.route('/koppelingen', methods=['GET', 'POST'])
@@ -125,6 +221,10 @@ def koppelingen():
 
         if not user or not org:
             flash('Ongeldige gebruiker of organisatie.', 'danger')
+            return redirect(url_for('platform.koppelingen'))
+
+        if org.slug == 'sjabloon' and user.rol != 'platformbeheerder':
+            flash('Enkel platformbeheerders hebben toegang tot de Sjabloon-organisatie.', 'danger')
             return redirect(url_for('platform.koppelingen'))
 
         # Check of koppeling al bestaat
@@ -160,7 +260,7 @@ def koppelingen():
 
     links = query.order_by(order_col).all()
     all_users = User.query.order_by(User.naam).all()
-    all_orgs = Organisatie.query.order_by(Organisatie.naam).all()
+    all_orgs = Organisatie.query.filter(Organisatie.slug != 'sjabloon').order_by(Organisatie.naam).all()
     return render_template(
         'platform/koppelingen.html',
         links=links,

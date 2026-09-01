@@ -75,6 +75,20 @@
                                title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
                                 <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
                             </a>
+                            {% set has_agenda = item.agenda_items|length > 0 %}
+                            {% set has_responses = (item.evaluatie_formulier and item.evaluatie_formulier.reacties|length > 0) %}
+                            {% if not has_agenda and not has_responses %}
+                            <form action="{{ url_for('admin.activiteitstype_verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u activiteitstype {{ item.naam }} wilt verwijderen?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: er zijn nog {% if has_agenda %}{{ item.agenda_items|length }} agenda-activiteit(en){% else %}{{ item.evaluatie_formulier.reacties|length }} evaluatie(s){% endif %} aan gekoppeld">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

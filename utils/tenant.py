@@ -35,12 +35,17 @@ def set_organisatie_id_op_model(instance):
 
 def seed_organisatie_defaults(org_id):
     """Seed de standaard gegevens (leeftijdscategorieën, toestellen, activiteitstypes, locaties, herkomsten) voor een nieuwe organisatie."""
+    from models.organisatie import Organisatie
     from models.age_category import AgeCategory
     from models.device import Device
     from models.activity_type import ActivityType
     from models.location import Location
     from models.digidokter import Digidokter
     from models.herkomst import Herkomst
+
+    # Bepaal de bron-organisatie (eerst 'Sjabloon', anders org 1)
+    template_org = Organisatie.query.filter_by(slug='sjabloon', actief=True).first()
+    source_org_id = template_org.id if (template_org and template_org.id != org_id) else (1 if org_id != 1 else None)
 
     # Digidokters (niet gekopieerd, want dit zijn specifieke vrijwilligers)
     if not Digidokter.query.filter_by(organisatie_id=org_id).first():
@@ -50,8 +55,8 @@ def seed_organisatie_defaults(org_id):
     # Leeftijdscategorieën
     if not AgeCategory.query.filter_by(organisatie_id=org_id).first():
         active_cats = []
-        if org_id != 1:
-            active_cats = AgeCategory.query.filter_by(organisatie_id=1, actief=True).order_by(AgeCategory.volgorde).all()
+        if source_org_id:
+            active_cats = AgeCategory.query.filter_by(organisatie_id=source_org_id, actief=True).order_by(AgeCategory.volgorde).all()
         
         if active_cats:
             for i, cat in enumerate(active_cats):
@@ -63,8 +68,8 @@ def seed_organisatie_defaults(org_id):
     # Toestellen
     if not Device.query.filter_by(organisatie_id=org_id).first():
         active_devs = []
-        if org_id != 1:
-            active_devs = Device.query.filter_by(organisatie_id=1, actief=True).order_by(Device.volgorde).all()
+        if source_org_id:
+            active_devs = Device.query.filter_by(organisatie_id=source_org_id, actief=True).order_by(Device.volgorde).all()
         
         if active_devs:
             for i, dev in enumerate(active_devs):
@@ -79,8 +84,8 @@ def seed_organisatie_defaults(org_id):
     # Activiteitstypes
     if not ActivityType.query.filter_by(organisatie_id=org_id).first():
         active_types = []
-        if org_id != 1:
-            active_types = ActivityType.query.filter_by(organisatie_id=1, actief=True).order_by(ActivityType.volgorde).all()
+        if source_org_id:
+            active_types = ActivityType.query.filter_by(organisatie_id=source_org_id, actief=True).order_by(ActivityType.volgorde).all()
         
         if active_types:
             for i, at in enumerate(active_types):
@@ -93,8 +98,8 @@ def seed_organisatie_defaults(org_id):
     # Locaties
     if not Location.query.filter_by(organisatie_id=org_id).first():
         active_locs = []
-        if org_id != 1:
-            active_locs = Location.query.filter_by(organisatie_id=1, actief=True).order_by(Location.volgorde).all()
+        if source_org_id:
+            active_locs = Location.query.filter_by(organisatie_id=source_org_id, actief=True).order_by(Location.volgorde).all()
         
         if active_locs:
             for i, loc in enumerate(active_locs):
@@ -106,8 +111,8 @@ def seed_organisatie_defaults(org_id):
     # Herkomsten
     if not Herkomst.query.filter_by(organisatie_id=org_id).first():
         active_herkomsten = []
-        if org_id != 1:
-            active_herkomsten = Herkomst.query.filter_by(organisatie_id=1, actief=True).order_by(Herkomst.volgorde).all()
+        if source_org_id:
+            active_herkomsten = Herkomst.query.filter_by(organisatie_id=source_org_id, actief=True).order_by(Herkomst.volgorde).all()
         
         if active_herkomsten:
             for i, hk in enumerate(active_herkomsten):

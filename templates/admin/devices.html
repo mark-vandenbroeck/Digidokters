@@ -61,6 +61,18 @@
                                title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
                                 <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
                             </a>
+                            {% if item.registraties|length == 0 %}
+                            <form action="{{ url_for('admin.toestel_verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u toestel {{ item.naam }} wilt verwijderen?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: er zijn nog {{ item.registraties|length }} registratie(s) aan gekoppeld">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

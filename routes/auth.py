@@ -70,7 +70,10 @@ def login():
             flash(f'Welkom, platformbeheerder {gebruiker.naam}!', 'success')
             return redirect(url_for('platform.dashboard'))
 
-        active_memberships = [uo for uo in gebruiker.user_organisaties if uo.actief and uo.organisatie.actief]
+        active_memberships = [
+            uo for uo in gebruiker.user_organisaties 
+            if uo.actief and uo.organisatie.actief and (gebruiker.rol == 'platformbeheerder' or uo.organisatie.slug != 'sjabloon')
+        ]
         if not active_memberships:
             logout_user()
             flash('Uw account is niet gekoppeld aan een actieve organisatie. Contacteer de beheerder.', 'danger')
@@ -109,24 +112,22 @@ def wachtwoord_wijzigen():
         huidig = request.form.get('huidig_wachtwoord', '')
         nieuw = request.form.get('nieuw_wachtwoord', '')
         bevestig = request.form.get('bevestig_wachtwoord', '')
-        email = request.form.get('email', '').strip().lower() or None
+        email = request.form.get('email', '').strip().lower()
 
-        wachtwoord_verplicht = current_user.moet_wachtwoord_wijzigen
-        wachtwoord_gewijzigd = wachtwoord_verplicht or nieuw or bevestig
+        # E-mail valideren als ingevuld
+        if email and not _EMAIL_REGEX.match(email):
+            flash('Ongeldig e-mailadres.', 'danger')
+            return render_template('auth/change_password.html', form_data=request.form)
 
-        # Controleer huidig wachtwoord (tenzij verplichte reset). Nodig zodra
-        # er iets wijzigt (wachtwoord én/of e-mailadres), als beveiliging tegen
-        # account-overname via een losstaande sessie.
-        if not wachtwoord_verplicht:
+        # Wachtwoordwijziging is optioneel indien de gebruiker het niet MOET wijzigen
+        wachtwoord_gewijzigd = False
+        if huidig or nieuw or bevestig or current_user.moet_wachtwoord_wijzigen:
+            wachtwoord_gewijzigd = True
             if not check_password_hash(current_user.wachtwoord_hash, huidig):
                 flash('Huidig wachtwoord is onjuist.', 'danger')
                 return render_template('auth/change_password.html', form_data=request.form)
 
-        # E-mailadres valideren
-        if email and not _EMAIL_REGEX.match(email):
-            flash('Voer een geldig e-mailadres in.', 'danger')
-            return render_template('auth/change_password.html', form_data=request.form)
-
+        # Controleer of e-mail al door iemand anders gebruikt wordt
         if email and User.query.filter(User.email == email, User.id != current_user.id).first():
             flash('Dit e-mailadres is al in gebruik door een andere gebruiker.', 'danger')
             return render_template('auth/change_password.html', form_data=request.form)
@@ -170,7 +171,10 @@ def select_org():
                 self.organisatie = org
         memberships = [MockMembership(o) for o in active_orgs]
     else:
-        memberships = [uo for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief]
+        memberships = [
+            uo for uo in current_user.user_organisaties 
+            if uo.actief and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon'
+        ]
     
     if not memberships:
         logout_user()
@@ -206,7 +210,10 @@ def switch_organisatie():
         else:
             flash('Ongeldige organisatie.', 'danger')
     else:
-        active_memberships = [uo for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief]
+        active_memberships = [
+            uo for uo in current_user.user_organisaties 
+            if uo.actief and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon'
+        ]
         membership = next((uo for uo in active_memberships if uo.organisatie_id == org_id), None)
         if membership:
             session['organisatie_id'] = org_id

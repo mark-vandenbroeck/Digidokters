@@ -185,10 +185,11 @@ def verstuur_uitnodigingen_voor_sessie(agenda_item, host_url=None):
         datum_str = agenda_item.datum.strftime('%d-%m-%Y')
         onderwerp = f"Evaluatie: {agenda_item.type.naam} op {datum_str}"
         locatie_naam = agenda_item.locatie.naam if agenda_item.locatie else 'onbekende locatie'
+        omschrijving_blok = f"\nOmschrijving: {agenda_item.omschrijving.strip()}\n" if agenda_item.omschrijving and agenda_item.omschrijving.strip() else ""
 
         inhoud = f"""Beste {dd.naam},
 
-Bedankt voor je inzet tijdens het {agenda_item.type.naam} op {datum_str} van {agenda_item.uur_van} tot {agenda_item.uur_tot} ({locatie_naam})!
+Bedankt voor je inzet tijdens het {agenda_item.type.naam} op {datum_str} van {agenda_item.uur_van} tot {agenda_item.uur_tot} ({locatie_naam})!{omschrijving_blok}
 
 We horen graag hoe de sessie verlopen is. Zou je even de tijd willen nemen om het korte evaluatieformulier in te vullen? Dit helpt ons om de sessies continu te verbeteren.
 

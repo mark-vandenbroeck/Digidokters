@@ -61,6 +61,12 @@
                     {{ reacties|length }} / {{ item.digidokters|length }}
                 </div>
             </div>
+            {% if item.omschrijving %}
+            <div class="col-12 mt-2 pt-2 border-top">
+                <div class="text-muted small">Omschrijving</div>
+                <div class="text-dark" style="white-space: pre-wrap;">{{ item.omschrijving }}</div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

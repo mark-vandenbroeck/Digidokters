@@ -51,6 +51,12 @@
                             {% endfor %}
                         </div>
                     </div>
+                    {% if item.omschrijving %}
+                    <div class="col-12 mt-2 pt-2 border-top border-primary-subtle">
+                        <div class="small text-muted">Omschrijving:</div>
+                        <div class="text-dark" style="white-space: pre-wrap;">{{ item.omschrijving }}</div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -134,6 +134,7 @@ class TestEvaluations(BaseTestCase):
             uur_tot="16:00",
             type_id=self.type_digicafe.id,
             locatie_id=self.locatie.id,
+            omschrijving="Thema: Veilig online bankieren",
             organisatie_id=self.org.id
         )
         agenda_item.digidokters.append(self.digidokter)
@@ -175,6 +176,7 @@ class TestEvaluations(BaseTestCase):
         resp_get = self.client.get(f'/evaluaties/agenda/{agenda_item.id}/invullen')
         self.assertEqual(resp_get.status_code, 200)
         self.assertIn(b'Evaluatie Digicaf', resp_get.data)
+        self.assertIn(b'Thema: Veilig online bankieren', resp_get.data)
 
         # Formulier inzenden
         resp_post = self.client.post(f'/evaluaties/agenda/{agenda_item.id}/invullen', data={
@@ -296,3 +298,39 @@ class TestEvaluations(BaseTestCase):
         resp_dash = self.client.get('/admin/evaluaties')
         self.assertEqual(resp_dash.status_code, 200)
         self.assertIn(b'Formulieren per Activiteitstype', resp_dash.data)
+
+    def test_invitation_email_contains_omschrijving(self):
+        """Test dat de uitnodigingsmail de omschrijving van het agenda-item bevat."""
+        from unittest.mock import patch
+        from routes.evaluations import verstuur_uitnodigingen_voor_sessie
+
+        # Maak agenda-item met omschrijving
+        sessie = AgendaItem(
+            datum=date.today() - timedelta(days=1),
+            uur_van="10:00",
+            uur_tot="12:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Thema: Slimme meters en energiebesparing",
+            organisatie_id=self.org.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+
+        form = EvaluationForm(organisatie_id=self.org.id, activity_type_id=self.type_digicafe.id, titel="Digicafé Evaluatie")
+        db.session.add(form)
+        db.session.flush()
+        vraag = EvaluationQuestion(form_id=form.id, vraag_tekst="Tevreden?", type="open_tekst", opties=[], volgorde=1, verplicht=False)
+        db.session.add(vraag)
+        db.session.commit()
+
+        with patch('routes.evaluations.verstuur_email') as mock_email:
+            mock_email.return_value = (True, "OK")
+            aantal, verzonden, fouten = verstuur_uitnodigingen_voor_sessie(sessie, host_url="http://localhost:5000")
+            self.assertEqual(aantal, 1)
+            mock_email.assert_called_once()
+            args, _ = mock_email.call_args
+            # args[0] = emails, args[1] = onderwerp, args[2] = inhoud
+            email_body = args[2]
+            self.assertIn("Omschrijving: Thema: Slimme meters en energiebesparing", email_body)
+

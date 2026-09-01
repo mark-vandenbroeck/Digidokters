@@ -75,9 +75,9 @@
                                title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
                                 <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
                             </a>
-                            {% set has_agenda = item.agenda_items|length > 0 %}
-                            {% set has_responses = (item.evaluatie_formulier and item.evaluatie_formulier.reacties|length > 0) %}
-                            {% if not has_agenda and not has_responses %}
+                            {% set agenda_cnt = agenda_counts.get(item.id, 0) if agenda_counts is defined else item.agenda_items|length %}
+                            {% set eval_cnt = eval_counts.get(item.id, 0) if eval_counts is defined else (item.evaluatie_formulier.reacties|length if item.evaluatie_formulier else 0) %}
+                            {% if agenda_cnt == 0 and eval_cnt == 0 %}
                             <form action="{{ url_for('admin.activiteitstype_verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u activiteitstype {{ item.naam }} wilt verwijderen?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
@@ -85,7 +85,7 @@
                                 </button>
                             </form>
                             {% else %}
-                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: er zijn nog {% if has_agenda %}{{ item.agenda_items|length }} agenda-activiteit(en){% else %}{{ item.evaluatie_formulier.reacties|length }} evaluatie(s){% endif %} aan gekoppeld">
+                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: er zijn nog {% if agenda_cnt > 0 %}{{ agenda_cnt }} agenda-activiteit(en){% else %}{{ eval_cnt }} evaluatie(s){% endif %} aan gekoppeld">
                                 <i class="bi bi-trash"></i>
                             </button>
                             {% endif %}

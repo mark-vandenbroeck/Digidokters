@@ -23,13 +23,18 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/beheer')
 def gebruikers():
     from utils.tenant import get_huidige_organisatie_id
     from models.organisatie import UserOrganisatie
-    from models.registration import Registration
+    from sqlalchemy.orm import joinedload
     org_id = get_huidige_organisatie_id()
 
     sort_by = request.args.get('sort_by', 'naam').strip()
     direction = request.args.get('direction', 'asc').strip()
 
-    query = UserOrganisatie.query.join(User, UserOrganisatie.user_id == User.id).filter(UserOrganisatie.organisatie_id == org_id)
+    query = (
+        UserOrganisatie.query
+        .options(joinedload(UserOrganisatie.user))
+        .join(User, UserOrganisatie.user_id == User.id)
+        .filter(UserOrganisatie.organisatie_id == org_id)
+    )
 
     if sort_by == 'email':
         order_col = User.email.desc() if direction == 'desc' else User.email.asc()
@@ -44,11 +49,13 @@ def gebruikers():
 
     memberships = query.order_by(order_col).all()
 
-    digidokter_counts = {}
-    for m in memberships:
-        u = m.user
-        count = Digidokter.query.filter_by(user_id=u.id).count()
-        digidokter_counts[u.id] = count
+    # Efficiënte SQL telling van digidokters gekoppeld aan gebruikers
+    digidokter_counts = dict(
+        db.session.query(Digidokter.user_id, db.func.count(Digidokter.id))
+        .filter(Digidokter.user_id.isnot(None))
+        .group_by(Digidokter.user_id)
+        .all()
+    )
 
     return render_template(
         'admin/users.html',
@@ -270,9 +277,51 @@ def gebruiker_verwijderen(user_id):
 # ─── Generieke beheer helper ─────────────────────────────────────────────────
 
 def _beheer_lijst(model, template, naam_veld='naam'):
-    from utils.tenant import filter_op_organisatie
+    from utils.tenant import filter_op_organisatie, get_huidige_organisatie_id
+    from models.registration import Registration
+    from models.agenda import AgendaItem
+    org_id = get_huidige_organisatie_id()
     items = filter_op_organisatie(model.query, model).order_by(getattr(model, 'volgorde'), getattr(model, naam_veld)).all()
-    return render_template(template, items=items)
+
+    # Bereken efficiënte tellingen in 1 enkele snelle query i.p.v. zware N+1 relatie loading
+    usage_counts = {}
+    if model.__name__ == 'AgeCategory':
+        usage_counts = dict(
+            db.session.query(Registration.leeftijdscategorie_id, db.func.count(Registration.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Registration.leeftijdscategorie_id)
+            .all()
+        )
+    elif model.__name__ == 'Device':
+        usage_counts = dict(
+            db.session.query(Registration.toestel_id, db.func.count(Registration.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Registration.toestel_id)
+            .all()
+        )
+    elif model.__name__ == 'Herkomst':
+        usage_counts = dict(
+            db.session.query(Registration.herkomst_id, db.func.count(Registration.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Registration.herkomst_id)
+            .all()
+        )
+    elif model.__name__ == 'Digidokter':
+        usage_counts = dict(
+            db.session.query(Registration.digidokter_id, db.func.count(Registration.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Registration.digidokter_id)
+            .all()
+        )
+    elif model.__name__ == 'Location':
+        usage_counts = dict(
+            db.session.query(AgendaItem.locatie_id, db.func.count(AgendaItem.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(AgendaItem.locatie_id)
+            .all()
+        )
+
+    return render_template(template, items=items, usage_counts=usage_counts)
 
 
 def _beheer_toggle(model, item_id, redirect_endpoint):
@@ -1212,9 +1261,26 @@ def restore():
 @login_required
 @admin_required
 def activiteitstypes():
-    from utils.tenant import filter_op_organisatie
+    from utils.tenant import filter_op_organisatie, get_huidige_organisatie_id
+    from models.agenda import AgendaItem
+    from models.evaluation import EvaluationForm, EvaluationResponse
+    org_id = get_huidige_organisatie_id()
     items = filter_op_organisatie(ActivityType.query, ActivityType).order_by(ActivityType.volgorde, ActivityType.naam).all()
-    return render_template('admin/activiteitstypes.html', items=items)
+
+    agenda_counts = dict(
+        db.session.query(AgendaItem.type_id, db.func.count(AgendaItem.id))
+        .filter_by(organisatie_id=org_id)
+        .group_by(AgendaItem.type_id)
+        .all()
+    )
+    eval_counts = dict(
+        db.session.query(EvaluationForm.activity_type_id, db.func.count(EvaluationResponse.id))
+        .join(EvaluationResponse, EvaluationResponse.form_id == EvaluationForm.id)
+        .filter(EvaluationForm.organisatie_id == org_id)
+        .group_by(EvaluationForm.activity_type_id)
+        .all()
+    )
+    return render_template('admin/activiteitstypes.html', items=items, agenda_counts=agenda_counts, eval_counts=eval_counts)
 
 
 @admin_bp.route('/activiteitstypes/nieuw', methods=['GET', 'POST'])

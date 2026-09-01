@@ -11,13 +11,13 @@ class AgendaItem(db.Model):
     __tablename__ = 'agenda_items'
 
     id = db.Column(db.Integer, primary_key=True)
-    datum = db.Column(db.Date, nullable=False)
+    datum = db.Column(db.Date, nullable=False, index=True)
     uur_van = db.Column(db.String(5), nullable=False)  # HH:MM format
     uur_tot = db.Column(db.String(5), nullable=False)  # HH:MM format
-    type_id = db.Column(db.Integer, db.ForeignKey('activity_types.id'), nullable=False)
-    locatie_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    type_id = db.Column(db.Integer, db.ForeignKey('activity_types.id'), nullable=False, index=True)
+    locatie_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
     omschrijving = db.Column(db.Text, nullable=True)
-    organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False)
+    organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False, index=True)
     
     # Velden voor terugkerende reeksen
     reeks_id = db.Column(db.String(50), nullable=True)

@@ -59,4 +59,8 @@ class User(UserMixin, db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    from sqlalchemy.orm import joinedload
+    from models.organisatie import UserOrganisatie
+    return User.query.options(
+        joinedload(User.user_organisaties).joinedload(UserOrganisatie.organisatie)
+    ).filter_by(id=int(user_id)).first()

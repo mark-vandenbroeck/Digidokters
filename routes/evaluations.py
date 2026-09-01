@@ -215,44 +215,59 @@ Digidokters Team
     return len(verzonden_namen), verzonden_namen, fouten
 
 
-def controleer_en_verstuur_afgelopen_evaluaties(org_id, host_url=None):
+def controleer_en_verstuur_afgelopen_evaluaties(org_id, host_url=None, async_mode=True):
     """
-    Controleert automatisch op afgelopen sessies met evaluatieplicht waarvoor nog geen uitnodiging is gestuurd.
+    Controleert automatisch op recente afgelopen sessies (afgelopen 2 dagen) met evaluatieplicht
+    waarvoor nog geen uitnodiging is gestuurd.
     """
-    nu = datetime.now()
-    vandaag = nu.date()
-    huidige_tijd_str = nu.strftime('%H:%M')
+    from flask import current_app
+    app = current_app._get_current_object()
 
-    # Zoek afgelopen sessies
-    afgelopen_items = (
-        AgendaItem.query
-        .filter_by(organisatie_id=org_id)
-        .join(ActivityType, AgendaItem.type_id == ActivityType.id)
-        .filter(ActivityType.heeft_evaluatie == True)
-        .filter(
-            (AgendaItem.datum < vandaag) |
-            ((AgendaItem.datum == vandaag) & (AgendaItem.uur_tot <= huidige_tijd_str))
-        )
-        .all()
-    )
+    def _execute_check():
+        with app.app_context():
+            from sqlalchemy.orm import selectinload
+            nu = datetime.now()
+            vandaag = nu.date()
+            # Enkel recente sessies van de laatste 2 dagen controleren (voorkom zware scans van historische data)
+            min_datum = vandaag - timedelta(days=2)
+            huidige_tijd_str = nu.strftime('%H:%M')
 
-    totaal_verzonden = 0
-    for item in afgelopen_items:
-        # Check of er digidokters zijn die nog geen uitnodiging kregen en nog niet invulden
-        for dd in item.digidokters:
-            if not dd.email:
-                continue
-            reeds_ingevuld = EvaluationResponse.query.filter_by(agenda_item_id=item.id, digidokter_id=dd.id).first()
-            if reeds_ingevuld:
-                continue
-            inv = EvaluationInvitation.query.filter_by(agenda_item_id=item.id, digidokter_id=dd.id).first()
-            if not inv:
-                # Verstuur
-                count, namen, _ = verstuur_uitnodigingen_voor_sessie(item, host_url)
-                totaal_verzonden += count
-                break
+            afgelopen_items = (
+                AgendaItem.query
+                .filter_by(organisatie_id=org_id)
+                .join(ActivityType, AgendaItem.type_id == ActivityType.id)
+                .filter(ActivityType.heeft_evaluatie == True)
+                .filter(AgendaItem.datum >= min_datum)
+                .filter(
+                    (AgendaItem.datum < vandaag) |
+                    ((AgendaItem.datum == vandaag) & (AgendaItem.uur_tot <= huidige_tijd_str))
+                )
+                .options(selectinload(AgendaItem.digidokters))
+                .all()
+            )
 
-    return totaal_verzonden
+            totaal_verzonden = 0
+            for item in afgelopen_items:
+                for dd in item.digidokters:
+                    if not dd.email:
+                        continue
+                    reeds_ingevuld = EvaluationResponse.query.filter_by(agenda_item_id=item.id, digidokter_id=dd.id).first()
+                    if reeds_ingevuld:
+                        continue
+                    inv = EvaluationInvitation.query.filter_by(agenda_item_id=item.id, digidokter_id=dd.id).first()
+                    if not inv:
+                        count, namen, _ = verstuur_uitnodigingen_voor_sessie(item, host_url)
+                        totaal_verzonden += count
+                        break
+            return totaal_verzonden
+
+    if async_mode and not current_app.config.get('TESTING'):
+        import threading
+        t = threading.Thread(target=_execute_check, daemon=True)
+        t.start()
+        return 0
+    else:
+        return _execute_check()
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -61,7 +61,8 @@
                                title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
                                 <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
                             </a>
-                            {% if item.registraties|length == 0 %}
+                            {% set count = usage_counts.get(item.id, 0) if usage_counts is defined else item.registraties|length %}
+                            {% if count == 0 %}
                             <form action="{{ url_for('admin.leeftijdscategorie_verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u leeftijdscategorie {{ item.naam }} wilt verwijderen?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
@@ -69,7 +70,7 @@
                                 </button>
                             </form>
                             {% else %}
-                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: er zijn nog {{ item.registraties|length }} registratie(s) aan gekoppeld">
+                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: er zijn nog {{ count }} registratie(s) aan gekoppeld">
                                 <i class="bi bi-trash"></i>
                             </button>
                             {% endif %}

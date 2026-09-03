@@ -34,5 +34,7 @@ import_logs/
 Thumbs.db
 ~$*
 
-# Migrations (optioneel: verwijder als u migraties in git wilt bijhouden)
-# migrations/
+# Standalone local migration scripts
+migrate_*.py
+scripts/
+

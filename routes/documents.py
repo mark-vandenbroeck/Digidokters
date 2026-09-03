@@ -56,8 +56,9 @@ def index():
             flash('Gevraagde map werd niet gevonden.', 'warning')
             return redirect(url_for('doc.index'))
 
+    zoek_snippets = {}
     if zoek:
-        # Zoeken over alle mappen en documenten van deze organisatie
+        # Zoeken over alle mappen en documenten van deze organisatie (inclusief tekstinhoud)
         mappen = filter_op_organisatie(
             Folder.query.filter(Folder.naam.ilike(f'%{zoek}%')), Folder
         ).order_by(Folder.naam).all()
@@ -65,9 +66,16 @@ def index():
         documenten = filter_op_organisatie(
             Document.query.filter(
                 (Document.bestandsnaam.ilike(f'%{zoek}%')) |
-                (Document.omschrijving.ilike(f'%{zoek}%'))
+                (Document.omschrijving.ilike(f'%{zoek}%')) |
+                (Document.tekst_inhoud.ilike(f'%{zoek}%'))
             ), Document
         ).order_by(Document.bestandsnaam).all()
+
+        from utils.text_extractor import genereer_zoek_snippet
+        for doc in documenten:
+            snippet = genereer_zoek_snippet(doc.tekst_inhoud, zoek)
+            if snippet:
+                zoek_snippets[doc.id] = snippet
     else:
         # Gewone mappenweergave op dit niveau (huidige map of root)
         mappen_query = Folder.query.filter_by(organisatie_id=org_id, parent_id=map_id)
@@ -89,6 +97,7 @@ def index():
         documenten=documenten,
         breadcrumbs=breadcrumbs,
         zoek=zoek,
+        zoek_snippets=zoek_snippets,
         totaal_documenten=totaal_documenten,
         totaal_grootte_mb=totaal_grootte_mb,
         max_file_size_mb=16
@@ -197,6 +206,9 @@ def upload():
     mime_type = bestand.content_type or mimetypes.guess_type(bestandsnaam)[0] or 'application/octet-stream'
     doc_type = _bepaal_bestandstype(bestandsnaam, mime_type)
 
+    from utils.text_extractor import extraheer_tekst_uit_bestand
+    tekst_inhoud = extraheer_tekst_uit_bestand(inhoud, bestandsnaam, mime_type)
+
     document = Document(
         organisatie_id=org_id,
         map_id=map_id,
@@ -206,6 +218,7 @@ def upload():
         mime_type=mime_type,
         bestandsgrootte=bestandsgrootte,
         inhoud=inhoud,
+        tekst_inhoud=tekst_inhoud,
         aangemaakt_door_id=current_user.id
     )
     db.session.add(document)
@@ -283,8 +296,12 @@ def overschrijven(doc_id):
     mime_type = bestand.content_type or mimetypes.guess_type(nieuwe_naam)[0] or 'application/octet-stream'
     doc_type = _bepaal_bestandstype(nieuwe_naam, mime_type)
 
+    from utils.text_extractor import extraheer_tekst_uit_bestand
+    tekst_inhoud = extraheer_tekst_uit_bestand(inhoud, nieuwe_naam, mime_type)
+
     doc.bestandsnaam = nieuwe_naam
     doc.inhoud = inhoud
+    doc.tekst_inhoud = tekst_inhoud
     doc.bestandsgrootte = bestandsgrootte
     doc.mime_type = mime_type
     doc.type = doc_type

@@ -69,7 +69,7 @@
                         {% endif %}
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" name="zoek" class="form-select-sm form-control" placeholder="Zoek in mappen of bestanden..." value="{{ zoek }}">
+                            <input type="text" name="zoek" class="form-select-sm form-control" placeholder="Zoek in mappen, bestanden of inhoud..." value="{{ zoek }}">
                             {% if zoek %}
                                 <a href="{{ url_for('doc.index', map_id=huidige_map.id if huidige_map else None) }}" class="btn btn-outline-secondary" title="Wis zoekopdracht">
                                     <i class="bi bi-x-lg"></i>
@@ -204,6 +204,16 @@
                                         {% if doc.omschrijving %}
                                             <div class="small text-muted text-truncate" style="max-width: 350px;" title="{{ doc.omschrijving }}">
                                                 {{ doc.omschrijving }}
+                                            </div>
+                                        {% endif %}
+                                        {% if zoek and zoek_snippets and zoek_snippets.get(doc.id) %}
+                                            <div class="mt-1">
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.68rem;">
+                                                    <i class="bi bi-file-earmark-font me-1"></i>Gevonden in inhoud
+                                                </span>
+                                                <div class="small text-muted fst-italic mt-1 bg-light px-2 py-1 rounded border-start border-primary border-2" style="max-width: 480px; font-size: 0.8rem; line-height: 1.3;">
+                                                    {{ zoek_snippets.get(doc.id) }}
+                                                </div>
                                             </div>
                                         {% endif %}
                                     </td>

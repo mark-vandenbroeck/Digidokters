@@ -37,6 +37,7 @@ class Document(db.Model):
     mime_type = db.Column(db.String(100), nullable=False)  # bijv. 'application/pdf'
     bestandsgrootte = db.Column(db.Integer, nullable=False)  # in bytes
     inhoud = db.Column(db.LargeBinary, nullable=False)  # Binaire inhoud van het document
+    tekst_inhoud = db.Column(db.Text, nullable=True)  # Geëxtraheerde platte tekst voor zoekindex
     versie = db.Column(db.Integer, default=1, nullable=False)
 
     aangemaakt_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

@@ -31,7 +31,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 4.  **Registraties (`registrations`):** Registratie van een cliëntbezoek met foreign keys naar digidokter, leeftijdscategorie, toestel en herkomst.
 5.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
 6.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
-7.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering.
+7.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering en geïndexeerde tekstinhoud (`tekst_inhoud`).
 8.  **Herkomst (`herkomst`):** Standaard keuzelijst met herkomstbronnen (bijv. website, mond-tot-mond) per organisatie.
 9.  **Evaluatieformulieren & Vragen (`evaluatie_formulieren`, `evaluatie_vragen`):** Configureerbare evaluatievragenlijsten gekoppeld aan specifieke activiteitstypes (zoals Digicafé).
 10. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
@@ -62,6 +62,7 @@ Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 *   Binaire bestandsobjecten worden direct in de database opgeslagen (`LargeBinary`), zodat ze automatisch meegaan in databasebackups en isolatie.
 *   In-browser preview voor ondersteunde bestandstypen (zoals PDF en afbeeldingen).
 *   **Versiebeheer:** Mogelijkheid om bestaande documenten te overschrijven, waarbij het versienummer automatisch wordt verhoogd (v1, v2, v3...).
+*   **Full-text zoeken (inclusief documentinhoud):** De zoekbalk doorzoekt niet alleen mappen, bestandsnamen en omschrijvingen, maar ook de volledige tekstinhoud van documenten (Word `.docx`, PDF `.pdf`, Excel `.xlsx` en tekstbestanden). Bij een inhoudsmatch toont de resultatentabel een badge *Gevonden in inhoud* met een contextfragment (snippet) rondom de zoekterm.
 *   Toegang is afgeschermd voor gebruikers met de rol `lezer`.
 
 ### 5. Evaluatieformulieren voor Activiteiten & Digicafés

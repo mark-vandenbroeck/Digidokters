@@ -34,6 +34,8 @@ class Config:
         'max_overflow': 20,
         'pool_timeout': 30,
     }
+    if 'postgresql' in _db_url:
+        SQLALCHEMY_ENGINE_OPTIONS['connect_args'] = {'client_encoding': 'utf8'}
 
     # Upload settings
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB

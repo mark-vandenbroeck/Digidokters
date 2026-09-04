@@ -69,7 +69,7 @@ Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
 *   **Activiteitstype-integratie:** Activiteitstypes kunnen worden gemarkeerd met de vlag `"Evaluatieformulier gewenst"` (`heeft_evaluatie`), standaard actief voor **Digicafé**.
 *   **Dynamische Vragenlijst-editor:** Beheerders kunnen per activiteitstype dynamisch een onbeperkt aantal vragen toevoegen, bewerken, van volgorde wisselen of verwijderen.
 *   **Ondersteunde Vraagtypes:** Multiple choice (met configureerbare opties horizontaal gerangschikt) en vrije open tekstvelden, met optionele verplichting.
-*   **Geautomatiseerde E-mailuitnodigingen:** Na afloop van een sessie worden gekoppelde digidokters automatisch uitgenodigd via een unieke, beveiligde token-URL (`/evaluaties/invullen/<token>`). Beheerders kunnen uitnodigingen ook handmatig verzenden.
+*   **Geautomatiseerde E-mailuitnodigingen & Herinneringen:** Na afloop van een sessie worden gekoppelde digidokters automatisch uitgenodigd via een unieke, beveiligde token-URL (`/evaluaties/invullen/<token>`). Beheerders kunnen uitnodigingen ook handmatig verzenden en gerichte herinneringsmails sturen naar digidokters die het formulier nog niet hebben ingevuld, inclusief visuele statusindicatoren per digidokter.
 *   **Registratie:** Inzendingen registreren de specifieke digidokter, de timestamp (`ingediend_op`) en de antwoorden als JSON data, met bescherming tegen dubbel invullen.
 *   **Resultatenoverzicht & Filter:** Inzage in alle reacties per activiteit met filter *"Enkel activiteiten met minstens 1 ingevulde evaluatie"* en detailinzage per sessie.
 
@@ -108,6 +108,16 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
 *   **Keep-alive Workflow:** Een GitHub Actions-workflow (`.github/workflows/keep-alive.yml`) roept dit endpoint elke 10 minuten aan (tussen 8u en 22u Brusselse tijd) om te voorkomen dat de gratis Render.com-instantie in slaap valt.
 
 ### 11. Platformbeheer & Organisatiebeheer
+*   **Globaal Platformdashboard (`/platform/dashboard`):**
+    *   *Geaggregeerde Platform-KPI's:* Direct inzicht in het totaal aantal consultaties over alle aangesloten gemeenten heen, het totaal aantal actieve vrijwilligers (inclusief unieke personen), aangesloten gemeenten en sessies.
+    *   *Interactieve Visualisaties:* Chart.js staafgrafiek voor de consultatiespreiding per gemeente en doughnutgrafiek voor de verdeling van actieve vrijwilligers.
+    *   *Spreidingstabel:* Volledige tabel met statusbadges, aantal consultaties, percentage-aandeel in het netwerk (met dynamische voortgangsbalken), actieve vrijwilligers, sessies en actieve koppelingen per gemeente.
+    *   *Periodefilter:* Selecteerbaar kalenderjaar of totaaloverzicht ("Alle jaren").
+*   **Aanpasbare E-mailsjablonen (`/platform/emailsjablonen`):**
+    *   Platformbeheerders kunnen de standaardteksten en onderwerpen van uitnodigings- (`evaluatie_uitnodiging`) en herinneringsmails (`evaluatie_herinnering`) direct via de beheerinterface aanpassen.
+    *   *Dynamische Placeholders:* Ondersteuning voor variabelen zoals `{naam}`, `{activiteit}`, `{datum}`, `{uur_van}`, `{uur_tot}`, `{locatie}`, `{omschrijving_blok}` en `{link}` met handige klikbare invoegbadges.
+    *   *Real-time Live Preview:* Een split-screen weergave die direct toont hoe de e-mail eruitziet met realistische dummy-data.
+    *   *Fabrieksherstel:* Met één klik kan elk sjabloon worden hersteld naar de standaardinstellingen.
 *   **Multi-tenant Organisatiebeheer:** Platformbeheerders kunnen nieuwe organisaties toevoegen, bewerken, en gebruikers koppelen aan organisaties met specifieke rollen.
 *   **Centrale Sjabloon-organisatie (`Sjabloon`):** Een speciale beschermde tenant met slug `sjabloon` dient als referentie-blauwdruk voor het hele platform.
     *   Wanneer een platformbeheerder een nieuwe gemeente of organisatie aanmaakt, worden alle actieve stamgegevens (leeftijdscategorieën, toestellen, activiteitstypes, evaluatieformulieren & vragen, locaties, herkomsten) automatisch gekopieerd uit deze Sjabloon-organisatie.

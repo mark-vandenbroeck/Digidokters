@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}E-mailsjablonen – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h1 class="dd-page-title mb-0">
+            <i class="bi bi-envelope-paper me-2 text-primary"></i>Aanpasbare E-mailsjablonen
+        </h1>
+        <p class="dd-page-subtitle mb-0">
+            Beheer de standaardteksten voor uitnodigings- en herinneringsmails over het gehele platform
+        </p>
+    </div>
+    <a href="{{ url_for('platform.dashboard') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Terug naar dashboard
+    </a>
+</div>
+
+<div class="row g-4">
+    {% for tpl in templates %}
+    <div class="col-12 col-lg-6">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge {% if 'uitnodiging' in tpl.sleutel %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% endif %} fs-6 py-2 px-3">
+                        <i class="bi {% if 'uitnodiging' in tpl.sleutel %}bi-send{% else %}bi-alarm{% endif %} me-1"></i>
+                        {{ tpl.naam }}
+                    </span>
+                </div>
+                <span class="badge bg-light text-muted border font-monospace">{{ tpl.sleutel }}</span>
+            </div>
+            <div class="card-body p-4 d-flex flex-column">
+                <p class="text-muted small mb-3">
+                    {{ tpl.beschrijving or 'Geen beschrijving opgegeven.' }}
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">Onderwerp:</label>
+                    <div class="p-2 bg-light rounded border text-dark font-monospace small">
+                        {{ tpl.onderwerp }}
+                    </div>
+                </div>
+
+                <div class="mb-3 flex-grow-1">
+                    <label class="form-label small fw-bold text-secondary mb-1">Berichttekst (voorbeeld):</label>
+                    <div class="p-3 bg-light rounded border text-secondary small font-monospace" style="max-height: 180px; overflow-y: auto; white-space: pre-wrap;">{{ tpl.inhoud }}</div>
+                </div>
+
+                {% if tpl.beschikbare_variabelen %}
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">Beschikbare variabelen:</label>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for var in tpl.beschikbare_variabelen.split(',') %}
+                        <span class="badge bg-secondary-subtle text-secondary border font-monospace small">{{ var.strip() }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="pt-3 border-top d-flex justify-content-between align-items-center mt-auto">
+                    <small class="text-muted">
+                        <i class="bi bi-clock-history me-1"></i>Gewijzigd: {{ tpl.gewijzigd_op.strftime('%d-%m-%Y %H:%M') if tpl.gewijzigd_op else '–' }}
+                    </small>
+                    <a href="{{ url_for('platform.emailsjablonen_wijzigen', template_id=tpl.id) }}" class="btn btn-primary btn-sm px-3">
+                        <i class="bi bi-pencil-square me-1"></i>Sjabloon aanpassen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="card p-5 text-center text-muted">
+            <i class="bi bi-envelope-x fs-1 mb-2"></i>
+            <h5>Geen e-mailsjablonen gevonden</h5>
+            <p>De standaardsjablonen worden automatisch geïnitialiseerd.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

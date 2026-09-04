@@ -43,7 +43,7 @@ def create_app(config_class=Config):
     os.makedirs(app.config['IMPORT_LOG_FOLDER'], exist_ok=True)
 
     # Importeer modellen zodat Flask-Migrate ze detecteert
-    from models import user, digidokter, age_category, device, registration, organisatie, activity_type, location, agenda, herkomst, evaluation  # noqa: F401
+    from models import user, digidokter, age_category, device, registration, organisatie, activity_type, location, agenda, herkomst, evaluation, email_template  # noqa: F401
 
     # Registreer blueprints
     from routes.auth import auth_bp

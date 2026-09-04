@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% block title %}E-mailsjabloon bewerken: {{ template.naam }} – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('platform.emailsjablonen') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div>
+            <h1 class="dd-page-title mb-0">
+                <i class="bi bi-envelope-check me-2 text-primary"></i>{{ template.naam }} aanpassen
+            </h1>
+            <p class="dd-page-subtitle mb-0">{{ template.beschrijving }}</p>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <form action="{{ url_for('platform.emailsjablonen_herstellen', template_id=template.id) }}" method="POST"
+              onsubmit="return confirm('Weet je zeker dat je dit sjabloon wilt herstellen naar de fabrieksstandaard? Alle handmatige wijzigingen gaan verloren.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-warning">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Herstel naar standaard
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Editor Column -->
+    <div class="col-12 col-lg-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
+                    <i class="bi bi-pencil-square me-2"></i>Sjabloontekst bewerken
+                </h2>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" id="templateForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- Onderwerp -->
+                    <div class="mb-3">
+                        <label for="onderwerp" class="form-label fw-semibold">E-mail Onderwerp <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="onderwerp" name="onderwerp"
+                               value="{{ template.onderwerp }}" required maxlength="200">
+                    </div>
+
+                    <!-- Beschikbare variabelen helper -->
+                    {% if template.beschikbare_variabelen %}
+                    <div class="mb-3 p-3 bg-light rounded border">
+                        <label class="form-label small fw-bold text-secondary mb-2 d-block">
+                            <i class="bi bi-code-slash me-1"></i>Klik op een variabele om deze in te voegen in het bericht:
+                        </label>
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for var in template.beschikbare_variabelen.split(',') %}
+                            {% set clean_var = var.strip() %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary font-monospace py-0 px-2 var-pill"
+                                    onclick="insertVariable('{{ clean_var }}')">
+                                {{ clean_var }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Inhoud -->
+                    <div class="mb-4">
+                        <label for="inhoud" class="form-label fw-semibold">E-mail Inhoud (Platte tekst) <span class="text-danger">*</span></label>
+                        <textarea class="form-control font-monospace" id="inhoud" name="inhoud" rows="14"
+                                  required style="font-size: 0.92rem; line-height: 1.5;">{{ template.inhoud }}</textarea>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{{ url_for('platform.emailsjablonen') }}" class="btn btn-outline-secondary">Annuleren</a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-save me-1"></i>Wijzigingen opslaan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Preview Column -->
+    <div class="col-12 col-lg-5">
+        <div class="card shadow-sm border-0 sticky-top" style="top: 20px; z-index: 10;">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
+                    <i class="bi bi-eye me-2"></i>Live Voorbeeldweergave
+                </h2>
+                <span class="badge bg-info-subtle text-info border border-info-subtle small">Voorbeeldgegevens</span>
+            </div>
+            <div class="card-body p-4 bg-light">
+                <!-- E-mail mock container -->
+                <div class="bg-white rounded border shadow-sm p-3">
+                    <div class="border-bottom pb-2 mb-3">
+                        <div class="text-muted small"><strong>Van:</strong> Digidokters Platform &lt;digidokters@gmail.com&gt;</div>
+                        <div class="text-muted small"><strong>Aan:</strong> Jan Janssens &lt;jan.janssens@example.com&gt;</div>
+                        <div class="text-dark fw-bold small mt-1">
+                            <strong>Onderwerp:</strong> <span id="previewSubject" class="text-primary">{{ preview_onderwerp }}</span>
+                        </div>
+                    </div>
+                    <div id="previewBody" class="text-dark small font-monospace" style="white-space: pre-wrap; line-height: 1.6;">{{ preview_inhoud }}</div>
+                </div>
+                <div class="mt-3 text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Bovenstaand voorbeeld toont hoe de e-mail eruitziet met dummy-gegevens voor een digidokter.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const sampleData = {
+    naam: 'Jan Janssens',
+    activiteit: 'Digidokter Sessie',
+    datum: '{{ vandaag_str }}',
+    uur_van: '09:30',
+    uur_tot: '11:30',
+    locatie: 'Bibliotheek Hoofdfiliaal',
+    omschrijving_blok: '\nOmschrijving: Vrije inloop voor digitale vragen en ondersteuning bij eBox en Itsme.\n',
+    link: window.location.origin + '/evaluaties/invullen/voorbeeld-token-12345'
+};
+
+function renderText(text) {
+    if (!text) return '';
+    let rendered = text;
+    for (const [key, val] of Object.entries(sampleData)) {
+        rendered = rendered.replaceAll('{' + key + '}', val);
+    }
+    return rendered;
+}
+
+function updatePreview() {
+    const subjectInput = document.getElementById('onderwerp');
+    const bodyInput = document.getElementById('inhoud');
+    const previewSubject = document.getElementById('previewSubject');
+    const previewBody = document.getElementById('previewBody');
+
+    if (subjectInput && previewSubject) {
+        previewSubject.textContent = renderText(subjectInput.value);
+    }
+    if (bodyInput && previewBody) {
+        previewBody.textContent = renderText(bodyInput.value);
+    }
+}
+
+function insertVariable(varText) {
+    const textarea = document.getElementById('inhoud');
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + varText + text.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + varText.length;
+    textarea.focus();
+    updatePreview();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const subjectInput = document.getElementById('onderwerp');
+    const bodyInput = document.getElementById('inhoud');
+
+    if (subjectInput) subjectInput.addEventListener('input', updatePreview);
+    if (bodyInput) bodyInput.addEventListener('input', updatePreview);
+
+    updatePreview();
+});
+</script>
+{% endblock %}

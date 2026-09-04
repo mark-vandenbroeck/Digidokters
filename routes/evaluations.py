@@ -8,6 +8,7 @@ from models.activity_type import ActivityType
 from models.agenda import AgendaItem
 from models.digidokter import Digidokter
 from models.evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
+from models.email_template import EmailTemplate
 from models.user import User
 from utils.decorators import admin_required, writer_required
 from utils.mail import verstuur_email
@@ -183,11 +184,26 @@ def verstuur_uitnodigingen_voor_sessie(agenda_item, host_url=None):
         link = f"{base_url}/evaluaties/invullen/{token}"
 
         datum_str = agenda_item.datum.strftime('%d-%m-%Y')
-        onderwerp = f"Evaluatie: {agenda_item.type.naam} op {datum_str}"
         locatie_naam = agenda_item.locatie.naam if agenda_item.locatie else 'onbekende locatie'
         omschrijving_blok = f"\nOmschrijving: {agenda_item.omschrijving.strip()}\n" if agenda_item.omschrijving and agenda_item.omschrijving.strip() else ""
 
-        inhoud = f"""Beste {dd.naam},
+        context = {
+            'naam': dd.naam,
+            'activiteit': agenda_item.type.naam,
+            'datum': datum_str,
+            'uur_van': agenda_item.uur_van,
+            'uur_tot': agenda_item.uur_tot,
+            'locatie': locatie_naam,
+            'omschrijving_blok': omschrijving_blok,
+            'link': link
+        }
+
+        tpl = EmailTemplate.query.filter_by(sleutel='evaluatie_uitnodiging').first()
+        if tpl:
+            onderwerp, inhoud = tpl.render(context)
+        else:
+            onderwerp = f"Evaluatie: {agenda_item.type.naam} op {datum_str}"
+            inhoud = f"""Beste {dd.naam},
 
 Bedankt voor je inzet tijdens het {agenda_item.type.naam} op {datum_str} van {agenda_item.uur_van} tot {agenda_item.uur_tot} ({locatie_naam})!{omschrijving_blok}
 
@@ -206,6 +222,102 @@ Digidokters Team
             if success:
                 verzonden_namen.append(f"{dd.naam} ({email})")
                 invitation.verzonden_op = datetime.utcnow()
+                db.session.commit()
+            else:
+                fouten.append(f"{dd.naam} ({msg})")
+        except Exception as e:
+            fouten.append(f"{dd.naam} (Fout: {str(e)})")
+
+    return len(verzonden_namen), verzonden_namen, fouten
+
+
+def verstuur_herinneringen_voor_sessie(agenda_item, host_url=None):
+    """
+    Verstuurt e-mailherinneringen naar digidokters van een afgelopen sessie
+    die de evaluatie nog niet hebben ingevuld.
+    Retourneert (aantal_verzonden, lijst_van_namen_of_fouten, fouten).
+    """
+    if not agenda_item or not agenda_item.type.heeft_evaluatie:
+        return 0, [], ["Geen evaluatieformulier vereist voor deze activiteit."]
+
+    form = EvaluationForm.query.filter_by(activity_type_id=agenda_item.type_id, organisatie_id=agenda_item.organisatie_id).first()
+    if not form or not form.actief or not form.vragen:
+        return 0, [], ["Er is nog geen actief evaluatieformulier met vragen geconfigureerd voor dit type activiteit."]
+
+    base_url = host_url or (request.host_url.rstrip('/') if request else '')
+    verzonden_namen = []
+    fouten = []
+
+    tpl = EmailTemplate.query.filter_by(sleutel='evaluatie_herinnering').first()
+
+    for dd in agenda_item.digidokters:
+        # Check of digidokter al heeft ingevuld
+        reeds_ingevuld = EvaluationResponse.query.filter_by(agenda_item_id=agenda_item.id, digidokter_id=dd.id).first()
+        if reeds_ingevuld:
+            continue
+
+        email = dd.email
+        if not email:
+            fouten.append(f"{dd.naam} (geen e-mailadres gekoppeld)")
+            continue
+
+        # Haal token op of maak nieuw aan
+        invitation = EvaluationInvitation.query.filter_by(agenda_item_id=agenda_item.id, digidokter_id=dd.id).first()
+        if not invitation:
+            token = secrets.token_urlsafe(32)
+            invitation = EvaluationInvitation(
+                agenda_item_id=agenda_item.id,
+                digidokter_id=dd.id,
+                token=token,
+                verzonden_op=datetime.utcnow(),
+                is_ingevuld=False
+            )
+            db.session.add(invitation)
+            db.session.commit()
+        else:
+            token = invitation.token
+
+        link = f"{base_url}/evaluaties/invullen/{token}"
+
+        datum_str = agenda_item.datum.strftime('%d-%m-%Y')
+        locatie_naam = agenda_item.locatie.naam if agenda_item.locatie else 'onbekende locatie'
+        omschrijving_blok = f"\nOmschrijving: {agenda_item.omschrijving.strip()}\n" if agenda_item.omschrijving and agenda_item.omschrijving.strip() else ""
+
+        context = {
+            'naam': dd.naam,
+            'activiteit': agenda_item.type.naam,
+            'datum': datum_str,
+            'uur_van': agenda_item.uur_van,
+            'uur_tot': agenda_item.uur_tot,
+            'locatie': locatie_naam,
+            'omschrijving_blok': omschrijving_blok,
+            'link': link
+        }
+
+        if tpl:
+            onderwerp, inhoud = tpl.render(context)
+        else:
+            onderwerp = f"Herinnering: Evaluatie voor {agenda_item.type.naam} op {datum_str}"
+            inhoud = f"""Beste {dd.naam},
+
+Dit is een vriendelijke herinnering om het evaluatieformulier in te vullen voor het {agenda_item.type.naam} op {datum_str} van {agenda_item.uur_van} tot {agenda_item.uur_tot} ({locatie_naam}).{omschrijving_blok}
+
+We hebben je feedback nog niet ontvangen. Jouw ervaringen als vrijwilliger zijn voor ons erg waardevol om de werking van Digidokters te versterken.
+
+👉 Klik op onderstaande link om het formulier alsnog in te vullen:
+{link}
+
+Hartelijk dank voor je tijd en toewijding!
+
+Met vriendelijke groet,
+Digidokters Team
+"""
+        try:
+            success, msg = verstuur_email([email], onderwerp, inhoud)
+            if success:
+                verzonden_namen.append(f"{dd.naam} ({email})")
+                invitation.herinnering_verzonden_op = datetime.utcnow()
+                invitation.herinnering_aantal = (invitation.herinnering_aantal or 0) + 1
                 db.session.commit()
             else:
                 fouten.append(f"{dd.naam} ({msg})")
@@ -529,17 +641,21 @@ def sessie_detail(agenda_id):
 
     form = EvaluationForm.query.filter_by(activity_type_id=item.type_id, organisatie_id=org_id).first()
     reacties = EvaluationResponse.query.filter_by(agenda_item_id=item.id).order_by(EvaluationResponse.ingediend_op.desc()).all()
+    uitnodigingen = EvaluationInvitation.query.filter_by(agenda_item_id=item.id).all()
+    uitnodigingen_map = {inv.digidokter_id: inv for inv in uitnodigingen}
 
     return render_template(
         'admin/evaluaties/sessie_detail.html',
         item=item,
         form=form,
-        reacties=reacties
+        reacties=reacties,
+        uitnodigingen=uitnodigingen,
+        uitnodigingen_map=uitnodigingen_map
     )
 
 
 # ═══════════════════════════════════════════════════════════════
-# UITNODIGINGEN VERSTUREN (HANDMATIG / VANUIT AGENDA)
+# UITNODIGINGEN & HERINNERINGEN VERSTUREN (HANDMATIG / VANUIT AGENDA)
 # ═══════════════════════════════════════════════════════════════
 
 @eval_bp.route('/agenda/<int:agenda_id>/verstuur-evaluaties', methods=['POST'])
@@ -554,7 +670,7 @@ def verstuur_uitnodigingen(agenda_id):
 
     if not item.type.heeft_evaluatie:
         flash('Voor dit type activiteit is geen evaluatieformulier ingeschakeld.', 'warning')
-        return redirect(url_for('agenda.lijst'))
+        return redirect(request.referrer or url_for('agenda.lijst'))
 
     aantal, namen, fouten = verstuur_uitnodigingen_voor_sessie(item, request.host_url.rstrip('/'))
 
@@ -566,7 +682,34 @@ def verstuur_uitnodigingen(agenda_id):
     if fouten:
         flash(f'Kon niet versturen naar: {", ".join(fouten)}.', 'warning')
 
-    return redirect(url_for('agenda.lijst'))
+    return redirect(request.referrer or url_for('agenda.lijst'))
+
+
+@eval_bp.route('/agenda/<int:agenda_id>/verstuur-herinneringen', methods=['POST'])
+@login_required
+@writer_required
+def verstuur_herinneringen(agenda_id):
+    """Verstuurt handmatig evaluatie-herinneringen naar digidokters die de evaluatie nog niet hebben ingevuld."""
+    org_id = get_huidige_organisatie_id()
+    item = db.session.get(AgendaItem, agenda_id)
+    if not item or item.organisatie_id != org_id:
+        abort(404)
+
+    if not item.type.heeft_evaluatie:
+        flash('Voor dit type activiteit is geen evaluatieformulier ingeschakeld.', 'warning')
+        return redirect(request.referrer or url_for('agenda.lijst'))
+
+    aantal, namen, fouten = verstuur_herinneringen_voor_sessie(item, request.host_url.rstrip('/'))
+
+    if aantal > 0:
+        flash(f'Evaluatie-herinnering succesvol verstuurd naar: {", ".join(namen)}.', 'success')
+    elif not fouten:
+        flash('Alle gekoppelde digidokters hebben de evaluatie reeds ingevuld.', 'info')
+
+    if fouten:
+        flash(f'Kon herinnering niet versturen naar: {", ".join(fouten)}.', 'warning')
+
+    return redirect(request.referrer or url_for('agenda.lijst'))
 
 
 # ═══════════════════════════════════════════════════════════════

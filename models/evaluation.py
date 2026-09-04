@@ -98,6 +98,8 @@ class EvaluationInvitation(db.Model):
     token = db.Column(db.String(64), unique=True, nullable=False, index=True)
     verzonden_op = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     is_ingevuld = db.Column(db.Boolean, default=False, nullable=False)
+    herinnering_verzonden_op = db.Column(db.DateTime, nullable=True)
+    herinnering_aantal = db.Column(db.Integer, default=0, nullable=False)
 
     __table_args__ = (
         db.UniqueConstraint('agenda_item_id', 'digidokter_id', name='uq_eval_invitation_agenda_digidokter'),

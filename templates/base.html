@@ -114,6 +114,11 @@
                 <i class="bi bi-link-45deg"></i>
                 <span>Koppelingen</span>
             </a>
+            <a href="{{ url_for('platform.emailsjablonen') }}"
+               class="dd-nav-link {% if request.endpoint and 'emailsjabloon' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-envelope-paper"></i>
+                <span>E-mailsjablonen</span>
+            </a>
             <a href="{{ url_for('admin.audit_log') }}"
                class="dd-nav-link {% if request.endpoint == 'admin.audit_log' %}active{% endif %}">
                 <i class="bi bi-shield-shaded"></i>

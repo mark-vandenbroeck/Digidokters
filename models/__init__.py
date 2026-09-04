@@ -12,12 +12,14 @@ from .document import Folder, Document
 from .audit import AuditLog
 from .herkomst import Herkomst
 from .evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
+from .email_template import EmailTemplate
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
     'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem',
     'Folder', 'Document', 'AuditLog', 'Herkomst',
-    'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation'
+    'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation',
+    'EmailTemplate'
 ]
 
 

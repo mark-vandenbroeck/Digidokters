@@ -1,74 +1,272 @@
 {% extends 'base.html' %}
 {% block title %}Platform Dashboard – Digidokters{% endblock %}
 
+{% block extra_css %}
+<style>
+.progress-bar-glow {
+    transition: width 0.6s ease;
+}
+.org-hover-row:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.04);
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="mb-4">
-    <h1 class="dd-page-title mb-0"><i class="bi bi-speedometer2 me-2 text-primary"></i>Platform Dashboard</h1>
-    <p class="dd-page-subtitle mb-0">Beheer van organisaties en globale gebruikerskoppelingen</p>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-speedometer2 me-2 text-primary"></i>Platform Dashboard</h1>
+        <p class="dd-page-subtitle mb-0">Globaal beheer en geaggregeerde statistieken over alle aangesloten gemeenten</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <form method="GET" action="{{ url_for('platform.dashboard') }}" class="d-flex align-items-center gap-2 mb-0">
+            <label class="text-nowrap small text-muted fw-semibold">
+                <i class="bi bi-funnel me-1"></i>Periode:
+            </label>
+            <select name="jaar" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="alle" {% if geselecteerd_jaar == 'alle' %}selected{% endif %}>Alle jaren (Totaal)</option>
+                {% for j in beschikbare_jaren %}
+                <option value="{{ j }}" {% if geselecteerd_jaar == j|string %}selected{% endif %}>{{ j }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <a href="{{ url_for('platform.emailsjablonen') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-envelope-paper me-1"></i>E-mailsjablonen
+        </a>
+        <a href="{{ url_for('platform.organisaties') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-building me-1"></i>Organisaties
+        </a>
+    </div>
 </div>
 
-<!-- Samenvatting KPI's -->
+<!-- Primaire Aggregatie KPI's (Consultaties, Vrijwilligers, Organisaties, Sessies) -->
 <div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-lg-3">
-        <div class="dd-stat-card">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
             <div class="dd-stat-icon bg-blue-soft text-blue">
-                <i class="bi bi-building"></i>
+                <i class="bi bi-clipboard2-pulse"></i>
             </div>
             <div>
-                <div class="dd-stat-value">{{ total_orgs }}</div>
-                <div class="dd-stat-label">Organisaties (totaal)</div>
+                <div class="dd-stat-value">{{ "{:,}".format(total_consultaties).replace(',', '.') }}</div>
+                <div class="dd-stat-label">
+                    Totaal Consultaties
+                    {% if geselecteerd_jaar != 'alle' %}<span class="badge bg-primary-subtle text-primary ms-1">{{ geselecteerd_jaar }}</span>{% endif %}
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-lg-3">
-        <div class="dd-stat-card">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
             <div class="dd-stat-icon bg-teal-soft text-teal">
-                <i class="bi bi-building-check"></i>
-            </div>
-            <div>
-                <div class="dd-stat-value">{{ active_orgs }}</div>
-                <div class="dd-stat-label">Organisaties (actief)</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-sm-6 col-lg-3">
-        <div class="dd-stat-card">
-            <div class="dd-stat-icon bg-purple-soft text-purple">
                 <i class="bi bi-people-fill"></i>
             </div>
             <div>
-                <div class="dd-stat-value">{{ total_users }}</div>
-                <div class="dd-stat-label">Gebruikers (totaal)</div>
+                <div class="dd-stat-value">{{ active_volunteers }}</div>
+                <div class="dd-stat-label">
+                    Actieve Vrijwilligers
+                    <span class="text-muted small">({{ unique_active_volunteers }} uniek)</span>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-lg-3">
-        <div class="dd-stat-card">
-            <div class="dd-stat-icon bg-orange-soft text-orange">
-                <i class="bi bi-link-45deg"></i>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-purple-soft text-purple">
+                <i class="bi bi-building"></i>
             </div>
             <div>
-                <div class="dd-stat-value">{{ total_links }}</div>
-                <div class="dd-stat-label">Gebruiker-koppelingen</div>
+                <div class="dd-stat-value">{{ active_orgs }} <span class="fs-6 text-muted fw-normal">/ {{ total_orgs }}</span></div>
+                <div class="dd-stat-label">Aangesloten Gemeenten</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-orange-soft text-orange">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ total_sessions }}</div>
+                <div class="dd-stat-label">Geplande / Afgelopen Sessies</div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Grafieken: Spreiding over gemeenten -->
+<div class="row g-4 mb-4">
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
+                    <i class="bi bi-bar-chart-line-fill text-primary me-2"></i>Consultaties per Gemeente
+                </h2>
+                <span class="badge bg-light text-muted border small">
+                    {% if geselecteerd_jaar == 'alle' %}Alle jaren{% else %}Jaar {{ geselecteerd_jaar }}{% endif %}
+                </span>
+            </div>
+            <div class="card-body p-4">
+                {% if chart_consultaties and total_consultaties > 0 %}
+                <div style="position: relative; height: 280px; width: 100%;">
+                    <canvas id="gemeenteConsultatiesChart"></canvas>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-clipboard-x fs-1 d-block mb-2 opacity-50"></i>
+                    <p class="mb-0">Geen consultaties geregistreerd voor de geselecteerde periode.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
+                    <i class="bi bi-pie-chart-fill text-teal me-2"></i>Vrijwilligersverdeling
+                </h2>
+            </div>
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                {% if chart_vrijwilligers and active_volunteers > 0 %}
+                <div style="position: relative; height: 240px; width: 100%;">
+                    <canvas id="gemeenteVrijwilligersChart"></canvas>
+                </div>
+                <div class="text-center mt-3 text-muted small">
+                    Verdeling van {{ active_volunteers }} actieve vrijwilligers over gemeenten
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-person-x fs-1 d-block mb-2 opacity-50"></i>
+                    <p class="mb-0">Geen actieve vrijwilligers gevonden.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabel: Spreiding over gemeenten & organisaties -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
+            <i class="bi bi-geo-alt-fill text-danger me-2"></i>Spreiding over Gemeenten & Organisaties
+        </h2>
+        <div class="small text-muted">
+            Totaal {{ gemeenten_statistieken|length }} geregistreerde organisatie(s)
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Gemeente / Organisatie</th>
+                        <th>Status</th>
+                        <th class="text-end">Consultaties</th>
+                        <th style="min-width: 140px;">Aandeel</th>
+                        <th class="text-end">Actieve Vrijwilligers</th>
+                        <th class="text-end">Sessies</th>
+                        <th class="text-end">Koppelingen</th>
+                        <th class="pe-4 text-end">Actie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for g in gemeenten_statistieken %}
+                    <tr class="org-hover-row">
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="rounded-circle bg-light border p-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                    <i class="bi {% if g.is_sjabloon %}bi-file-earmark-code text-info{% else %}bi-building text-primary{% endif %}"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold text-dark">{{ g.naam }}</div>
+                                    <div class="text-muted small font-monospace">slug: {{ g.slug }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if g.is_sjabloon %}
+                                <span class="badge bg-info-subtle text-info border border-info-subtle">Sjabloon</span>
+                            {% elif g.actief %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">Actief</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Gedeactiveerd</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-bold">
+                            {{ "{:,}".format(g.consultaties).replace(',', '.') }}
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="progress flex-grow-1" style="height: 6px;">
+                                    <div class="progress-bar bg-primary progress-bar-glow" role="progressbar"
+                                         style="width: {{ g.percentage }}%;" aria-valuenow="{{ g.percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <span class="small fw-semibold text-muted" style="min-width: 42px;">{{ g.percentage }}%</span>
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <span class="badge bg-teal-soft text-teal fs-6">{{ g.vrijwilligers }}</span>
+                        </td>
+                        <td class="text-end text-muted">
+                            {{ g.sessies }}
+                        </td>
+                        <td class="text-end text-muted">
+                            {{ g.gebruikers }}
+                        </td>
+                        <td class="pe-4 text-end">
+                            <a href="{{ url_for('platform.organisatie_wijzigen', org_id=g.id) }}"
+                               class="btn btn-sm btn-outline-secondary" title="Organisatie bewerken">
+                                <i class="bi bi-gear"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Snelkoppelingen en Systeeminformatie -->
 <div class="row g-4">
-    <!-- Snelkoppelingen en beheersecties -->
+    <!-- Snelkoppelingen -->
     <div class="col-12 col-md-6">
-        <div class="card h-100">
-            <div class="card-header"><i class="bi bi-gear-fill me-2"></i>Snelkoppelingen</div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('platform.organisaties') }}" class="btn btn-outline-primary text-start p-3">
-                        <div class="fw-semibold"><i class="bi bi-building me-2"></i>Organisaties beheren</div>
-                        <div class="small text-muted mt-1">Bekijk, bewerk, activeer of maak nieuwe organisaties aan.</div>
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
+                    <i class="bi bi-lightning-charge-fill text-warning me-2"></i>Platform Beheeracties
+                </h2>
+            </div>
+            <div class="card-body p-4">
+                <div class="d-grid gap-3">
+                    <a href="{{ url_for('platform.emailsjablonen') }}" class="btn btn-outline-primary text-start p-3 d-flex align-items-center gap-3">
+                        <div class="fs-4 text-primary"><i class="bi bi-envelope-paper-fill"></i></div>
+                        <div>
+                            <div class="fw-semibold">Aanpasbare E-mailsjablonen</div>
+                            <div class="small text-muted">Standaardtekst van uitnodigings- en herinneringsmails beheren.</div>
+                        </div>
                     </a>
-                    <a href="{{ url_for('platform.koppelingen') }}" class="btn btn-outline-primary text-start p-3">
-                        <div class="fw-semibold"><i class="bi bi-link-45deg me-2"></i>Gebruikers koppelen</div>
-                        <div class="small text-muted mt-1">Koppel gebruikers aan organisaties en beheer hun rollen en status.</div>
+                    <a href="{{ url_for('platform.organisaties') }}" class="btn btn-outline-primary text-start p-3 d-flex align-items-center gap-3">
+                        <div class="fs-4 text-primary"><i class="bi bi-building"></i></div>
+                        <div>
+                            <div class="fw-semibold">Organisaties & Gemeenten</div>
+                            <div class="small text-muted">Nieuwe gemeenten toevoegen, activeren of instellingen wijzigen.</div>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('platform.koppelingen') }}" class="btn btn-outline-primary text-start p-3 d-flex align-items-center gap-3">
+                        <div class="fs-4 text-primary"><i class="bi bi-link-45deg"></i></div>
+                        <div>
+                            <div class="fw-semibold">Gebruikerskoppelingen</div>
+                            <div class="small text-muted">Gebruikers en beheerders koppelen aan aangesloten gemeenten.</div>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('admin.audit_log') }}" class="btn btn-outline-primary text-start p-3 d-flex align-items-center gap-3">
+                        <div class="fs-4 text-primary"><i class="bi bi-shield-shaded"></i></div>
+                        <div>
+                            <div class="fw-semibold">Audit Logs</div>
+                            <div class="small text-muted">Systeembrede logs van alle platformactiviteiten raadplegen.</div>
+                        </div>
                     </a>
                 </div>
             </div>
@@ -77,31 +275,129 @@
 
     <!-- Systeeminformatie -->
     <div class="col-12 col-md-6">
-        <div class="card h-100">
-            <div class="card-header"><i class="bi bi-info-circle-fill me-2"></i>Systeeminformatie</div>
-            <div class="card-body">
-                <table class="table table-sm table-borderless mb-0">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
+                    <i class="bi bi-info-circle-fill text-info me-2"></i>Platform Architectuur
+                </h2>
+            </div>
+            <div class="card-body p-4">
+                <table class="table table-sm table-borderless mb-3">
                     <tbody>
                         <tr>
-                            <td class="fw-semibold text-muted" style="width: 150px;">Applicatie:</td>
+                            <td class="fw-semibold text-muted" style="width: 170px;">Applicatie:</td>
                             <td>Digidokters Multi-Tenant Platform</td>
                         </tr>
                         <tr>
-                            <td class="fw-semibold text-muted">Status:</td>
-                            <td><span class="badge bg-success">Operationeel</span></td>
+                            <td class="fw-semibold text-muted">Systeemstatus:</td>
+                            <td><span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-check-circle me-1"></i>Operationeel</span></td>
                         </tr>
                         <tr>
-                            <td class="fw-semibold text-muted">Aantal tenants:</td>
-                            <td>{{ total_orgs }} organisatie(s)</td>
+                            <td class="fw-semibold text-muted">Aantal organisaties:</td>
+                            <td>{{ total_orgs }} totaal ({{ active_orgs }} actief)</td>
                         </tr>
                         <tr>
-                            <td class="fw-semibold text-muted">Rol:</td>
-                            <td>Platformbeheerder (Super-admin)</td>
+                            <td class="fw-semibold text-muted">Gebruikersaccounts:</td>
+                            <td>{{ total_users }} gebruikers ({{ total_links }} koppelingen)</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold text-muted">Rol ingelogd:</td>
+                            <td><span class="badge bg-primary">Platformbeheerder</span></td>
                         </tr>
                     </tbody>
                 </table>
+                <div class="p-3 bg-light rounded border text-muted small">
+                    <i class="bi bi-shield-check me-1 text-success"></i>
+                    <strong>Multi-tenant isolatie:</strong> Lokale medewerkers hebben uitsluitend toegang tot hun toegewezen gemeentedata. Het platformdashboard geeft geaggregeerd inzicht over het complete netwerk.
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const labels = {{ chart_gemeenten | tojson }};
+    const consultaties = {{ chart_consultaties | tojson }};
+    const vrijwilligers = {{ chart_vrijwilligers | tojson }};
+
+    // 1. Staafgrafiek: Consultaties per Gemeente
+    const ctxBar = document.getElementById('gemeenteConsultatiesChart');
+    if (ctxBar && labels.length > 0) {
+        new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Aantal Consultaties',
+                    data: consultaties,
+                    backgroundColor: 'rgba(13, 110, 253, 0.75)',
+                    borderColor: 'rgb(13, 110, 253)',
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.parsed.y} consultaties`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Doughnut Grafiek: Vrijwilligers per Gemeente
+    const ctxPie = document.getElementById('gemeenteVrijwilligersChart');
+    if (ctxPie && labels.length > 0 && vrijwilligers.some(v => v > 0)) {
+        const colors = [
+            '#0d6efd', '#20c997', '#6f42c1', '#fd7e14', '#0dcaf0',
+            '#ffc107', '#d63384', '#6610f2', '#198754', '#adb5bd'
+        ];
+
+        new Chart(ctxPie, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: vrijwilligers,
+                    backgroundColor: colors.slice(0, labels.length),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, padding: 10 }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

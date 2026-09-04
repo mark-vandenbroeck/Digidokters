@@ -66,6 +66,16 @@ def create_app(config_class=Config):
     app.register_blueprint(doc_bp)
     app.register_blueprint(eval_bp)
 
+    @app.template_filter('weekdag')
+    def weekdag_filter(d):
+        if not d:
+            return ''
+        dagen = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag']
+        try:
+            return dagen[d.weekday()]
+        except Exception:
+            return ''
+
 
     # Controleer de organisatie-context voor authenticated requests
     from flask import session, redirect, url_for, request, flash, g

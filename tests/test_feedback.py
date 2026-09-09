@@ -282,3 +282,74 @@ class TestFeedback(BaseTestCase):
         # Lezer mag niet reageren
         res_reageer = self.client.post(f"/feedback/{fb.id}/reageer", data={"tekst": "Poging reactie"}, follow_redirects=True)
         self.assertIn("Als lezer heeft u enkel leesrechten", res_reageer.data.decode("utf-8"))
+
+    def test_screenshot_security_headers(self):
+        """SEC-06: Verifieer dat screenshot endpoint strikte CSP en nosniff headers bevat."""
+        self.login("tim@test.com", "password123")
+        png_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82"
+        self.client.post("/feedback/nieuw", data={
+            "type": "foutje",
+            "onderwerp": "Beveiliging screenshot test",
+            "beschrijving": "Test",
+            "screenshot": (io.BytesIO(png_data), "veilig.png")
+        }, follow_redirects=True)
+
+        fb = FeedbackItem.query.filter_by(onderwerp="Beveiliging screenshot test").first()
+        res = self.client.get(f"/feedback/{fb.id}/screenshot")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers.get('Content-Security-Policy'), "default-src 'none'; sandbox;")
+        self.assertEqual(res.headers.get('X-Content-Type-Options'), 'nosniff')
+
+    def test_cross_tenant_feedback_isolation(self):
+        """SEC-07: Verifieer dat gebruikers van een andere organisatie geen acties kunnen uitvoeren op feedback (IDOR-preventie)."""
+        from models.organisatie import Organisatie
+        org2 = Organisatie(naam="Tweede Organisatie", slug="tweede-org", actief=True)
+        db.session.add(org2)
+        db.session.commit()
+
+        user_org2 = User(
+            naam="UserOrg2",
+            email="user2@test.com",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="beheerder",
+            actief=True
+        )
+        db.session.add(user_org2)
+        db.session.commit()
+
+        uo2 = UserOrganisatie(user_id=user_org2.id, organisatie_id=org2.id, rol="beheerder", actief=True)
+        db.session.add(uo2)
+        db.session.commit()
+
+        # Feedback in Organisatie 1
+        fb_org1 = FeedbackItem(
+            organisatie_id=self.org.id,
+            user_id=self.admin_user.id,
+            type="voorstel",
+            onderwerp="Geheim voorstel Org 1",
+            beschrijving="Alleen voor Org 1",
+            aangemaakt_op=datetime.now(timezone.utc)
+        )
+        db.session.add(fb_org1)
+        db.session.commit()
+
+        # Login als gebruiker van Organisatie 2
+        self.login("user2@test.com", "password123")
+        with self.client.session_transaction() as sess:
+            sess['organisatie_id'] = org2.id
+
+        # 1. Detail bekijken van Org 1 feedback -> 404
+        res_detail = self.client.get(f"/feedback/{fb_org1.id}")
+        self.assertEqual(res_detail.status_code, 404)
+
+        # 2. Stemmen op Org 1 feedback -> 404
+        res_stem = self.client.post(f"/feedback/{fb_org1.id}/stem", data={"stem": "1"})
+        self.assertEqual(res_stem.status_code, 404)
+
+        # 3. Reageren op Org 1 feedback -> 404
+        res_reageer = self.client.post(f"/feedback/{fb_org1.id}/reageer", data={"tekst": "Inbreuk"})
+        self.assertEqual(res_reageer.status_code, 404)
+
+        # 4. Status afsluiten van Org 1 feedback (zelfs als beheerder van Org 2) -> 404
+        res_status = self.client.post(f"/feedback/{fb_org1.id}/status")
+        self.assertEqual(res_status.status_code, 404)

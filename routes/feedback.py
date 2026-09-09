@@ -105,11 +105,19 @@ def nieuw():
         screenshot_mime = None
         screenshot_data = None
 
+        VEILIGE_MIME_TYPES = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp'
+        }
+
         if 'screenshot' in request.files:
             file = request.files['screenshot']
             if file and file.filename:
                 ext = os.path.splitext(file.filename)[1].lower()
-                if ext in TOEGESTANE_BEELDFORMATEN:
+                if ext in VEILIGE_MIME_TYPES:
                     bestand_bytes = file.read()
                     if len(bestand_bytes) > MAX_SCREENSHOT_GROOTTE:
                         flash('Het screenshot is te groot (maximaal 5 MB toegestaan).', 'warning')
@@ -119,7 +127,8 @@ def nieuw():
                             vandaag_str=datetime.now().strftime('%d-%m-%Y om %H:%M')
                         )
                     screenshot_naam = secure_filename(file.filename)
-                    screenshot_mime = file.mimetype or 'image/png'
+                    # SEC-06: Bepaal MIME-type strikt op basis van de veilige extensie
+                    screenshot_mime = VEILIGE_MIME_TYPES[ext]
                     screenshot_data = bestand_bytes
                 else:
                     flash('Ongeldig bestandsformaat voor screenshot. Gebruik PNG, JPG, JPEG, GIF of WEBP.', 'warning')
@@ -187,12 +196,19 @@ def screenshot(id):
     if not fb.screenshot_data:
         abort(404)
 
-    return send_file(
+    safe_mimetypes = {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
+    mime = fb.screenshot_mime if fb.screenshot_mime in safe_mimetypes else 'image/png'
+
+    response = send_file(
         io.BytesIO(fb.screenshot_data),
-        mimetype=fb.screenshot_mime or 'image/png',
+        mimetype=mime,
         as_attachment=False,
         download_name=fb.screenshot_naam or 'screenshot.png'
     )
+    # SEC-06: Strict Content-Security-Policy en nosniff tegen inline XSS
+    response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox;"
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 @feedback_bp.route('/<int:id>/stem', methods=['POST'])
@@ -204,6 +220,11 @@ def stem(id):
         return redirect(request.referrer or url_for('feedback.detail', id=id))
 
     fb = db.get_or_404(FeedbackItem, id)
+    org_id = get_huidige_organisatie_id()
+
+    # SEC-07: Multi-tenant isolatie check
+    if current_user.rol != 'platformbeheerder' and fb.organisatie_id != org_id:
+        abort(404)
 
     if fb.is_afgesloten:
         flash('Deze feedback is afgesloten. Er kan niet meer gestemd worden.', 'warning')
@@ -253,6 +274,11 @@ def reageer(id):
         return redirect(url_for('feedback.detail', id=id))
 
     fb = db.get_or_404(FeedbackItem, id)
+    org_id = get_huidige_organisatie_id()
+
+    # SEC-07: Multi-tenant isolatie check
+    if current_user.rol != 'platformbeheerder' and fb.organisatie_id != org_id:
+        abort(404)
 
     if fb.is_afgesloten:
         flash('Deze feedback is afgesloten. Er kunnen geen nieuwe reacties meer geplaatst worden.', 'warning')
@@ -284,6 +310,11 @@ def status(id):
         return redirect(url_for('feedback.detail', id=id))
 
     fb = db.get_or_404(FeedbackItem, id)
+    org_id = get_huidige_organisatie_id()
+
+    # SEC-07: Multi-tenant isolatie check (ook voor beheerders van een andere organisatie)
+    if current_user.rol != 'platformbeheerder' and fb.organisatie_id != org_id:
+        abort(404)
 
     if fb.is_afgesloten:
         fb.is_afgesloten = False

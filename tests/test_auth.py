@@ -116,3 +116,15 @@ class TestAuth(BaseTestCase):
         # Beheer section should NOT be visible for medewerker
         self.assertNotIn('<div class="dd-nav-section mt-3">Beheer</div>', html)
 
+    def test_privacy_modal_comprehensive_sections(self):
+        self.login("tim@test.com", "password123")
+        response = self.client.get('/registraties')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertIn('1. Richtlijn voor Bezoekersregistratie', html)
+        self.assertIn('2. Uw gegevens als Vrijwilliger / Medewerker', html)
+        self.assertIn('3. Evaluaties & Kwaliteitsmeting', html)
+        self.assertIn('4. Feedback & Schermafbeeldingen', html)
+        self.assertIn('5. Documentbeheer', html)
+        self.assertIn('6. Recht op Vergetelheid & Inzage', html)
+

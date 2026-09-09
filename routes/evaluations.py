@@ -3,7 +3,7 @@ import json
 import secrets
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
 from flask_login import login_required, current_user
-from extensions import db
+from extensions import db, limiter
 from models.activity_type import ActivityType
 from models.agenda import AgendaItem
 from models.digidokter import Digidokter
@@ -798,6 +798,7 @@ def invullen_sessie(agenda_id):
 
 
 @eval_bp.route('/evaluaties/invullen/<token>', methods=['GET', 'POST'])
+@limiter.limit("30 per minute")
 def invullen_token(token):
     """Direct formulier invullen via de token uit de e-mail (zowel voor ingelogde als niet-ingelogde digidokters)."""
     invitation = EvaluationInvitation.query.filter_by(token=token).first()

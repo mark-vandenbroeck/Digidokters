@@ -81,7 +81,7 @@ def create_app(config_class=Config):
 
     # Controleer de organisatie-context voor authenticated requests
     from flask import session, redirect, url_for, request, flash, g
-    from flask_login import current_user
+    from flask_login import current_user, login_required
 
     @app.before_request
     def check_organisatie_context():
@@ -90,7 +90,6 @@ def create_app(config_class=Config):
             exempt_endpoints = [
                 'static',
                 'service_worker',
-                'test_mail',
                 'ping',
                 'auth.login',
                 'auth.logout',
@@ -137,9 +136,14 @@ def create_app(config_class=Config):
         return response
 
     @app.route('/test-mail')
+    @login_required
     def test_mail():
+        from utils.decorators import platform_admin_required
         from flask import request, jsonify
         from utils.mail import verstuur_email
+        
+        if current_user.rol != 'platformbeheerder':
+            return jsonify({'status': 'error', 'message': 'Toegang geweigerd. Enkel platformbeheerders.'}), 403
         
         recipient = request.args.get('to')
         if not recipient:
@@ -175,14 +179,15 @@ def create_app(config_class=Config):
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response.headers['Content-Security-Policy'] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
-            "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
-            "img-src 'self' data:; "
-            "connect-src 'self';"
-        )
+        if 'Content-Security-Policy' not in response.headers:
+            response.headers['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+                "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
+                "img-src 'self' data:; "
+                "connect-src 'self';"
+            )
         return response
 
     # Foutafhandeling

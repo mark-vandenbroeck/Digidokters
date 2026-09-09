@@ -205,6 +205,23 @@ class TestPlatformOrganizationDelete(BaseTestCase):
             aangemaakt_door_id=self.admin_user.id
         )
         db.session.add(doc)
+
+        # Add FeedbackItem, Vote & Comment
+        from models.feedback import FeedbackItem, FeedbackVote, FeedbackComment
+        fb = FeedbackItem(
+            organisatie_id=org2_id,
+            user_id=user_exclusive.id,
+            type="voorstel",
+            onderwerp="Org 2 Feedback",
+            beschrijving="Feedback for org 2"
+        )
+        db.session.add(fb)
+        db.session.commit()
+
+        fb_id = fb.id
+        vote = FeedbackVote(feedback_id=fb_id, user_id=user_exclusive.id, stem=1)
+        comment = FeedbackComment(feedback_id=fb_id, user_id=user_exclusive.id, tekst="Prima idee")
+        db.session.add_all([vote, comment])
         db.session.commit()
 
         # Verify everything is present before delete
@@ -212,6 +229,9 @@ class TestPlatformOrganizationDelete(BaseTestCase):
         self.assertGreater(AgendaItem.query.filter_by(organisatie_id=org2_id).count(), 0)
         self.assertGreater(Folder.query.filter_by(organisatie_id=org2_id).count(), 0)
         self.assertGreater(Document.query.filter_by(organisatie_id=org2_id).count(), 0)
+        self.assertGreater(FeedbackItem.query.filter_by(organisatie_id=org2_id).count(), 0)
+        self.assertGreater(FeedbackVote.query.filter_by(feedback_id=fb_id).count(), 0)
+        self.assertGreater(FeedbackComment.query.filter_by(feedback_id=fb_id).count(), 0)
 
         # 4. Perform Delete as platform admin
         self.login("superplatform@test.be", "password123")
@@ -224,6 +244,9 @@ class TestPlatformOrganizationDelete(BaseTestCase):
         self.assertEqual(AgendaItem.query.filter_by(organisatie_id=org2_id).count(), 0)
         self.assertEqual(Folder.query.filter_by(organisatie_id=org2_id).count(), 0)
         self.assertEqual(Document.query.filter_by(organisatie_id=org2_id).count(), 0)
+        self.assertEqual(FeedbackItem.query.filter_by(organisatie_id=org2_id).count(), 0)
+        self.assertEqual(FeedbackVote.query.filter_by(feedback_id=fb_id).count(), 0)
+        self.assertEqual(FeedbackComment.query.filter_by(feedback_id=fb_id).count(), 0)
         self.assertEqual(Digidokter.query.filter_by(organisatie_id=org2_id).count(), 0)
         self.assertEqual(ActivityType.query.filter_by(organisatie_id=org2_id).count(), 0)
         self.assertEqual(EvaluationForm.query.filter_by(organisatie_id=org2_id).count(), 0)

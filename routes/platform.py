@@ -291,6 +291,14 @@ def organisatie_verwijderen(org_id):
     # 6. Audit Logs
     AuditLog.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
 
+    # 6b. Feedback data (SEC-08: Cascade cleanup)
+    from models.feedback import FeedbackItem, FeedbackVote, FeedbackComment
+    fb_ids = [f.id for f in FeedbackItem.query.filter_by(organisatie_id=org_id).all()]
+    if fb_ids:
+        FeedbackVote.query.filter(FeedbackVote.feedback_id.in_(fb_ids)).delete(synchronize_session=False)
+        FeedbackComment.query.filter(FeedbackComment.feedback_id.in_(fb_ids)).delete(synchronize_session=False)
+    FeedbackItem.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+
     # 7. Gebruikerskoppelingen & Wees-gebruikers opruimen
     user_links = UserOrganisatie.query.filter_by(organisatie_id=org_id).all()
     user_ids_to_check = [link.user_id for link in user_links]

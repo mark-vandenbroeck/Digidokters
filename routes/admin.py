@@ -260,6 +260,9 @@ def gebruiker_verwijderen(user_id):
         flash('De hoofdbeheerder kan niet worden verwijderd.', 'danger')
         return redirect(url_for('admin.gebruikers'))
 
+    # GDPR-01: Controleer of de gebruiker behoort tot de huidige organisatie
+    membership = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first_or_404()
+
     # Controleer of er een Digidokter gekoppeld is aan dit gebruikersaccount
     dd_count = Digidokter.query.filter_by(user_id=user.id).count()
     if dd_count > 0:
@@ -267,6 +270,47 @@ def gebruiker_verwijderen(user_id):
         return redirect(url_for('admin.gebruikers'))
 
     naam = user.naam
+
+    # Indien de gebruiker ook actief is in andere organisaties: verbreek uitsluitend de koppeling met deze organisatie
+    other_links_count = UserOrganisatie.query.filter(
+        UserOrganisatie.user_id == user.id,
+        UserOrganisatie.organisatie_id != org_id
+    ).count()
+
+    if other_links_count > 0:
+        db.session.delete(membership)
+        db.session.commit()
+        flash(f'Gebruiker {naam} is ontkoppeld van deze organisatie. Het gebruikersaccount blijft behouden voor andere organisaties.', 'info')
+        return redirect(url_for('admin.gebruikers'))
+
+    # Gebruiker is exclusief aan deze organisatie gekoppeld: voer volledige gegevenswissing uit (Recht op vergetelheid)
+    # 1. Re-attribueer mappen en documenten naar de uitvoerende beheerder zodat organisatie-kennis bewaard blijft
+    from models.document import Folder, Document
+    Folder.query.filter_by(aangemaakt_door_id=user.id).update({'aangemaakt_door_id': current_user.id})
+    Document.query.filter_by(aangemaakt_door_id=user.id).update({'aangemaakt_door_id': current_user.id})
+    Document.query.filter_by(gewijzigd_door_id=user.id).update({'gewijzigd_door_id': current_user.id})
+
+    # 2. Anonimiseer evaluatieresponses
+    from models.evaluation import EvaluationResponse
+    EvaluationResponse.query.filter_by(user_id=user.id).update({'user_id': None})
+
+    # 3. Anonimiseer registratie auteur veld
+    Registration.query.filter_by(aangemaakt_door_id=user.id).update({'aangemaakt_door_id': None})
+
+    # 4. Opschonen van feedback items, stemmen en reacties van deze gebruiker
+    from models.feedback import FeedbackItem, FeedbackVote, FeedbackComment
+    FeedbackVote.query.filter_by(user_id=user.id).delete()
+    FeedbackComment.query.filter_by(user_id=user.id).delete()
+    fb_user_items = FeedbackItem.query.filter_by(user_id=user.id).all()
+    if fb_user_items:
+        fb_ids = [f.id for f in fb_user_items]
+        FeedbackVote.query.filter(FeedbackVote.feedback_id.in_(fb_ids)).delete(synchronize_session=False)
+        FeedbackComment.query.filter(FeedbackComment.feedback_id.in_(fb_ids)).delete(synchronize_session=False)
+        FeedbackItem.query.filter(FeedbackItem.id.in_(fb_ids)).delete(synchronize_session=False)
+    FeedbackItem.query.filter_by(afgesloten_door_id=user.id).update({'afgesloten_door_id': None})
+
+    # 5. Verwijder lidmaatschap en gebruiker
+    db.session.delete(membership)
     db.session.delete(user)
     db.session.commit()
 

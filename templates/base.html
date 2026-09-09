@@ -363,7 +363,7 @@ setTimeout(() => {
                 
                 <div class="card bg-light border-0 mb-3">
                     <div class="card-body">
-                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle-fill text-info me-2"></i>Richtlijn voor Bezoekersregistratie (Dataminimalisatie)</h6>
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle-fill text-info me-2"></i>1. Richtlijn voor Bezoekersregistratie (Dataminimalisatie)</h6>
                         <ul class="mb-0 text-muted">
                             <li><strong>Gebruik geen volledige namen:</strong> Noteer in het veld 'Cliënt' uitsluitend de voornaam of initialen (bijv. "Jan" of "J.P.").</li>
                             <li><strong>Omschrijf de vraag anoniem en functioneel:</strong> Voer geen medische, politieke of andere gevoelige persoonsgegevens in het veld 'Onderwerp' in (schrijf dus: <em>"Hulp bij inloggen eHealth"</em> in plaats van <em>"Hulp bij inloggen MyHealth vanwege diabetesrapport"</em>).</li>
@@ -373,18 +373,46 @@ setTimeout(() => {
                 
                 <div class="card bg-light border-0 mb-3">
                     <div class="card-body">
-                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-shield-shaded text-warning me-2"></i>Uw gegevens als Vrijwilliger</h6>
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-shield-shaded text-warning me-2"></i>2. Uw gegevens als Vrijwilliger / Medewerker</h6>
                         <ul class="mb-0 text-muted">
-                            <li><strong>Accountgegevens:</strong> Uw naam, rol en e-mailadres worden uitsluitend gebruikt voor accountbeheer, inloggen en systeemnotificaties (zoals wachtwoordherstel).</li>
-                            <li><strong>Database Auditing:</strong> Om veiligheidsredenen en ter voorkoming van dataverlies of misbruik, worden alle database-wijzigingen (toevoegen, aanpassen, verwijderen) inclusief uw gebruikersnaam geregistreerd in een beveiligd audit-logboek.</li>
+                            <li><strong>Accountgegevens:</strong> Uw naam, rol en e-mailadres worden uitsluitend gebruikt voor accountbeheer, inloggen en systeemnotificaties (zoals wachtwoordherstel en evaluatie-uitnodigingen).</li>
+                            <li><strong>Database Auditing:</strong> Om veiligheidsredenen en ter controle van de gegevensintegriteit, worden database-mutaties inclusief gebruikersnaam geregistreerd in een beveiligd audit-logboek.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card bg-light border-0 mb-3">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-clipboard-check-fill text-primary me-2"></i>3. Evaluaties & Kwaliteitsmeting</h6>
+                        <ul class="mb-0 text-muted">
+                            <li><strong>Doelbinding:</strong> Evaluaties dienen uitsluitend voor kwaliteitsmonitoring en werkingsevaluatie van de digidokter-sessies binnen de eigen gemeente.</li>
+                            <li><strong>Anonimisering:</strong> Resultaten worden geaggregeerd verwerkt. Bij verwijdering van een digidokter worden diens evaluatieresponses geanonimiseerd bewaard voor historische statistiek.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card bg-light border-0 mb-3">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-chat-heart-fill text-danger me-2"></i>4. Feedback & Schermafbeeldingen</h6>
+                        <ul class="mb-0 text-muted">
+                            <li><strong>Geen cliëntgegevens in screenshots:</strong> Zorg ervoor dat geüploade screenshots of beschrijvingen van bugs/voorstellen geen persoonsgegevens van bezoekers bevatten.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card bg-light border-0 mb-3">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-folder-fill text-secondary me-2"></i>5. Documentbeheer</h6>
+                        <ul class="mb-0 text-muted">
+                            <li><strong>Interne opslag:</strong> Geüploade handleidingen en documenten zijn strikt afgeschermd binnen de eigen organisatie en niet toegankelijk voor andere tenants.</li>
                         </ul>
                     </div>
                 </div>
                 
                 <div class="card bg-light border-0">
                     <div class="card-body">
-                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-trash3-fill text-danger me-2"></i>Recht op Vergetelheid (Verwijdering)</h6>
-                        <p class="mb-0 text-muted">Als een bezoeker vraagt om zijn of haar gegevens definitief te verwijderen, zal de beheerder de registratie wissen. Het systeem is zo geconfigureerd dat bij verwijdering van een registratie ook direct alle bijbehorende audit logs volledig worden gewist.</p>
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-trash3-fill text-danger me-2"></i>6. Recht op Vergetelheid & Inzage</h6>
+                        <p class="mb-0 text-muted">Als een bezoeker vraagt om zijn of haar gegevens definitief te wissen, verwijdert de beheerder de registratie. Het platform verwijdert hierbij automatisch en permanent alle gerelateerde audit-log records. Ook bij het verwijderen van een medewerkeraccount worden alle persoonskoppelingen gewist.</p>
                     </div>
                 </div>
             </div>

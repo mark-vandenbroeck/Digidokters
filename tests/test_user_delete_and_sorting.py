@@ -95,3 +95,131 @@ class TestUserDeleteAndSorting(BaseTestCase):
         res = self.client.get('/platform/koppelingen?sort_by=organisatie&direction=desc')
         self.assertEqual(res.status_code, 200)
         self.assertIn(b"Bestaande koppelingen", res.data)
+
+    def test_cross_tenant_gebruiker_verwijderen_geblokkeerd(self):
+        from models.organisatie import Organisatie
+        self.login_admin()
+
+        # Maak org 2 met een gebruiker die uitsluitend in org 2 zit
+        org2 = Organisatie(naam="Gemeente B", slug="gemeente-b", actief=True)
+        db.session.add(org2)
+        db.session.commit()
+
+        u_org2 = User(
+            naam="UserOrg2",
+            email="user.org2@test.be",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="medewerker",
+            actief=True
+        )
+        db.session.add(u_org2)
+        db.session.commit()
+        db.session.add(UserOrganisatie(user_id=u_org2.id, organisatie_id=org2.id, rol="medewerker", actief=True))
+        db.session.commit()
+
+        # Admin van org 1 probeert gebruiker van org 2 te verwijderen -> 404
+        res = self.client.post(f'/beheer/gebruikers/{u_org2.id}/verwijderen')
+        self.assertEqual(res.status_code, 404)
+        # Gebruiker bestaat nog
+        self.assertIsNotNone(db.session.get(User, u_org2.id))
+
+    def test_verwijder_multi_organisatie_gebruiker_ontkoppelt_alleen(self):
+        from models.organisatie import Organisatie
+        self.login_admin()
+
+        # Maak org 2
+        org2 = Organisatie(naam="Gemeente C", slug="gemeente-c", actief=True)
+        db.session.add(org2)
+        db.session.commit()
+
+        # Maak gebruiker gekoppeld aan ZOWEL org 1 als org 2
+        u_multi = User(
+            naam="MultiOrgUser",
+            email="multi@test.be",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="medewerker",
+            actief=True
+        )
+        db.session.add(u_multi)
+        db.session.commit()
+        db.session.add(UserOrganisatie(user_id=u_multi.id, organisatie_id=self.org.id, rol="medewerker", actief=True))
+        db.session.add(UserOrganisatie(user_id=u_multi.id, organisatie_id=org2.id, rol="medewerker", actief=True))
+        db.session.commit()
+
+        # Verwijderen in org 1 ontkoppelt alleen org 1
+        res = self.client.post(f'/beheer/gebruikers/{u_multi.id}/verwijderen', follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("is ontkoppeld van deze organisatie. Het gebruikersaccount blijft behouden voor andere organisaties.", res.get_data(as_text=True))
+
+        # Koppeling met org 1 is weg
+        self.assertIsNone(UserOrganisatie.query.filter_by(user_id=u_multi.id, organisatie_id=self.org.id).first())
+        # Maar account en koppeling met org 2 bestaan nog!
+        self.assertIsNotNone(UserOrganisatie.query.filter_by(user_id=u_multi.id, organisatie_id=org2.id).first())
+        self.assertIsNotNone(db.session.get(User, u_multi.id))
+
+    def test_verwijder_gebruiker_met_documenten_en_feedback(self):
+        from models.document import Folder, Document
+        from models.feedback import FeedbackItem, FeedbackVote, FeedbackComment
+        self.login_admin()
+
+        u = User(
+            naam="ContentCreator",
+            email="creator@test.be",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="medewerker",
+            actief=True
+        )
+        db.session.add(u)
+        db.session.commit()
+        db.session.add(UserOrganisatie(user_id=u.id, organisatie_id=self.org.id, rol="medewerker", actief=True))
+
+        # Maak map en document aan door deze gebruiker
+        folder = Folder(naam="Creator Map", organisatie_id=self.org.id, aangemaakt_door_id=u.id)
+        db.session.add(folder)
+        db.session.commit()
+
+        doc = Document(
+            bestandsnaam="creator_doc.pdf",
+            type="pdf",
+            mime_type="application/pdf",
+            bestandsgrootte=100,
+            inhoud=b"ABC",
+            organisatie_id=self.org.id,
+            map_id=folder.id,
+            aangemaakt_door_id=u.id
+        )
+        db.session.add(doc)
+
+        # Maak feedback item en comment door deze gebruiker
+        fb = FeedbackItem(
+            organisatie_id=self.org.id,
+            user_id=u.id,
+            type="voorstel",
+            onderwerp="Mijn idee",
+            beschrijving="Mijn omschrijving"
+        )
+        db.session.add(fb)
+        db.session.commit()
+
+        vote = FeedbackVote(feedback_id=fb.id, user_id=u.id, stem=1)
+        comment = FeedbackComment(feedback_id=fb.id, user_id=u.id, tekst="Mijn reactie")
+        db.session.add_all([vote, comment])
+        db.session.commit()
+
+        u_id = u.id
+        doc_id = doc.id
+        folder_id = folder.id
+
+        # Verwijder gebruiker -> mag NIET falen op foreign keys en moet documenten re-attribueren
+        res = self.client.post(f'/beheer/gebruikers/{u_id}/verwijderen', follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("is succesvol verwijderd", res.get_data(as_text=True))
+
+        # Gebruiker is weg
+        self.assertIsNone(db.session.get(User, u_id))
+        # Documenten bestaan nog, maar zijn geherattribueerd naar de uitvoerende beheerder
+        refreshed_doc = db.session.get(Document, doc_id)
+        self.assertEqual(refreshed_doc.aangemaakt_door_id, self.admin_user.id)
+        refreshed_folder = db.session.get(Folder, folder_id)
+        self.assertEqual(refreshed_folder.aangemaakt_door_id, self.admin_user.id)
+

@@ -270,3 +270,25 @@ class TestPlatformDashboardAndEmailTemplates(BaseTestCase):
             mock_route_email.return_value = (True, "OK")
             resp = self.client.post(f'/agenda/{agenda_item.id}/verstuur-herinneringen', follow_redirects=True)
             self.assertIn('Evaluatie-herinnering succesvol verstuurd', resp.get_data(as_text=True))
+
+    def test_test_mail_endpoint_authorization(self):
+        # 1. Niet ingelogd -> redirect naar login
+        resp = self.client.get('/test-mail?to=test@example.com')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/login', resp.headers['Location'])
+
+        # 2. Reguliere gebruiker / beheerder -> 403 Forbidden
+        self.login("tim@test.com", "password123")
+        resp = self.client.get('/test-mail?to=test@example.com')
+        self.assertEqual(resp.status_code, 403)
+        self.logout()
+
+        # 3. Platformbeheerder -> 200 OK
+        self.login("platformadmin@test.be", "adminpass123")
+        with patch('utils.mail.verstuur_email') as mock_verstuur:
+            mock_verstuur.return_value = (True, "OK")
+            resp = self.client.get('/test-mail?to=test@example.com')
+            self.assertEqual(resp.status_code, 200)
+            data = resp.get_json()
+            self.assertEqual(data['status'], 'success')
+

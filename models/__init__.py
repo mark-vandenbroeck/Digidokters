@@ -13,13 +13,14 @@ from .audit import AuditLog
 from .herkomst import Herkomst
 from .evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
 from .email_template import EmailTemplate
+from .feedback import FeedbackItem, FeedbackVote, FeedbackComment
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
     'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem',
     'Folder', 'Document', 'AuditLog', 'Herkomst',
     'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation',
-    'EmailTemplate'
+    'EmailTemplate', 'FeedbackItem', 'FeedbackVote', 'FeedbackComment'
 ]
 
 

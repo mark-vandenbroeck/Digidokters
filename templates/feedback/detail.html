@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}{{ feedback.onderwerp }} – Feedback – Digidokters{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{{ url_for('feedback.lijst') }}" class="text-decoration-none">Feedback</a></li>
+            <li class="breadcrumb-item active text-truncate" style="max-width: 400px;" aria-current="page">{{ feedback.onderwerp }}</li>
+        </ol>
+    </nav>
+
+    <!-- Header & Acties -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                <!-- Type Badge -->
+                {% if feedback.type == 'foutje' %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                    <i class="bi bi-bug me-1"></i>Foutje?
+                </span>
+                {% else %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                    <i class="bi bi-lightbulb me-1"></i>Voorstel
+                </span>
+                {% endif %}
+
+                <!-- Status Badge -->
+                {% if feedback.is_afgesloten %}
+                <span class="badge bg-secondary px-2 py-1">
+                    <i class="bi bi-lock-fill me-1"></i>Afgesloten
+                </span>
+                {% else %}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                    <i class="bi bi-record-circle me-1"></i>Open
+                </span>
+                {% endif %}
+
+                <span class="text-muted small">
+                    <i class="bi bi-clock me-1"></i>{{ feedback.aangemaakt_op.strftime('%d-%m-%Y om %H:%M') }}
+                </span>
+                <span class="text-muted small">
+                    door <span class="fw-semibold text-dark">{{ feedback.user.naam }}</span>
+                </span>
+            </div>
+            <h1 class="h3 fw-bold text-dark mb-0">{{ feedback.onderwerp }}</h1>
+        </div>
+
+        <!-- Beheerder actie: Afsluiten / Heropenen -->
+        {% if current_user.is_beheerder() %}
+        <div>
+            <form method="POST" action="{{ url_for('feedback.status', id=feedback.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                {% if feedback.is_afgesloten %}
+                <button type="submit" class="btn btn-outline-success btn-sm d-flex align-items-center gap-1 shadow-sm">
+                    <i class="bi bi-unlock me-1"></i>Heropenen
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
+                        onclick="return confirm('Weet je zeker dat je deze feedback wilt afsluiten? Er kan dan niet meer op gestemd of gereageerd worden.');">
+                    <i class="bi bi-lock me-1"></i>Afsluiten
+                </button>
+                {% endif %}
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Alert bij afgesloten status -->
+    {% if feedback.is_afgesloten %}
+    <div class="alert alert-secondary d-flex align-items-center gap-2 mb-4 shadow-sm" role="alert">
+        <i class="bi bi-lock-fill fs-5 text-secondary"></i>
+        <div>
+            Deze feedback is <strong>afgesloten</strong>
+            {% if feedback.afgesloten_op %}op {{ feedback.afgesloten_op.strftime('%d-%m-%Y om %H:%M') }}{% endif %}
+            {% if feedback.afgesloten_door %}door {{ feedback.afgesloten_door.naam }}{% endif %}.
+            Er kan niet meer gestemd of gereageerd worden.
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Hoofdcontent: Beschrijving & Screenshot & Stemmen -->
+        <div class="col-lg-8">
+            <!-- Beschrijving Kaart -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="card-title fw-bold text-dark mb-0 fs-6">
+                        <i class="bi bi-card-text text-primary me-2"></i>Beschrijving
+                    </h5>
+                    <!-- Stemknoppen op header / kaart -->
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- Duim omhoog -->
+                        <form method="POST" action="{{ url_for('feedback.stem', id=feedback.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="stem" value="1">
+                            <button type="submit"
+                                    class="btn btn-sm d-flex align-items-center gap-1 {% if mijn_stem == 1 %}btn-success{% else %}btn-outline-success{% endif %}"
+                                    {% if feedback.is_afgesloten or current_user.is_lezer() %}disabled title="{% if feedback.is_afgesloten %}Feedback is afgesloten{% else %}Als lezer kunt u niet stemmen{% endif %}"{% else %}title="Duim omhoog"{% endif %}>
+                                <i class="bi bi-hand-thumbs-up{% if mijn_stem == 1 %}-fill{% endif %}"></i>
+                                <span class="badge text-bg-light fw-bold ms-1" style="font-size: 0.75rem;">{{ feedback.stemmen_voor }}</span>
+                            </button>
+                        </form>
+
+                        <!-- Duim omlaag -->
+                        <form method="POST" action="{{ url_for('feedback.stem', id=feedback.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="stem" value="-1">
+                            <button type="submit"
+                                    class="btn btn-sm d-flex align-items-center gap-1 {% if mijn_stem == -1 %}btn-danger{% else %}btn-outline-danger{% endif %}"
+                                    {% if feedback.is_afgesloten or current_user.is_lezer() %}disabled title="{% if feedback.is_afgesloten %}Feedback is afgesloten{% else %}Als lezer kunt u niet stemmen{% endif %}"{% else %}title="Duim omlaag"{% endif %}>
+                                <i class="bi bi-hand-thumbs-down{% if mijn_stem == -1 %}-fill{% endif %}"></i>
+                                <span class="badge text-bg-light fw-bold ms-1" style="font-size: 0.75rem;">{{ feedback.stemmen_tegen }}</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="text-dark" style="white-space: pre-line; line-height: 1.6;">{{ feedback.beschrijving }}</div>
+
+                    <!-- Screenshot weergave indien aanwezig -->
+                    {% if feedback.screenshot_naam %}
+                    <div class="mt-4 pt-3 border-top">
+                        <h6 class="fw-bold text-dark mb-2">
+                            <i class="bi bi-image text-muted me-1"></i>Bijgevoegd screenshot
+                        </h6>
+                        <div class="d-inline-block border rounded p-1 bg-light shadow-sm">
+                            <a href="{{ url_for('feedback.screenshot', id=feedback.id) }}" target="_blank" title="Klik om op ware grootte te openen">
+                                <img src="{{ url_for('feedback.screenshot', id=feedback.id) }}"
+                                     alt="{{ feedback.screenshot_naam }}"
+                                     class="img-fluid rounded"
+                                     style="max-height: 400px; object-fit: contain; cursor: zoom-in;">
+                            </a>
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <i class="bi bi-paperclip me-1"></i>{{ feedback.screenshot_naam }} &bull;
+                            <a href="{{ url_for('feedback.screenshot', id=feedback.id) }}" target="_blank" class="text-decoration-none">
+                                Bekijk op volledige grootte <i class="bi bi-box-arrow-up-right small"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Conversatie Kaart -->
+            <div class="card border-0 shadow-sm" id="reacties">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <h5 class="card-title fw-bold text-dark mb-0 fs-6">
+                        <i class="bi bi-chat-dots text-primary me-2"></i>Conversatie
+                        <span class="badge bg-secondary-subtle text-secondary ms-1">{{ feedback.reacties|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Lijst van reacties -->
+                    {% if feedback.reacties %}
+                    <div class="d-flex flex-column gap-3 mb-4">
+                        {% for r in feedback.reacties %}
+                        <div class="d-flex gap-3 p-3 rounded bg-light border border-light-subtle">
+                            <!-- Avatar -->
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                                 style="width: 38px; height: 38px; font-size: 0.95rem;">
+                                {{ r.user.naam[0].upper() }}
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                                    <span class="fw-bold text-dark small">{{ r.user.naam }}</span>
+                                    <span class="text-muted small" style="font-size: 0.8rem;">
+                                        <i class="bi bi-clock me-1"></i>{{ r.aangemaakt_op.strftime('%d-%m-%Y om %H:%M') }}
+                                    </span>
+                                </div>
+                                <div class="text-dark small" style="white-space: pre-line; line-height: 1.5;">{{ r.tekst }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted small mb-3">
+                        <i class="bi bi-chat-square text-muted fs-3 d-block mb-2"></i>
+                        Er zijn nog geen reacties geplaatst in deze conversatie.
+                    </div>
+                    {% endif %}
+
+                    <!-- Reactieformulier -->
+                    {% if not feedback.is_afgesloten and not current_user.is_lezer() %}
+                    <div class="pt-3 border-top">
+                        <h6 class="fw-bold text-dark mb-2">Reactie toevoegen</h6>
+                        <form method="POST" action="{{ url_for('feedback.reageer', id=feedback.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <!-- Automatisch ingevulde gebruiker en tijdstip info -->
+                            <div class="small text-muted mb-2">
+                                <i class="bi bi-person me-1"></i>Reageren als <strong>{{ current_user.naam }}</strong> &bull;
+                                <i class="bi bi-clock me-1"></i>{{ nu_str }}
+                            </div>
+                            <div class="mb-3">
+                                <textarea name="tekst" class="form-control" rows="3"
+                                          placeholder="Plaats een constructieve reactie of vraag..." required></textarea>
+                            </div>
+                            <div class="d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary btn-sm px-3">
+                                    <i class="bi bi-chat-left-text me-1"></i>Plaats reactie
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    {% elif feedback.is_afgesloten %}
+                    <div class="p-3 bg-light rounded text-center text-muted small border">
+                        <i class="bi bi-lock me-1"></i>Deze conversatie is gesloten omdat de feedback is afgesloten.
+                    </div>
+                    {% elif current_user.is_lezer() %}
+                    <div class="p-3 bg-light rounded text-center text-muted small border">
+                        <i class="bi bi-eye me-1"></i>Als lezer heeft u enkel leesrechten en kunt u niet reageren.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Zijbalk: Details / Metadata -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-info-circle text-primary me-2"></i>Details
+                    </h6>
+                </div>
+                <div class="card-body p-3">
+                    <dl class="row mb-0 small">
+                        <dt class="col-5 text-muted">Type:</dt>
+                        <dd class="col-7 mb-2">
+                            {% if feedback.type == 'foutje' %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Foutje?</span>
+                            {% else %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">Voorstel</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-5 text-muted">Status:</dt>
+                        <dd class="col-7 mb-2">
+                            {% if feedback.is_afgesloten %}
+                            <span class="badge bg-secondary">Afgesloten</span>
+                            {% else %}
+                            <span class="badge bg-success">Open</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-5 text-muted">Ingediend door:</dt>
+                        <dd class="col-7 mb-2 fw-medium text-dark">{{ feedback.user.naam }}</dd>
+
+                        <dt class="col-5 text-muted">Aangemaakt op:</dt>
+                        <dd class="col-7 mb-2 text-dark">{{ feedback.aangemaakt_op.strftime('%d-%m-%Y om %H:%M') }}</dd>
+
+                        {% if feedback.is_afgesloten %}
+                        <dt class="col-5 text-muted">Afgesloten door:</dt>
+                        <dd class="col-7 mb-2 text-dark">{{ feedback.afgesloten_door.naam if feedback.afgesloten_door else 'Onbekend' }}</dd>
+
+                        <dt class="col-5 text-muted">Afgesloten op:</dt>
+                        <dd class="col-7 mb-2 text-dark">{{ feedback.afgesloten_op.strftime('%d-%m-%Y om %H:%M') if feedback.afgesloten_op else '-' }}</dd>
+                        {% endif %}
+
+                        <dt class="col-5 text-muted">Duimpjes omhoog:</dt>
+                        <dd class="col-7 mb-2 text-success fw-bold">
+                            <i class="bi bi-hand-thumbs-up-fill me-1"></i>{{ feedback.stemmen_voor }}
+                        </dd>
+
+                        <dt class="col-5 text-muted">Duimpjes omlaag:</dt>
+                        <dd class="col-7 mb-0 text-danger fw-bold">
+                            <i class="bi bi-hand-thumbs-down-fill me-1"></i>{{ feedback.stemmen_tegen }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="d-grid">
+                <a href="{{ url_for('feedback.lijst') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Terug naar lijst
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback – Digidokters{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1 fw-bold text-dark">
+                <i class="bi bi-chat-heart text-primary me-2"></i>Feedback
+            </h1>
+            <p class="text-muted small mb-0">
+                Meld een foutje of doe een voorstel om het platform te verbeteren.
+            </p>
+        </div>
+        <div>
+            {% if not current_user.is_lezer() %}
+            <a href="{{ url_for('feedback.nieuw') }}" class="btn btn-primary shadow-sm">
+                <i class="bi bi-plus-lg me-1"></i>Nieuwe feedback
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filters en Zoeken -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-3">
+            <form method="GET" action="{{ url_for('feedback.lijst') }}" class="row g-2 align-items-center">
+                <input type="hidden" name="status" value="{{ status_filter }}">
+
+                <!-- Status Filter Pills -->
+                <div class="col-12 col-md-auto">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a href="{{ url_for('feedback.lijst', status='alle', type=type_filter, zoek=zoek) }}"
+                           class="btn {% if status_filter == 'alle' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                            Alle <span class="badge bg-white text-dark ms-1">{{ totaal_aantal }}</span>
+                        </a>
+                        <a href="{{ url_for('feedback.lijst', status='open', type=type_filter, zoek=zoek) }}"
+                           class="btn {% if status_filter == 'open' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                            Open <span class="badge bg-white text-dark ms-1">{{ open_aantal }}</span>
+                        </a>
+                        <a href="{{ url_for('feedback.lijst', status='afgesloten', type=type_filter, zoek=zoek) }}"
+                           class="btn {% if status_filter == 'afgesloten' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                            Afgesloten <span class="badge bg-white text-dark ms-1">{{ afgesloten_aantal }}</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Type Filter -->
+                <div class="col-6 col-md-auto">
+                    <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="alle" {% if type_filter == 'alle' %}selected{% endif %}>Alle types</option>
+                        <option value="foutje" {% if type_filter == 'foutje' %}selected{% endif %}>Foutje?</option>
+                        <option value="voorstel" {% if type_filter == 'voorstel' %}selected{% endif %}>Voorstel</option>
+                    </select>
+                </div>
+
+                <!-- Zoekveld -->
+                <div class="col-12 col-md">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" name="zoek" value="{{ zoek }}" class="form-control"
+                               placeholder="Zoek op onderwerp of beschrijving...">
+                        {% if zoek %}
+                        <a href="{{ url_for('feedback.lijst', status=status_filter, type=type_filter) }}" class="btn btn-outline-secondary" title="Wis zoekfilter">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                        {% endif %}
+                        <button class="btn btn-outline-primary" type="submit">Zoeken</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Feedbacks Lijst -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            {% if feedbacks %}
+            <div class="list-group list-group-flush">
+                {% for fb in feedbacks %}
+                <div class="list-group-item p-3 list-group-item-action transition-all {% if fb.is_afgesloten %}bg-light opacity-75{% endif %}"
+                     style="{% if fb.is_afgesloten %}filter: grayscale(35%); border-left: 4px solid #6c757d;{% else %}border-left: 4px solid {% if fb.type == 'foutje' %}#dc3545{% else %}#198754{% endif %};{% endif %}">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                <!-- Type Badge -->
+                                {% if fb.type == 'foutje' %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                    <i class="bi bi-bug me-1"></i>Foutje?
+                                </span>
+                                {% else %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    <i class="bi bi-lightbulb me-1"></i>Voorstel
+                                </span>
+                                {% endif %}
+
+                                <!-- Status Badge -->
+                                {% if fb.is_afgesloten %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-lock-fill me-1"></i>Afgesloten
+                                </span>
+                                {% else %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                    <i class="bi bi-record-circle me-1"></i>Open
+                                </span>
+                                {% endif %}
+
+                                {% if fb.screenshot_naam %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="Bevat screenshot">
+                                    <i class="bi bi-image me-1"></i>Screenshot
+                                </span>
+                                {% endif %}
+
+                                <span class="text-muted small">
+                                    <i class="bi bi-clock me-1"></i>{{ fb.aangemaakt_op.strftime('%d-%m-%Y om %H:%M') }}
+                                </span>
+                                <span class="text-muted small">
+                                    door <span class="fw-medium text-dark">{{ fb.user.naam }}</span>
+                                </span>
+                            </div>
+
+                            <!-- Onderwerp -->
+                            <h2 class="h5 mb-1 fw-bold">
+                                <a href="{{ url_for('feedback.detail', id=fb.id) }}" class="text-decoration-none {% if fb.is_afgesloten %}text-muted{% else %}text-dark{% endif %}">
+                                    {{ fb.onderwerp }}
+                                </a>
+                            </h2>
+
+                            <!-- Korte samenvatting beschrijving -->
+                            <p class="text-muted small mb-2 text-truncate" style="max-width: 850px;">
+                                {{ fb.beschrijving }}
+                            </p>
+                        </div>
+
+                        <!-- Stemmen & Reacties tellers -->
+                        <div class="d-flex align-items-center gap-3 text-nowrap mt-2 mt-md-0">
+                            <!-- Duimpjes -->
+                            <div class="d-flex align-items-center gap-2 p-1 px-2 rounded bg-white border border-light-subtle shadow-sm">
+                                <span class="text-success small d-flex align-items-center gap-1" title="Duimpjes omhoog">
+                                    <i class="bi bi-hand-thumbs-up-fill"></i>
+                                    <span class="fw-bold" style="font-size: 0.85rem;">{{ fb.stemmen_voor }}</span>
+                                </span>
+                                <span class="text-muted opacity-50">|</span>
+                                <span class="text-danger small d-flex align-items-center gap-1" title="Duimpjes omlaag">
+                                    <i class="bi bi-hand-thumbs-down-fill"></i>
+                                    <span class="fw-bold" style="font-size: 0.85rem;">{{ fb.stemmen_tegen }}</span>
+                                </span>
+                            </div>
+
+                            <!-- Reacties teller -->
+                            <a href="{{ url_for('feedback.detail', id=fb.id) }}#reacties" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+                                <i class="bi bi-chat-dots"></i>
+                                <span>{{ fb.reacties|length }}</span>
+                            </a>
+
+                            <a href="{{ url_for('feedback.detail', id=fb.id) }}" class="btn btn-sm btn-outline-primary">
+                                Bekijken <i class="bi bi-chevron-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <div class="display-6 text-muted mb-3"><i class="bi bi-chat-heart"></i></div>
+                <h5 class="text-dark fw-bold">Geen feedback gevonden</h5>
+                <p class="text-muted small mb-3">
+                    {% if zoek or status_filter != 'alle' or type_filter != 'alle' %}
+                    Er zijn geen feedback items die voldoen aan de filters.
+                    {% else %}
+                    Er is nog geen feedback ingediend.
+                    {% endif %}
+                </p>
+                {% if not current_user.is_lezer() %}
+                <a href="{{ url_for('feedback.nieuw') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg me-1"></i>Eerste feedback indienen
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

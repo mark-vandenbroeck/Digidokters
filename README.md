@@ -36,6 +36,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 9.  **Evaluatieformulieren & Vragen (`evaluatie_formulieren`, `evaluatie_vragen`):** Configureerbare evaluatievragenlijsten gekoppeld aan specifieke activiteitstypes (zoals Digicafé).
 10. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
 11. **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
+12. **Feedback & Conversatie (`feedback_items`, `feedback_votes`, `feedback_comments`):** Beheer van gebruikersfeedback ("Voorstel" of "Foutje?"), stemmen met duimpjes (+1/-1), screenshot-opslag, conversatiereacties en beheerderstatus (open/afgesloten).
 
 ---
 
@@ -126,6 +127,19 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
     *   **Veiligheid:** De hoofdorganisatie (ID 1) en de template-organisatie (`Sjabloon`) zijn permanent beschermd tegen wissen.
     *   **Volledige Cleanup:** Alle bijbehorende data (registraties, agenda-items, evaluaties, documenten, mappen, stamgegevens en gebruikerskoppelingen) wordt automatisch en geordend verwijderd.
     *   **Duidelijke Waarschuwing:** De interface toont een rode modal die expliciet waarschuwt voor de onomkeerbaarheid en de lijst van alle data die permanent verloren gaat.
+
+### 12. Feedback & Meedenken (Foutjes & Voorstellen)
+*   **Nieuwe Rubriek 'Algemeen':** In het linkermenu is een speciale rubriek `Algemeen` toegevoegd waarin zowel **Feedback** (`/feedback/`) als **Privacy & AVG** gecentraliseerd zijn.
+*   **Twee Categorieën:** Gebruikers kunnen kiezen tussen **"Voorstel"** (ideeën en verbeteringen) en **"Foutje?"** (bugmelding of afwijkend gedrag).
+*   **Automatische Gegevens:** De naam van de indiener en de exacte timestamp worden automatisch geregistreerd en zijn strikt niet-wijzigbaar om betrouwbaarheid te borgen.
+*   **Screenshots Uploaden:** Ondersteuning voor het uploaden van schermafbeeldingen (PNG, JPG, JPEG, GIF, WEBP tot 5 MB), veilig opgeslagen als binaire data in de database (`LargeBinary`) en voorzien van een ingebouwde preview- en zoomfunctie in de detailweergave.
+*   **Interactief Stemmen:** Gebruikers kunnen hun stem uitbrengen met een duim omhoog (👍) of duim omlaag (👎). Het aantal stemmen staat compact naast het betreffende icoon vermeld. Nogmaals op dezelfde duim klikken trekt de stem in; klikken op de tegenovergestelde duim past de stem aan.
+*   **Conversatiedraad per Item:** Onder elk item kunnen gebruikers inhoudelijk reageren. Bij elke bijdrage worden automatisch auteur en tijdstip vastgelegd.
+*   **Rolgebaseerde Rechten:**
+    *   *Medewerkers & Beheerders:* Kunnen feedback indienen, stemmen en deelnemen aan de conversatie.
+    *   *Lezers:* Hebben enkel leesrechten (kunnen de items en reacties raadplegen, maar kunnen niets toevoegen, stemmen of reageren).
+*   **Afsluiten door Beheerders:** Beheerders kunnen een item met één klik **afsluiten** (waarna er niet meer op gestemd of gereageerd kan worden) of heropenen.
+*   **Overzichtslijst:** Standaard chronologisch gesorteerd (nieuwste items bovenaan). Afgesloten items worden herkenbaar grijs getoond (*greyed out*). Snelfilters voor Alle / Open / Afgesloten, type-selectie en realtime zoekfilter.
 
 ---
 

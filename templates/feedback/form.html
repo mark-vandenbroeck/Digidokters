@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Nieuwe feedback – Digidokters{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Breadcrumb & Terugknop -->
+    <div class="mb-3">
+        <a href="{{ url_for('feedback.lijst') }}" class="text-decoration-none text-muted small">
+            <i class="bi bi-arrow-left me-1"></i>Terug naar Feedback overzicht
+        </a>
+    </div>
+
+    <!-- Header -->
+    <div class="mb-4">
+        <h1 class="h3 mb-1 fw-bold text-dark">
+            <i class="bi bi-pencil-square text-primary me-2"></i>Nieuwe feedback indienen
+        </h1>
+        <p class="text-muted small mb-0">
+            Meld een foutje of doe een voorstel ter verbetering van het platform.
+        </p>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('feedback.nieuw') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <!-- Automatisch ingevulde velden (niet wijzigbaar) -->
+                        <div class="row g-3 mb-4 p-3 bg-light rounded border border-light-subtle">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-1">
+                                    <i class="bi bi-person me-1"></i>Gebruiker <span class="text-muted fst-italic">(automatisch)</span>
+                                </label>
+                                <input type="text" class="form-control form-control-sm bg-white"
+                                       value="{{ current_user.naam }} ({{ current_user.email }})" readonly disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-1">
+                                    <i class="bi bi-clock me-1"></i>Tijdstip <span class="text-muted fst-italic">(automatisch)</span>
+                                </label>
+                                <input type="text" class="form-control form-control-sm bg-white"
+                                       value="{{ vandaag_str }}" readonly disabled>
+                            </div>
+                        </div>
+
+                        <!-- Keuzemogelijkheid: Foutje? of Voorstel -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold text-dark d-block mb-2">
+                                Type feedback <span class="text-danger">*</span>
+                            </label>
+                            <div class="d-flex gap-3">
+                                <div class="form-check p-0">
+                                    <input type="radio" class="btn-check" name="type" id="type_voorstel" value="voorstel"
+                                           {% if not form_data or form_data.get('type') == 'voorstel' %}checked{% endif %}>
+                                    <label class="btn btn-outline-success px-4 py-2 d-flex align-items-center gap-2" for="type_voorstel">
+                                        <i class="bi bi-lightbulb-fill"></i>
+                                        <span class="fw-medium">Voorstel</span>
+                                    </label>
+                                </div>
+                                <div class="form-check p-0">
+                                    <input type="radio" class="btn-check" name="type" id="type_foutje" value="foutje"
+                                           {% if form_data and form_data.get('type') == 'foutje' %}checked{% endif %}>
+                                    <label class="btn btn-outline-danger px-4 py-2 d-flex align-items-center gap-2" for="type_foutje">
+                                        <i class="bi bi-bug-fill"></i>
+                                        <span class="fw-medium">Foutje?</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Onderwerp -->
+                        <div class="mb-3">
+                            <label for="onderwerp" class="form-label fw-semibold text-dark">
+                                Onderwerp <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="onderwerp" name="onderwerp"
+                                   placeholder="Korte, duidelijke samenvatting..."
+                                   value="{{ form_data.get('onderwerp', '') if form_data else '' }}" required maxlength="200">
+                        </div>
+
+                        <!-- Beschrijving -->
+                        <div class="mb-3">
+                            <label for="beschrijving" class="form-label fw-semibold text-dark">
+                                Beschrijving <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" id="beschrijving" name="beschrijving" rows="6"
+                                      placeholder="Beschrijf het foutje of je voorstel zo duidelijk mogelijk..." required>{{ form_data.get('beschrijving', '') if form_data else '' }}</textarea>
+                            <div class="form-text">
+                                Geef waar mogelijk context over welke stappen je hebt ondernomen of wat je precies had verwacht.
+                            </div>
+                        </div>
+
+                        <!-- Screenshot upload -->
+                        <div class="mb-4">
+                            <label for="screenshot" class="form-label fw-semibold text-dark">
+                                <i class="bi bi-paperclip me-1"></i>Screenshot uploaden <span class="text-muted fw-normal">(optioneel)</span>
+                            </label>
+                            <input class="form-control" type="file" id="screenshot" name="screenshot"
+                                   accept=".png, .jpg, .jpeg, .gif, .webp">
+                            <div class="form-text">
+                                Toegestane bestandsformaten: PNG, JPG, JPEG, GIF of WEBP (maximaal 5 MB).
+                            </div>
+                        </div>
+
+                        <!-- Actieknoppen -->
+                        <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
+                            <a href="{{ url_for('feedback.lijst') }}" class="btn btn-light">Annuleren</a>
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-send me-1"></i>Feedback versturen
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Zijbalk met toelichting -->
+        <div class="col-lg-4 mt-4 mt-lg-0">
+            <div class="card border-0 shadow-sm bg-light">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold text-dark mb-3">
+                        <i class="bi bi-info-circle text-primary me-2"></i>Hoe werkt het?
+                    </h6>
+                    <ul class="list-unstyled small text-muted mb-0 d-flex flex-column gap-2">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                            <span><strong>Voorstel:</strong> Ideeën voor nieuwe mogelijkheden of handige verbeteringen.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-bug-fill text-danger mt-1"></i>
+                            <span><strong>Foutje?:</strong> Iets werkt niet naar behoren of toont een onverwacht resultaat.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-hand-thumbs-up-fill text-primary mt-1"></i>
+                            <span><strong>Stemmen & discussie:</strong> Collega's kunnen via duimpjes hun mening geven en reageren in de conversatie.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-shield-lock-fill text-secondary mt-1"></i>
+                            <span><strong>Afsluiten:</strong> Beheerders kunnen een item afsluiten zodra het is opgelost of afgerond.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

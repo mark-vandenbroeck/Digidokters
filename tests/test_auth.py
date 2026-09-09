@@ -98,3 +98,21 @@ class TestAuth(BaseTestCase):
         # Verify redirect to login page with warning message
         self.assertIn("sessie is verlopen", response.data.decode('utf-8').lower())
         self.assertIn("inloggen", response.data.decode('utf-8').lower())
+
+    def test_medewerker_sidebar_shows_data_section(self):
+        # Medewerker logs in and views page
+        self.login("tim@test.com", "password123")
+        response = self.client.get('/registraties')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        # Data section header must be visible in sidebar
+        self.assertIn('<div class="dd-nav-section mt-3">Data</div>', html)
+        # Exporteren, Statistieken and Privacy must be visible
+        self.assertIn('Exporteren', html)
+        self.assertIn('Statistieken', html)
+        self.assertIn('Privacy & AVG', html)
+        # Importeren should NOT be visible for medewerker
+        self.assertNotIn('Importeren', html)
+        # Beheer section should NOT be visible for medewerker
+        self.assertNotIn('<div class="dd-nav-section mt-3">Beheer</div>', html)
+

@@ -218,9 +218,11 @@
                 <span>Audit Logs</span>
             </a>
             {% endif %}
+            {% endif %}
 
             <!-- Data -->
             <div class="dd-nav-section mt-3">Data</div>
+            {% if current_user.is_beheerder() and session.get('organisatie_id') %}
             <a href="{{ url_for('ie.importeer') }}"
                class="dd-nav-link {% if request.endpoint == 'ie.importeer' %}active{% endif %}">
                 <i class="bi bi-cloud-upload"></i>
@@ -236,6 +238,13 @@
                class="dd-nav-link {% if request.endpoint == 'stats.overzicht' %}active{% endif %}">
                 <i class="bi bi-graph-up"></i>
                 <span>Statistieken</span>
+            </a>
+            <!-- Algemeen -->
+            <div class="dd-nav-section mt-3">Algemeen</div>
+            <a href="{{ url_for('feedback.lijst') }}"
+               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('feedback.') %}active{% endif %}">
+                <i class="bi bi-chat-heart"></i>
+                <span>Feedback</span>
             </a>
             <a href="#" data-bs-toggle="modal" data-bs-target="#privacyModal" class="dd-nav-link">
                 <i class="bi bi-shield-lock"></i>

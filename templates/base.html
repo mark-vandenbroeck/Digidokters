@@ -291,6 +291,11 @@
                     <i class="bi bi-chat-heart"></i>
                     <span>Feedback</span>
                 </a>
+                <a href="{{ url_for('app_docs.index') }}"
+                   class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('app_docs.') %}active{% endif %}">
+                    <i class="bi bi-journal-bookmark"></i>
+                    <span>App documentatie</span>
+                </a>
                 <a href="#" data-bs-toggle="modal" data-bs-target="#privacyModal" class="dd-nav-link">
                     <i class="bi bi-shield-lock"></i>
                     <span>Privacy & AVG</span>

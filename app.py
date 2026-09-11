@@ -43,7 +43,7 @@ def create_app(config_class=Config):
     os.makedirs(app.config['IMPORT_LOG_FOLDER'], exist_ok=True)
 
     # Importeer modellen zodat Flask-Migrate ze detecteert
-    from models import user, digidokter, age_category, device, registration, organisatie, activity_type, location, agenda, herkomst, evaluation, email_template, feedback  # noqa: F401
+    from models import user, digidokter, age_category, device, registration, organisatie, activity_type, location, agenda, herkomst, evaluation, email_template, feedback, question_category, question_classification, app_document  # noqa: F401
 
     # Registreer blueprints
     from routes.auth import auth_bp
@@ -56,6 +56,7 @@ def create_app(config_class=Config):
     from routes.documents import doc_bp
     from routes.evaluations import eval_bp
     from routes.feedback import feedback_bp
+    from routes.app_documents import app_docs_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(reg_bp)
@@ -67,6 +68,7 @@ def create_app(config_class=Config):
     app.register_blueprint(doc_bp)
     app.register_blueprint(eval_bp)
     app.register_blueprint(feedback_bp)
+    app.register_blueprint(app_docs_bp)
 
     @app.template_filter('weekdag')
     def weekdag_filter(d):
@@ -96,7 +98,7 @@ def create_app(config_class=Config):
                 'auth.select_org',
                 'auth.switch_organisatie',
             ]
-            if request.endpoint in exempt_endpoints or request.endpoint.startswith('auth.') or request.endpoint.startswith('platform.'):
+            if request.endpoint in exempt_endpoints or request.endpoint.startswith('auth.') or request.endpoint.startswith('platform.') or request.endpoint.startswith('app_docs.'):
                 if current_user.is_authenticated and current_user.rol == 'platformbeheerder':
                     from models.organisatie import Organisatie
                     g.beschikbare_organisaties = Organisatie.query.filter_by(actief=True).all()
@@ -336,6 +338,16 @@ def create_app(config_class=Config):
         n_cats = seed_standaard_categorieen()
         if n_cats > 0:
             print(f"✓ {n_cats} nieuwe vraagcategorieën geïnitialiseerd")
+
+        # 11. Seed standaard mappen voor App Documentatie
+        from models.app_document import AppFolder
+        if AppFolder.query.count() == 0:
+            admin_user = User.query.filter_by(rol='platformbeheerder').first() or User.query.first()
+            if admin_user:
+                for map_naam in ['Gebruikershandleidingen', 'GDPR & Security', 'Technische documentatie']:
+                    db.session.add(AppFolder(naam=map_naam, aangemaakt_door_id=admin_user.id))
+                db.session.commit()
+                print("✓ Standaard mappen voor App Documentatie geïnitialiseerd")
 
     # CLI-commando: flask create-org <naam> <slug>
     import click

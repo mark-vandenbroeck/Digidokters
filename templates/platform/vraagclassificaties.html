@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% block title %}AI Vraagclassificaties – Platformbeheer – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h1 class="dd-page-title mb-0">
+            <i class="bi bi-stars me-2 text-primary"></i>AI Vraagclassificaties (Gemini)
+        </h1>
+        <p class="dd-page-subtitle mb-0">
+            Resultaten van automatische AI-categorisatie en handmatige validatie over alle consultaties
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a href="{{ url_for('platform.vraagcategorieen') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-tags me-1"></i>Beheer Categorieën
+        </a>
+        {% if ongeclassificeerd_aantal > 0 %}
+        <form action="{{ url_for('platform.vraagclassificaties_batch_analyse') }}" method="POST" class="d-inline"
+              onsubmit="return confirm('Er zijn {{ ongeclassificeerd_aantal }} ongeclassificeerde consultaties. Wilt u de AI-analyse hiervoor nu starten?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-cpu me-1"></i>Batch-analyse starten ({{ ongeclassificeerd_aantal }})
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- KPI Kaarten -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-blue-soft text-blue">
+                <i class="bi bi-check2-all"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ totaal_geclassificeerd }}</div>
+                <div class="dd-stat-label">Geclassificeerde vragen</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon {% if ongeclassificeerd_aantal > 0 %}bg-warning-subtle text-warning-emphasis{% else %}bg-green-soft text-green{% endif %}">
+                <i class="bi {% if ongeclassificeerd_aantal > 0 %}bi-hourglass-split{% else %}bi-check-circle-fill{% endif %}"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ ongeclassificeerd_aantal }}</div>
+                <div class="dd-stat-label">Nog niet geanalyseerd</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-purple-soft text-purple">
+                <i class="bi bi-tags-fill"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ categorieen|length }}</div>
+                <div class="dd-stat-label">Vaste categorieën</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="dd-stat-card">
+            <div class="dd-stat-icon bg-teal-soft text-teal">
+                <i class="bi bi-graph-up-arrow"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value"><a href="{{ url_for('stats.overzicht') }}" class="text-decoration-none text-dark">Rapportage</a></div>
+                <div class="dd-stat-label">Bekijk in Statistieken</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filterbalk -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-3">
+        <form method="GET" action="{{ url_for('platform.vraagclassificaties') }}" class="row g-2 align-items-center">
+            <div class="col-12 col-md-4 col-lg-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Zoek op onderwerp, nr of uitleg...">
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <select name="categorie_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">Alle categorieën</option>
+                    {% for cat in categorieen %}
+                    <option value="{{ cat.id }}" {% if geselecteerde_cat == (cat.id|string) %}selected{% endif %}>{{ cat.naam }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <select name="organisatie_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">Alle organisaties</option>
+                    {% for org in organisaties %}
+                    <option value="{{ org.id }}" {% if geselecteerde_org == (org.id|string) %}selected{% endif %}>{{ org.naam }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-2 col-lg-3 d-flex gap-2">
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="onzeker" name="onzeker" value="1" 
+                           {% if filter_onzeker %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="form-check-label small" for="onzeker">Zekerheid &lt; 80%</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="handmatig" name="handmatig" value="1" 
+                           {% if filter_handmatig %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="form-check-label small" for="handmatig">Handmatig</label>
+                </div>
+            </div>
+            <div class="col-12 col-md-auto ms-auto d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary">Filteren</button>
+                {% if q or geselecteerde_cat or filter_onzeker or filter_handmatig or geselecteerde_org %}
+                <a href="{{ url_for('platform.vraagclassificaties') }}" class="btn btn-sm btn-outline-secondary" title="Filters wissen">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabel met resultaten -->
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 130px;">Consultatie</th>
+                        <th style="width: 140px;">Organisatie</th>
+                        <th style="min-width: 250px;">Onderwerp / Vraag van bezoeker</th>
+                        <th style="min-width: 200px;">Toegewezen Categorie</th>
+                        <th style="width: 110px;" class="text-center">Zekerheid</th>
+                        <th style="min-width: 240px;">AI Motivatie</th>
+                        <th style="width: 110px;" class="text-center">Status</th>
+                        <th class="text-end pe-3" style="width: 100px;">Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in classificaties %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold text-dark">{{ item.registration.registratienummer }}</div>
+                            <div class="text-muted small">{{ item.registration.datum.strftime('%d-%m-%Y') }}</div>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-secondary border">
+                                {{ item.registration.organisatie.naam }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="fw-medium text-dark">{{ item.registration.onderwerp }}</div>
+                        </td>
+                        <td>
+                            {% if item.category %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-1 px-2">
+                                <i class="bi bi-tag-fill me-1"></i>{{ item.category.naam }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border">Onbekend</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.zekerheid is not none %}
+                                {% set pct = (item.zekerheid * 100)|round|int %}
+                                <span class="badge {% if pct >= 90 %}bg-success-subtle text-success border border-success-subtle{% elif pct >= 75 %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %}">
+                                    {{ pct }}%
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="small text-secondary" style="line-height: 1.3;">
+                                {{ item.toelichting or '-' }}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            {% if item.is_handmatig_aangepast %}
+                            <span class="badge bg-info-subtle text-info border border-info-subtle" title="Aangepast door beheerder">
+                                <i class="bi bi-person-check me-1"></i>Handmatig
+                            </span>
+                            {% else %}
+                            <span class="badge bg-light text-muted border font-monospace small" title="Geclassificeerd door {{ item.model_naam or 'Gemini' }}">
+                                <i class="bi bi-robot me-1 text-primary"></i>AI
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-3">
+                            <div class="d-inline-flex gap-1">
+                                <a href="{{ url_for('platform.vraagclassificatie_wijzigen', classif_id=item.id) }}" 
+                                   class="btn btn-outline-secondary btn-sm" title="Handmatig categorie corrigeren">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form action="{{ url_for('platform.vraagclassificatie_heranalyse', classif_id=item.id) }}" method="POST" 
+                                      class="d-inline" onsubmit="return confirm('Vraag opnieuw analyseren met Gemini AI?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm" title="Opnieuw analyseren met Gemini">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <i class="bi bi-search fs-2 d-block mb-2 text-secondary"></i>
+                            Geen classificaties gevonden met de huidige filters.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Paginering -->
+    {% if pagination.pages > 1 %}
+    <div class="card-footer bg-white border-top py-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="small text-muted">
+                Pagina {{ pagination.page }} van {{ pagination.pages }} ({{ pagination.total }} resultaten)
+            </div>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('platform.vraagclassificaties', page=pagination.prev_num, q=q, categorie_id=geselecteerde_cat, onzeker=1 if filter_onzeker else None, handmatig=1 if filter_handmatig else None, organisatie_id=geselecteerde_org) }}">Vorige</a>
+                    </li>
+                    {% for p in pagination.iter_pages(left_edge=2, left_current=2, right_current=2, right_edge=2) %}
+                        {% if p %}
+                            <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('platform.vraagclassificaties', page=p, q=q, categorie_id=geselecteerde_cat, onzeker=1 if filter_onzeker else None, handmatig=1 if filter_handmatig else None, organisatie_id=geselecteerde_org) }}">{{ p }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('platform.vraagclassificaties', page=pagination.next_num, q=q, categorie_id=geselecteerde_cat, onzeker=1 if filter_onzeker else None, handmatig=1 if filter_handmatig else None, organisatie_id=geselecteerde_org) }}">Volgende</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

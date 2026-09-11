@@ -8,6 +8,8 @@ from models.registration import Registration
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
+from models.question_category import QuestionCategory
+from models.question_classification import QuestionClassification
 
 stats_bp = Blueprint('stats', __name__)
 
@@ -42,15 +44,26 @@ def _weekelijkse_telling(jaar):
 @stats_bp.route('/statistieken')
 @login_required
 def overzicht():
-    jaar = request.args.get('jaar', None, type=int)
-    if not jaar:
-        jaar = date.today().year
+    jaar_param = request.args.get('jaar')
+    if jaar_param == 'alle':
+        jaar = 'alle'
+    else:
+        try:
+            jaar = int(jaar_param) if jaar_param else date.today().year
+        except (ValueError, TypeError):
+            jaar = date.today().year
+
+    actieve_tab = request.args.get('tab', 'visitors')
+    if actieve_tab not in ('visitors', 'volunteers', 'questions'):
+        actieve_tab = 'visitors'
 
     from utils.tenant import get_huidige_organisatie_id
     org_id = get_huidige_organisatie_id()
 
     # Filter op jaar en organisatie
     def jaar_filter(q):
+        if jaar == 'alle':
+            return q.filter(Registration.organisatie_id == org_id)
         return q.filter(Registration.organisatie_id == org_id, extract('year', Registration.datum) == jaar)
 
     # Totaal dit jaar
@@ -180,15 +193,36 @@ def overzicht():
     if not jaren:
         jaren = [date.today().year]
 
-    # Tijdlijn per week: dit jaar vs vorig jaar, uitgelijnd op weeknummer
-    laatste_week_huidig, tellingen_huidig = _weekelijkse_telling(jaar)
-    laatste_week_vorig, tellingen_vorig = _weekelijkse_telling(jaar - 1)
-    max_weken = max(laatste_week_huidig, laatste_week_vorig)
-    week_labels = [f'W{w}' for w in range(1, max_weken + 1)]
-    per_week = [tellingen_huidig.get(w, 0) if w <= laatste_week_huidig else None
-                for w in range(1, max_weken + 1)]
-    per_week_vorig_jaar = [tellingen_vorig.get(w, 0) if w <= laatste_week_vorig else None
-                            for w in range(1, max_weken + 1)]
+    # Tijdlijn per week (jaar-op-jaar) of per jaar (bij 'alle')
+    if jaar != 'alle':
+        vorig_jaar = jaar - 1
+        laatste_week_huidig, tellingen_huidig = _weekelijkse_telling(jaar)
+        laatste_week_vorig, tellingen_vorig = _weekelijkse_telling(jaar - 1)
+        max_weken = max(laatste_week_huidig, laatste_week_vorig)
+        week_labels = [f'W{w}' for w in range(1, max_weken + 1)]
+        per_week = [tellingen_huidig.get(w, 0) if w <= laatste_week_huidig else None
+                    for w in range(1, max_weken + 1)]
+        per_week_vorig_jaar = [tellingen_vorig.get(w, 0) if w <= laatste_week_vorig else None
+                                for w in range(1, max_weken + 1)]
+        per_jaar_labels = []
+        per_jaar_counts = []
+    else:
+        vorig_jaar = None
+        week_labels = []
+        per_week = []
+        per_week_vorig_jaar = []
+        jaren_tellingen = (
+            db.session.query(
+                extract('year', Registration.datum).label('jr'),
+                func.count(Registration.id).label('aantal')
+            )
+            .filter(Registration.organisatie_id == org_id)
+            .group_by('jr')
+            .order_by('jr')
+            .all()
+        )
+        per_jaar_labels = [str(int(r.jr)) for r in jaren_tellingen if r.jr is not None]
+        per_jaar_counts = [r.aantal for r in jaren_tellingen if r.jr is not None]
 
     # ---------------------------------------------------------
     # AGENDA & VRIJWILLIGERS STATISTIEKEN (Nieuwe Tab)
@@ -198,10 +232,12 @@ def overzicht():
     from models.activity_type import ActivityType
     from sqlalchemy.orm import joinedload, selectinload
 
-    # Haal agenda-items op van dit jaar voor deze organisatie met eager loading
+    # Haal agenda-items op voor deze organisatie met eager loading
+    agenda_query = AgendaItem.query.filter(AgendaItem.organisatie_id == org_id)
+    if jaar != 'alle':
+        agenda_query = agenda_query.filter(extract('year', AgendaItem.datum) == jaar)
     agenda_items = (
-        AgendaItem.query
-        .filter(AgendaItem.organisatie_id == org_id, extract('year', AgendaItem.datum) == jaar)
+        agenda_query
         .options(
             joinedload(AgendaItem.type),
             joinedload(AgendaItem.locatie),
@@ -276,12 +312,13 @@ def overzicht():
     vrijwilligersuren_per_maand = [round(hours_per_month_dict[m], 1) for m in range(1, 13)]
 
     # Druktest / ratio per dag
-    reg_counts = (
+    reg_counts_query = (
         db.session.query(Registration.datum, func.count(Registration.id))
-        .filter(Registration.organisatie_id == org_id, extract('year', Registration.datum) == jaar)
-        .group_by(Registration.datum)
-        .all()
+        .filter(Registration.organisatie_id == org_id)
     )
+    if jaar != 'alle':
+        reg_counts_query = reg_counts_query.filter(extract('year', Registration.datum) == jaar)
+    reg_counts = reg_counts_query.group_by(Registration.datum).all()
     reg_counts_dict = {r[0]: r[1] for r in reg_counts}
 
     sessions_ratio = []
@@ -300,6 +337,128 @@ def overzicht():
             })
     sessions_ratio = sorted(sessions_ratio, key=lambda x: x['datum'], reverse=True)[:10]
 
+    # ---------------------------------------------------------
+    # AI VRAGENANALYSE STATISTIEKEN (Tab 3)
+    # ---------------------------------------------------------
+    totaal_geanalyseerd = (
+        jaar_filter(
+            db.session.query(func.count(QuestionClassification.id))
+            .select_from(Registration)
+            .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
+        ).scalar() or 0
+    )
+    
+    dekkingsgraad = round((totaal_geanalyseerd / totaal_jaar * 100), 1) if totaal_jaar > 0 else 0
+    
+    gem_zekerheid_val = (
+        jaar_filter(
+            db.session.query(func.avg(QuestionClassification.zekerheid))
+            .select_from(Registration)
+            .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
+        ).scalar()
+    )
+    gemiddelde_zekerheid = round(gem_zekerheid_val * 100, 1) if gem_zekerheid_val is not None else 0
+
+    aantal_handmatig = (
+        jaar_filter(
+            db.session.query(func.count(QuestionClassification.id))
+            .select_from(Registration)
+            .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
+            .filter(QuestionClassification.is_handmatig_aangepast == True)
+        ).scalar() or 0
+    )
+
+    vragen_per_cat_raw = (
+        jaar_filter(
+            db.session.query(
+                QuestionCategory.naam,
+                func.count(QuestionClassification.id).label('aantal'),
+                func.avg(QuestionClassification.zekerheid).label('gem_zekerheid')
+            )
+            .select_from(Registration)
+            .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
+            .join(QuestionCategory, QuestionClassification.category_id == QuestionCategory.id)
+        )
+        .group_by(QuestionCategory.naam)
+        .order_by(func.count(QuestionClassification.id).desc())
+        .all()
+    )
+
+    vragen_per_categorie = []
+    for r in vragen_per_cat_raw:
+        pct = round((r.aantal / totaal_geanalyseerd * 100), 1) if totaal_geanalyseerd > 0 else 0
+        gem_z = round((r.gem_zekerheid or 0) * 100, 1)
+        vragen_per_categorie.append({
+            'naam': r.naam,
+            'aantal': r.aantal,
+            'percentage': pct,
+            'gem_zekerheid': gem_z
+        })
+
+    cat_chart_labels = [c['naam'] for c in vragen_per_categorie]
+    cat_chart_data = [c['aantal'] for c in vragen_per_categorie]
+
+    # Top 5 categorieën verloop doorheen het jaar (12 maanden)
+    top_5_cat_namen = [c['naam'] for c in vragen_per_categorie[:5]]
+    trend_per_maand_cats = {}
+    for cat_naam in top_5_cat_namen:
+        maand_tellingen = dict(
+            jaar_filter(
+                db.session.query(
+                    extract('month', Registration.datum).label('maand'),
+                    func.count(QuestionClassification.id)
+                )
+                .select_from(Registration)
+                .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
+                .join(QuestionCategory, QuestionClassification.category_id == QuestionCategory.id)
+                .filter(QuestionCategory.naam == cat_naam)
+            )
+            .group_by(extract('month', Registration.datum))
+            .all()
+        )
+        trend_per_maand_cats[cat_naam] = [maand_tellingen.get(m, 0) for m in range(1, 13)]
+
+    # Kruisanalyse per toestel
+    cat_toestel_raw = (
+        jaar_filter(
+            db.session.query(
+                QuestionCategory.naam.label('cat_naam'),
+                Device.naam.label('toestel_naam'),
+                func.count(Registration.id).label('aantal')
+            )
+            .select_from(Registration)
+            .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
+            .join(QuestionCategory, QuestionClassification.category_id == QuestionCategory.id)
+            .join(Device, Registration.toestel_id == Device.id)
+        )
+        .group_by(QuestionCategory.naam, Device.naam)
+        .order_by(func.count(Registration.id).desc())
+        .all()
+    )
+    cat_toestel_dict = {}
+    for r in cat_toestel_raw:
+        cat_toestel_dict.setdefault(r.cat_naam, []).append({'toestel': r.toestel_naam, 'aantal': r.aantal})
+
+    # Kruisanalyse per leeftijd
+    cat_leeftijd_raw = (
+        jaar_filter(
+            db.session.query(
+                QuestionCategory.naam.label('cat_naam'),
+                AgeCategory.naam.label('leeftijd_naam'),
+                func.count(Registration.id).label('aantal')
+            )
+            .select_from(Registration)
+            .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
+            .join(QuestionCategory, QuestionClassification.category_id == QuestionCategory.id)
+            .join(AgeCategory, Registration.leeftijdscategorie_id == AgeCategory.id)
+        )
+        .group_by(QuestionCategory.naam, AgeCategory.naam)
+        .order_by(func.count(Registration.id).desc())
+        .all()
+    )
+    cat_leeftijd_dict = {}
+    for r in cat_leeftijd_raw:
+        cat_leeftijd_dict.setdefault(r.cat_naam, []).append({'leeftijd': r.leeftijd_naam, 'aantal': r.aantal})
 
     return render_template(
         'stats/overview.html',
@@ -318,7 +477,9 @@ def overzicht():
         week_labels=week_labels,
         per_week=per_week,
         per_week_vorig_jaar=per_week_vorig_jaar,
-        vorig_jaar=jaar - 1,
+        vorig_jaar=vorig_jaar,
+        per_jaar_labels=per_jaar_labels,
+        per_jaar_counts=per_jaar_counts,
         
         # Agenda & Vrijwilligers
         totaal_sessies=totaal_sessies,
@@ -329,5 +490,19 @@ def overzicht():
         type_bezetting=type_bezetting,
         maand_labels=maand_labels,
         vrijwilligersuren_per_maand=vrijwilligersuren_per_maand,
-        sessions_ratio=sessions_ratio
+        sessions_ratio=sessions_ratio,
+
+        # AI Vragenanalyse
+        totaal_geanalyseerd=totaal_geanalyseerd,
+        dekkingsgraad=dekkingsgraad,
+        gemiddelde_zekerheid=gemiddelde_zekerheid,
+        aantal_handmatig=aantal_handmatig,
+        vragen_per_categorie=vragen_per_categorie,
+        cat_chart_labels=cat_chart_labels,
+        cat_chart_data=cat_chart_data,
+        top_5_cat_namen=top_5_cat_namen,
+        trend_per_maand_cats=trend_per_maand_cats,
+        cat_toestel_dict=cat_toestel_dict,
+        cat_leeftijd_dict=cat_leeftijd_dict,
+        actieve_tab=actieve_tab
     )

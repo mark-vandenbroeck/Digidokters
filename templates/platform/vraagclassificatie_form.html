@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Classificatie Handmatig Corrigeren – Platformbeheer – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-7">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h1 class="dd-page-title mb-0">
+                    <i class="bi bi-pencil-square me-2 text-primary"></i>Classificatie Corrigeren
+                </h1>
+                <p class="dd-page-subtitle mb-0">
+                    Handmatige validatie of categoriewijziging voor consultatie {{ classificatie.registration.registratienummer }}
+                </p>
+            </div>
+            <a href="{{ url_for('platform.vraagclassificaties') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Terug
+            </a>
+        </div>
+
+        <!-- Consultatie context -->
+        <div class="card shadow-sm border-0 mb-4 bg-light">
+            <div class="card-body p-4">
+                <div class="row g-2 mb-2">
+                    <div class="col-sm-4 text-muted small">Registratienummer:</div>
+                    <div class="col-sm-8 fw-semibold">{{ classificatie.registration.registratienummer }}</div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-sm-4 text-muted small">Datum & Organisatie:</div>
+                    <div class="col-sm-8">{{ classificatie.registration.datum.strftime('%d-%m-%Y') }} ({{ classificatie.registration.organisatie.naam }})</div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-sm-4 text-muted small">Hulpvraag (Onderwerp):</div>
+                    <div class="col-sm-8 p-2 bg-white rounded border fw-medium text-primary-emphasis">
+                        {{ classificatie.registration.onderwerp }}
+                    </div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-sm-4 text-muted small">AI Bepaling:</div>
+                    <div class="col-sm-8">
+                        <span class="badge bg-secondary-subtle text-secondary border">
+                            {{ classificatie.category.naam if classificatie.category else 'Geen' }}
+                        </span>
+                        {% if classificatie.zekerheid is not none %}
+                        <span class="small text-muted ms-2">({{ (classificatie.zekerheid * 100)|round|int }}% zeker via {{ classificatie.model_naam }})</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="category_id" class="form-label fw-semibold">Juiste Vraagcategorie <span class="text-danger">*</span></label>
+                        <select class="form-select" id="category_id" name="category_id" required>
+                            {% for cat in categorieen %}
+                            <option value="{{ cat.id }}" {% if classificatie.category_id == cat.id %}selected{% endif %}>
+                                {{ cat.naam }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Selecteer de meest toepasselijke categorie voor deze hulpvraag.</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="toelichting" class="form-label fw-semibold">Toelichting / Reden van toewijzing</label>
+                        <textarea class="form-control" id="toelichting" name="toelichting" rows="3"
+                                  placeholder="Korte motivatie voor deze categoriekeuze...">{{ classificatie.toelichting or '' }}</textarea>
+                    </div>
+
+                    <div class="alert alert-warning py-2 small mb-4" role="alert">
+                        <i class="bi bi-exclamation-circle me-1"></i>
+                        Bij het opslaan wordt deze vraag gemarkeerd als <strong>Handmatig gecorrigeerd</strong>.
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{{ url_for('platform.vraagclassificaties') }}" class="btn btn-outline-secondary">
+                            Annuleren
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>Opslaan & Toepassen
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

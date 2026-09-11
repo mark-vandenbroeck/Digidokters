@@ -119,6 +119,16 @@
                 <i class="bi bi-envelope-paper"></i>
                 <span>E-mailsjablonen</span>
             </a>
+            <a href="{{ url_for('platform.vraagcategorieen') }}"
+               class="dd-nav-link {% if request.endpoint and 'vraagcategorie' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-tags"></i>
+                <span>Vraagcategorieën</span>
+            </a>
+            <a href="{{ url_for('platform.vraagclassificaties') }}"
+               class="dd-nav-link {% if request.endpoint and 'vraagclassificatie' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-stars"></i>
+                <span>Vraagclassificaties</span>
+            </a>
             <a href="{{ url_for('admin.audit_log') }}"
                class="dd-nav-link {% if request.endpoint == 'admin.audit_log' %}active{% endif %}">
                 <i class="bi bi-shield-shaded"></i>

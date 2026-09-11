@@ -22,6 +22,7 @@ class Registration(db.Model):
     gewijzigd_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                              onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False, index=True)
+    organisatie = db.relationship('Organisatie', backref=db.backref('registraties', lazy=True))
 
     __table_args__ = (
         db.UniqueConstraint('organisatie_id', 'registratienummer', name='uq_registration_org_num'),

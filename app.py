@@ -365,6 +365,23 @@ def create_app(config_class=Config):
             db.session.rollback()
             print(f'Fout bij verwijderen: {str(e)}')
 
+    @app.cli.command('seed-vraagcategorieen')
+    def seed_vraagcategorieen():
+        """Zorg dat de standaard 10 vraagcategorieën bestaan in de database."""
+        from utils.ai_classifier import seed_standaard_categorieen
+        n = seed_standaard_categorieen()
+        print(f'✓ {n} nieuwe vraagcategorieën toegevoegd.')
+
+    @app.cli.command('seed-vragenanalyse')
+    def seed_vragenanalyse():
+        """Classificeer alle ongeclassificeerde consultaties met Gemini AI."""
+        from utils.ai_classifier import seed_retroactieve_classificaties
+        print("Starten van retroactieve classificatie met Gemini AI...")
+        def progress(done, total):
+            print(f"  -> Voortgang: {done}/{total} consultaties verwerkt ({done/total*100:.1f}%)")
+        verwerkt, fouten = seed_retroactieve_classificaties(batch_size=25, progress_callback=progress)
+        print(f"✓ Voltooid: {verwerkt} consultaties geclassificeerd, {fouten} mislukt.")
+
     # Synchroniseer bestaande gebruikers als Digidokter op de achtergrond bij het opstarten
     with app.app_context():
         try:

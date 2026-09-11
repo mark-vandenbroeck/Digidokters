@@ -128,7 +128,26 @@ def lijst():
 @login_required
 @writer_required
 def nieuw():
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
     keuzes = _keuzelijsten()
+
+    # Bepaal standaard digidokter op basis van de ingelogde gebruiker
+    default_digidokter_id = None
+    if current_user.is_authenticated:
+        dd_match = Digidokter.query.filter_by(
+            user_id=current_user.id,
+            organisatie_id=org_id,
+            actief=True
+        ).first()
+        if not dd_match:
+            dd_match = Digidokter.query.filter(
+                db.func.lower(Digidokter.naam) == db.func.lower(current_user.naam),
+                Digidokter.organisatie_id == org_id,
+                Digidokter.actief == True
+            ).first()
+        if dd_match:
+            default_digidokter_id = dd_match.id
 
     if request.method == 'POST':
         datum_str = request.form.get('datum', str(date.today()))
@@ -136,7 +155,8 @@ def nieuw():
             datum = date.fromisoformat(datum_str)
         except ValueError:
             flash('Ongeldige datum.', 'danger')
-            return render_template('registrations/add.html', **keuzes, datum_vandaag=str(date.today()))
+            return render_template('registrations/add.html', **keuzes, datum_vandaag=str(date.today()),
+                                   default_digidokter_id=default_digidokter_id)
 
         client = request.form.get('client', '').strip()
         digidokter_id = request.form.get('digidokter_id', 0, type=int)
@@ -191,7 +211,7 @@ def nieuw():
             for f in fouten:
                 flash(f, 'danger')
             return render_template('registrations/add.html', **keuzes, datum_vandaag=datum_str,
-                                   form_data=request.form)
+                                   form_data=request.form, default_digidokter_id=default_digidokter_id)
 
         reg = Registration(
             registratienummer=Registration.genereer_registratienummer(org_id, datum.year),
@@ -209,10 +229,19 @@ def nieuw():
         set_organisatie_id_op_model(reg)
         db.session.add(reg)
         db.session.commit()
+
+        # Start asynchrone AI-vraagclassificatie op de achtergrond
+        try:
+            from utils.ai_classifier import trigger_asynchrone_classificatie
+            trigger_asynchrone_classificatie(reg.id)
+        except Exception:
+            pass
+
         flash(f'Registratie {reg.registratienummer} succesvol toegevoegd.', 'success')
         return redirect(url_for('reg.lijst'))
 
-    return render_template('registrations/add.html', **keuzes, datum_vandaag=str(date.today()))
+    return render_template('registrations/add.html', **keuzes, datum_vandaag=str(date.today()),
+                           default_digidokter_id=default_digidokter_id)
 
 
 @reg_bp.route('/registraties/<int:reg_id>')
@@ -299,6 +328,7 @@ def wijzigen(reg_id):
                 flash(f, 'danger')
             return render_template('registrations/edit.html', reg=reg, **keuzes)
 
+        oude_onderwerp = reg.onderwerp
         reg.datum = datum
         reg.client = client
         reg.digidokter_id = digidokter_id
@@ -309,6 +339,15 @@ def wijzigen(reg_id):
         reg.leeftijdscategorie_id = leeftijdscategorie_id
         reg.toestel_id = toestel_id
         db.session.commit()
+
+        # Indien onderwerp gewijzigd of nog niet geclassificeerd, heranalyseer asynchroon
+        if onderwerp != oude_onderwerp or not reg.classification:
+            try:
+                from utils.ai_classifier import trigger_asynchrone_classificatie
+                trigger_asynchrone_classificatie(reg.id)
+            except Exception:
+                pass
+
         flash(f'Registratie {reg.registratienummer} succesvol bijgewerkt.', 'success')
         return redirect(url_for('reg.bekijken', reg_id=reg.id))
 

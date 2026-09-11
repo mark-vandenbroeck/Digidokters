@@ -59,36 +59,41 @@
             <i class="bi bi-file-earmark-pdf-fill me-1"></i>Exporteren naar PDF
         </button>
         <!-- Jaar filter selector -->
-        <form method="GET" action="{{ url_for('stats.overzicht') }}" class="d-flex align-items-center gap-2 mb-0">
+        <form method="GET" action="{{ url_for('stats.overzicht') }}" class="d-flex align-items-center gap-2 mb-0" id="jaarForm">
             <label class="text-nowrap small text-muted">Jaar selecteren:</label>
+            <input type="hidden" name="tab" id="activeTabInput" value="{{ actieve_tab }}">
             <select class="form-select form-select-sm" name="jaar" onchange="this.form.submit()">
+                <option value="alle" {{ 'selected' if jaar == 'alle' }}>Alle jaren</option>
                 {% for j in jaren %}
-                <option value="{{ j }}" {{ 'selected' if j == jaar }}>{{ j }}</option>
+                <option value="{{ j }}" {{ 'selected' if j|string == jaar|string }}>{{ j }}</option>
                 {% endfor %}
             </select>
         </form>
     </div>
 </div>
 
-</div>
-
 <!-- Tab-navigatie -->
 <ul class="nav nav-tabs mb-4" id="statsTabs" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="visitors-tab" data-bs-toggle="tab" data-bs-target="#visitors-pane" type="button" role="tab" aria-controls="visitors-pane" aria-selected="true">
+        <button class="nav-link {{ 'active' if actieve_tab == 'visitors' }}" id="visitors-tab" data-bs-toggle="tab" data-bs-target="#visitors-pane" type="button" role="tab" aria-controls="visitors-pane" aria-selected="{{ 'true' if actieve_tab == 'visitors' else 'false' }}">
             <i class="bi bi-people-fill me-2 text-primary"></i>Bezoekers & Consultaties
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="volunteers-tab" data-bs-toggle="tab" data-bs-target="#volunteers-pane" type="button" role="tab" aria-controls="volunteers-pane" aria-selected="false">
+        <button class="nav-link {{ 'active' if actieve_tab == 'volunteers' }}" id="volunteers-tab" data-bs-toggle="tab" data-bs-target="#volunteers-pane" type="button" role="tab" aria-controls="volunteers-pane" aria-selected="{{ 'true' if actieve_tab == 'volunteers' else 'false' }}">
             <i class="bi bi-calendar-check-fill me-2 text-primary"></i>Vrijwilligers & Agenda
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {{ 'active' if actieve_tab == 'questions' }}" id="questions-tab" data-bs-toggle="tab" data-bs-target="#questions-pane" type="button" role="tab" aria-controls="questions-pane" aria-selected="{{ 'true' if actieve_tab == 'questions' else 'false' }}">
+            <i class="bi bi-stars me-2 text-primary"></i>Vragen & AI-Analyse
         </button>
     </li>
 </ul>
 
 <div class="tab-content" id="statsTabsContent">
     <!-- TAB 1: BEZOEKERS & CONSULTATIES -->
-    <div class="tab-pane fade show active" id="visitors-pane" role="tabpanel" aria-labelledby="visitors-tab" tabindex="0">
+    <div class="tab-pane fade {{ 'show active' if actieve_tab == 'visitors' }}" id="visitors-pane" role="tabpanel" aria-labelledby="visitors-tab" tabindex="0">
         <!-- Samenvatting KPI's -->
         <div class="row g-3 mb-4">
             <div class="col-12 col-sm-4">
@@ -98,7 +103,7 @@
                     </div>
                     <div>
                         <div class="dd-stat-value">{{ totaal_jaar }}</div>
-                        <div class="dd-stat-label">Bezoeken in {{ jaar }}</div>
+                        <div class="dd-stat-label">{% if jaar == 'alle' %}Bezoeken (alle jaren){% else %}Bezoeken in {{ jaar }}{% endif %}</div>
                     </div>
                 </div>
             </div>
@@ -259,7 +264,8 @@
                 </div>
             </div>
 
-            <!-- Tijdlijn per week (jaar-op-jaar) -->
+            <!-- Tijdlijn per week (jaar-op-jaar) of per jaar (bij 'alle') -->
+            {% if jaar != 'alle' %}
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
@@ -273,6 +279,21 @@
                     </div>
                 </div>
             </div>
+            {% else %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        Registraties per kalenderjaar
+                        <small class="text-muted d-block fw-normal mt-1">
+                            Totaal aantal geregistreerde consultaties per kalenderjaar.
+                        </small>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="yearsChart" height="90"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Drukste dagen -->
             <div class="col-12">
@@ -308,7 +329,7 @@
     </div>
 
     <!-- TAB 2: VRIJWILLIGERS & AGENDA -->
-    <div class="tab-pane fade" id="volunteers-pane" role="tabpanel" aria-labelledby="volunteers-tab" tabindex="0">
+    <div class="tab-pane fade {{ 'show active' if actieve_tab == 'volunteers' }}" id="volunteers-pane" role="tabpanel" aria-labelledby="volunteers-tab" tabindex="0">
         <!-- Samenvatting KPI's Vrijwilligers -->
         <div class="row g-3 mb-4">
             <div class="col-12 col-sm-4">
@@ -318,7 +339,7 @@
                     </div>
                     <div>
                         <div class="dd-stat-value">{{ totaal_vrijwilligersuren }} u</div>
-                        <div class="dd-stat-label">Gepresteerde uren in {{ jaar }}</div>
+                        <div class="dd-stat-label">{% if jaar == 'alle' %}Gepresteerde uren (alle jaren){% else %}Gepresteerde uren in {{ jaar }}{% endif %}</div>
                     </div>
                 </div>
             </div>
@@ -489,67 +510,288 @@
             </div>
         </div>
     </div>
+
+    <!-- TAB 3: VRAGEN & AI-ANALYSE -->
+    <div class="tab-pane fade {{ 'show active' if actieve_tab == 'questions' }}" id="questions-pane" role="tabpanel" aria-labelledby="questions-tab" tabindex="0">
+        <!-- Samenvatting KPI's -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="dd-stat-card">
+                    <div class="dd-stat-icon bg-blue-soft text-blue">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div>
+                        <div class="dd-stat-value">{{ totaal_geanalyseerd }} <small class="fs-6 text-muted">/ {{ totaal_jaar }}</small></div>
+                        <div class="dd-stat-label">Geanalyseerd ({{ dekkingsgraad }}% dekking)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="dd-stat-card">
+                    <div class="dd-stat-icon bg-purple-soft text-purple">
+                        <i class="bi bi-tag-fill"></i>
+                    </div>
+                    <div>
+                        <div class="dd-stat-value text-truncate" style="font-size: 1.15rem;" title="{{ vragen_per_categorie[0].naam if vragen_per_categorie else '-' }}">
+                            {{ vragen_per_categorie[0].naam if vragen_per_categorie else '-' }}
+                        </div>
+                        <div class="dd-stat-label">
+                            {% if vragen_per_categorie %}
+                            Meest voorkomend ({{ vragen_per_categorie[0].aantal }} vragen, {{ vragen_per_categorie[0].percentage }}%)
+                            {% else %}
+                            Geen categorieën
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="dd-stat-card">
+                    <div class="dd-stat-icon bg-green-soft text-green">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <div>
+                        <div class="dd-stat-value">{{ gemiddelde_zekerheid }}%</div>
+                        <div class="dd-stat-label">Gemiddelde AI-zekerheid</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="dd-stat-card">
+                    <div class="dd-stat-icon bg-teal-soft text-teal">
+                        <i class="bi bi-person-check-fill"></i>
+                    </div>
+                    <div>
+                        <div class="dd-stat-value">{{ aantal_handmatig }}</div>
+                        <div class="dd-stat-label">Handmatig geverifieerd</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if totaal_geanalyseerd > 0 %}
+        <!-- Grafiekenrij -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="card-title mb-0 fs-6 fw-bold">
+                            <i class="bi bi-bar-chart-fill me-2 text-primary"></i>Verdeling per Vraagcategorie ({% if jaar == 'alle' %}alle jaren{% else %}{{ jaar }}{% endif %})
+                        </h5>
+                    </div>
+                    <div class="card-body p-3">
+                        <canvas id="questionsCategoryChart" style="min-height: 320px; max-height: 380px;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="card-title mb-0 fs-6 fw-bold">
+                            <i class="bi bi-graph-up me-2 text-primary"></i>Maandelijkse Trend Top-Categorieën
+                        </h5>
+                    </div>
+                    <div class="card-body p-3">
+                        <canvas id="questionsTrendChart" style="min-height: 320px; max-height: 380px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailtabel per Categorie -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 fs-6 fw-bold">
+                    <i class="bi bi-table me-2 text-primary"></i>Analyse per Categorie
+                </h5>
+                {% if current_user.rol == 'platformbeheerder' %}
+                <a href="{{ url_for('platform.vraagclassificaties') }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-stars me-1"></i>Beheer classificaties
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Categorie</th>
+                                <th style="width: 120px;" class="text-center">Aantal</th>
+                                <th style="width: 180px;">Aandeel</th>
+                                <th style="width: 130px;" class="text-center">Gem. Zekerheid</th>
+                                <th style="min-width: 240px;">Top Apparaten</th>
+                                <th style="min-width: 240px;">Top Leeftijdsgroepen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in vragen_per_categorie %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ c.naam }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark border">{{ c.aantal }}</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height: 6px;">
+                                            <div class="progress-bar bg-primary" role="progressbar" style="width: {{ c.percentage }}%;"></div>
+                                        </div>
+                                        <span class="small text-muted" style="min-width: 40px;">{{ c.percentage }}%</span>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge {% if c.gem_zekerheid >= 90 %}bg-success-subtle text-success border border-success-subtle{% elif c.gem_zekerheid >= 75 %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %}">
+                                        {{ c.gem_zekerheid }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if cat_toestel_dict.get(c.naam) %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for t in cat_toestel_dict.get(c.naam)[:3] %}
+                                        <span class="badge bg-light text-secondary border small">
+                                            {{ t.toestel }} ({{ t.aantal }})
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if cat_leeftijd_dict.get(c.naam) %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for l in cat_leeftijd_dict.get(c.naam)[:3] %}
+                                        <span class="badge bg-light text-secondary border small">
+                                            {{ l.leeftijd }} ({{ l.aantal }})
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card shadow-sm border-0 py-5 text-center">
+            <div class="card-body">
+                <i class="bi bi-robot fs-1 text-secondary d-block mb-3"></i>
+                <h5 class="text-muted">Nog geen geclassificeerde consultaties gevonden voor {% if jaar == 'alle' %}deze organisatie{% else %}{{ jaar }}{% endif %}.</h5>
+                <p class="text-secondary small mb-3">
+                    Wanneer consultaties met behulp van Gemini AI worden geanalyseerd, verschijnen hier automatisch diepgaande rapportages.
+                </p>
+                {% if current_user.rol == 'platformbeheerder' %}
+                <a href="{{ url_for('platform.vraagclassificaties') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-cpu me-1"></i>Start Batch-analyse in Platformbeheer
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
-    // --- 1. Weekgrafiek (Bezoeken) ---
-    const weekLabels = {{ week_labels|tojson }};
-    const perWeekHuidig = {{ per_week|tojson }};
-    const perWeekVorig = {{ per_week_vorig_jaar|tojson }};
+    // --- 1. Weekgrafiek (Bezoeken per week) of Jaargrafiek (Bezoeken per jaar) ---
+    const weekChartCanvas = document.getElementById('weekChart');
+    if (weekChartCanvas) {
+        const weekLabels = {{ week_labels|tojson }};
+        const perWeekHuidig = {{ per_week|tojson }};
+        const perWeekVorig = {{ per_week_vorig_jaar|tojson }};
 
-    new Chart(document.getElementById('weekChart'), {
-        type: 'line',
-        data: {
-            labels: weekLabels,
-            datasets: [
-                {
-                    label: '{{ jaar }}',
-                    data: perWeekHuidig,
-                    borderColor: '#0d6efd',
-                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    tension: 0.2,
-                    spanGaps: false,
+        new Chart(weekChartCanvas, {
+            type: 'line',
+            data: {
+                labels: weekLabels,
+                datasets: [
+                    {
+                        label: '{{ jaar }}',
+                        data: perWeekHuidig,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        tension: 0.2,
+                        spanGaps: false,
+                    },
+                    {
+                        label: '{{ vorig_jaar }}',
+                        data: perWeekVorig,
+                        borderColor: '#adb5bd',
+                        backgroundColor: 'rgba(173, 181, 189, 0.1)',
+                        borderWidth: 2,
+                        borderDash: [5, 4],
+                        pointRadius: 2,
+                        tension: 0.2,
+                        spanGaps: false,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => 'Week ' + items[0].label.replace('W', '')
+                        }
+                    }
                 },
-                {
-                    label: '{{ vorig_jaar }}',
-                    data: perWeekVorig,
-                    borderColor: '#adb5bd',
-                    backgroundColor: 'rgba(173, 181, 189, 0.1)',
-                    borderWidth: 2,
-                    borderDash: [5, 4],
-                    pointRadius: 2,
-                    tension: 0.2,
-                    spanGaps: false,
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { position: 'top' },
-                tooltip: {
-                    callbacks: {
-                        title: (items) => 'Week ' + items[0].label.replace('W', '')
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    },
+                    x: {
+                        ticks: { maxTicksLimit: 15 }
                     }
                 }
+            }
+        });
+    }
+
+    const yearsChartCanvas = document.getElementById('yearsChart');
+    if (yearsChartCanvas) {
+        const yearLabels = {{ per_jaar_labels|tojson }};
+        const yearCounts = {{ per_jaar_counts|tojson }};
+
+        new Chart(yearsChartCanvas, {
+            type: 'bar',
+            data: {
+                labels: yearLabels,
+                datasets: [{
+                    label: 'Registraties',
+                    data: yearCounts,
+                    backgroundColor: 'rgba(13, 110, 253, 0.85)',
+                    borderColor: '#0d6efd',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { precision: 0 }
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
                 },
-                x: {
-                    ticks: { maxTicksLimit: 15 }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 
     // --- 2. Urengrafiek (Vrijwilligers) ---
     const monthLabels = {{ maand_labels|tojson }};
@@ -582,12 +824,113 @@
         }
     });
 
-    // Zorg ervoor dat Chart.js correct resizet bij het wisselen van tabbladen
+    // --- 3. Vragenanalyse Grafieken (AI) ---
+    const catLabels = {{ cat_chart_labels|tojson }};
+    const catData = {{ cat_chart_data|tojson }};
+    
+    const catChartCanvas = document.getElementById('questionsCategoryChart');
+    if (catChartCanvas && catLabels.length > 0) {
+        new Chart(catChartCanvas, {
+            type: 'bar',
+            data: {
+                labels: catLabels,
+                datasets: [{
+                    label: 'Aantal vragen',
+                    data: catData,
+                    backgroundColor: [
+                        'rgba(13, 110, 253, 0.85)',
+                        'rgba(32, 201, 151, 0.85)',
+                        'rgba(111, 66, 193, 0.85)',
+                        'rgba(253, 126, 20, 0.85)',
+                        'rgba(13, 202, 240, 0.85)',
+                        'rgba(214, 51, 132, 0.85)',
+                        'rgba(255, 193, 7, 0.85)',
+                        'rgba(25, 135, 84, 0.85)',
+                        'rgba(102, 16, 242, 0.85)',
+                        'rgba(108, 117, 125, 0.85)'
+                    ],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    }
+
+    const top5Cats = {{ top_5_cat_namen|tojson }};
+    const trendPerMaandCats = {{ trend_per_maand_cats|tojson }};
+    const trendColors = ['#0d6efd', '#20c997', '#6f42c1', '#fd7e14', '#0dcaf0'];
+
+    const trendChartCanvas = document.getElementById('questionsTrendChart');
+    if (trendChartCanvas && top5Cats.length > 0) {
+        const datasets = top5Cats.map((cat, idx) => ({
+            label: cat,
+            data: trendPerMaandCats[cat] || [],
+            borderColor: trendColors[idx % trendColors.length],
+            backgroundColor: 'transparent',
+            tension: 0.25,
+            borderWidth: 2,
+            pointRadius: 3
+        }));
+
+        new Chart(trendChartCanvas, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'],
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    }
+
+    // Zorg ervoor dat Chart.js correct resizet bij het wisselen van tabbladen en houd actieve tab bij
     document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(triggerEl => {
-        triggerEl.addEventListener('shown.bs.tab', () => {
+        triggerEl.addEventListener('shown.bs.tab', (event) => {
             window.dispatchEvent(new Event('resize'));
+            const targetId = event.target.getAttribute('id');
+            let tabKey = 'visitors';
+            if (targetId === 'volunteers-tab') tabKey = 'volunteers';
+            else if (targetId === 'questions-tab') tabKey = 'questions';
+
+            const activeTabInput = document.getElementById('activeTabInput');
+            if (activeTabInput) {
+                activeTabInput.value = tabKey;
+            }
+
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabKey);
+            window.history.replaceState({}, '', url);
         });
     });
+
+    // Hash ondersteuning (bijv. #volunteers-pane of #questions-pane)
+    const hash = window.location.hash;
+    if (hash) {
+        const targetBtn = document.querySelector(`button[data-bs-target="${hash}"]`);
+        if (targetBtn && !targetBtn.classList.contains('active')) {
+            const bsTab = bootstrap.Tab.getOrCreateInstance(targetBtn);
+            bsTab.show();
+        }
+    }
 
     window.prepareAndPrint = function() {
         // 1. Toon alle tab-panes door de Bootstrap klassen tijdelijk aan te passen

@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}{{ actie }} Vraagcategorie – Platformbeheer – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-7">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h1 class="dd-page-title mb-0">
+                    <i class="bi bi-tags me-2 text-primary"></i>{{ actie }} Vraagcategorie
+                </h1>
+                <p class="dd-page-subtitle mb-0">
+                    Stel de categorienaam en AI-richtlijnomschrijving in
+                </p>
+            </div>
+            <a href="{{ url_for('platform.vraagcategorieen') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Terug naar overzicht
+            </a>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="naam" class="form-label fw-semibold">Categorienaam <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="naam" name="naam" 
+                               value="{{ categorie.naam if categorie else '' }}" required autofocus
+                               placeholder="bijv. Digitale Veiligheid & Privacy">
+                        <div class="form-text">Kies een duidelijke, overkoepelende naam voor deze vraagcategorie.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="omschrijving" class="form-label fw-semibold">Omschrijving & Richtlijnen voor Gemini AI <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="omschrijving" name="omschrijving" rows="4" required
+                                  placeholder="Beschrijf concrete voorbeelden en trefwoorden van vragen die onder deze categorie vallen...">{{ categorie.omschrijving if categorie else '' }}</textarea>
+                        <div class="form-text">
+                            Deze tekst wordt door Google Gemini als instructie gebruikt om te bepalen welke consultatievragen in deze categorie horen. Noem relevante apps, trefwoorden en typische situaties.
+                        </div>
+                    </div>
+
+                    <div class="mb-4 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="actief" name="actief" 
+                               {% if not categorie or categorie.actief %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="actief">
+                            Actief (beschikbaar voor AI-classificaties)
+                        </label>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{{ url_for('platform.vraagcategorieen') }}" class="btn btn-outline-secondary">
+                            Annuleren
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>Opslaan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

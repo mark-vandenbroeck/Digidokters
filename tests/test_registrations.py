@@ -57,7 +57,7 @@ class TestRegistrations(BaseTestCase):
 
         # Check registration exists
         reg_id = reg.id
-        self.assertIsNotNone(Registration.query.get(reg_id))
+        self.assertIsNotNone(db.session.get(Registration, reg_id))
 
         # 2. Simulate audit log creation for this registration
         # Since audit log triggers automatically, db.session.commit() above should have created a CREATE log
@@ -69,8 +69,23 @@ class TestRegistrations(BaseTestCase):
         self.assertEqual(response.status_code, 200)
 
         # 4. Verify registration is deleted
-        self.assertIsNone(Registration.query.get(reg_id))
+        self.assertIsNone(db.session.get(Registration, reg_id))
 
         # 5. Verify associated audit logs are deleted (GDPR Compliance check)
         remaining_audit_logs = AuditLog.query.filter_by(tabel='registrations', record_id=reg_id).all()
         self.assertEqual(len(remaining_audit_logs), 0)
+
+    def test_default_digidokter_preselected_on_new_form(self):
+        # Koppel de digidokter aan de ingelogde gebruiker AdminMark
+        self.digidokter.user_id = self.admin_user.id
+        db.session.commit()
+
+        response = self.client.get('/registraties/nieuw')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+
+        # Controleer of de optie van self.digidokter het 'selected' attribuut heeft
+        expected_option = f'<option value="{self.digidokter.id}"\n                                selected>\n                                {self.digidokter.naam}\n                            </option>'
+        self.assertIn(f'value="{self.digidokter.id}"', html)
+        self.assertIn('selected', html)
+        self.assertIn(self.digidokter.naam, html)

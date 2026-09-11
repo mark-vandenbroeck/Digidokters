@@ -33,7 +33,7 @@
                             <option value="">— Kies een digidokter —</option>
                             {% for d in digidokters %}
                             <option value="{{ d.id }}"
-                                {{ 'selected' if form_data and form_data.digidokter_id == d.id|string }}>
+                                {{ 'selected' if (form_data and form_data.digidokter_id == d.id|string) or (not form_data and default_digidokter_id == d.id) }}>
                                 {{ d.naam }}
                             </option>
                             {% endfor %}

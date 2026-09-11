@@ -8,6 +8,9 @@ from models.registration import Registration
 from models.digidokter import Digidokter
 from models.agenda import AgendaItem
 from models.email_template import EmailTemplate, ensure_default_email_templates
+from models.question_category import QuestionCategory
+from models.question_classification import QuestionClassification
+from utils.ai_classifier import seed_standaard_categorieen
 from sqlalchemy import func, extract
 from utils.decorators import platform_admin_required
 
@@ -500,4 +503,273 @@ def emailsjablonen_herstellen(template_id):
         flash(f'Geen standaardwaarden gevonden voor sjabloon "{tpl.naam}".', 'warning')
 
     return redirect(url_for('platform.emailsjablonen_wijzigen', template_id=tpl.id))
+
+
+# ─── Vraagcategorieën (Stamgegevens) ────────────────────────────────────────
+
+@platform_bp.route('/vraagcategorieen')
+@login_required
+@platform_admin_required
+def vraagcategorieen():
+    seed_standaard_categorieen()
+    # Tel gekoppelde classificaties per categorie
+    subq = (
+        db.session.query(
+            QuestionClassification.category_id,
+            func.count(QuestionClassification.id).label('aantal_vragen')
+        )
+        .group_by(QuestionClassification.category_id)
+        .subquery()
+    )
+    categories_with_count = (
+        db.session.query(QuestionCategory, func.coalesce(subq.c.aantal_vragen, 0))
+        .outerjoin(subq, QuestionCategory.id == subq.c.category_id)
+        .order_by(QuestionCategory.volgorde.asc(), QuestionCategory.naam.asc())
+        .all()
+    )
+    return render_template('platform/vraagcategorieen.html', categories_with_count=categories_with_count)
+
+
+@platform_bp.route('/vraagcategorieen/nieuw', methods=['GET', 'POST'])
+@login_required
+@platform_admin_required
+def vraagcategorie_nieuw():
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        omschrijving = request.form.get('omschrijving', '').strip()
+        actief = request.form.get('actief') == 'on'
+        if not naam or not omschrijving:
+            flash('Naam en omschrijving zijn verplicht.', 'danger')
+            return render_template('platform/vraagcategorie_form.html', actie='Nieuw', categorie=None)
+        
+        bestaand = QuestionCategory.query.filter(func.lower(QuestionCategory.naam) == func.lower(naam)).first()
+        if bestaand:
+            flash(f'Een categorie met de naam "{naam}" bestaat al.', 'danger')
+            return render_template('platform/vraagcategorie_form.html', actie='Nieuw', categorie=None)
+
+        max_volgorde = db.session.query(func.max(QuestionCategory.volgorde)).scalar() or 0
+        cat = QuestionCategory(
+            naam=naam,
+            omschrijving=omschrijving,
+            volgorde=max_volgorde + 1,
+            actief=actief
+        )
+        db.session.add(cat)
+        db.session.commit()
+        flash(f'Categorie "{naam}" succesvol toegevoegd.', 'success')
+        return redirect(url_for('platform.vraagcategorieen'))
+
+    return render_template('platform/vraagcategorie_form.html', actie='Nieuw', categorie=None)
+
+
+@platform_bp.route('/vraagcategorieen/<int:cat_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@platform_admin_required
+def vraagcategorie_wijzigen(cat_id):
+    cat = db.get_or_404(QuestionCategory, cat_id)
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        omschrijving = request.form.get('omschrijving', '').strip()
+        actief = request.form.get('actief') == 'on'
+        if not naam or not omschrijving:
+            flash('Naam en omschrijving zijn verplicht.', 'danger')
+            return render_template('platform/vraagcategorie_form.html', actie='Wijzigen', categorie=cat)
+
+        bestaand = QuestionCategory.query.filter(
+            func.lower(QuestionCategory.naam) == func.lower(naam),
+            QuestionCategory.id != cat.id
+        ).first()
+        if bestaand:
+            flash(f'Een categorie met de naam "{naam}" bestaat al.', 'danger')
+            return render_template('platform/vraagcategorie_form.html', actie='Wijzigen', categorie=cat)
+
+        cat.naam = naam
+        cat.omschrijving = omschrijving
+        cat.actief = actief
+        cat.gewijzigd_op = datetime.now(timezone.utc)
+        db.session.commit()
+        flash(f'Categorie "{naam}" bijgewerkt.', 'success')
+        return redirect(url_for('platform.vraagcategorieen'))
+
+    return render_template('platform/vraagcategorie_form.html', actie='Wijzigen', categorie=cat)
+
+
+@platform_bp.route('/vraagcategorieen/<int:cat_id>/toggle', methods=['POST'])
+@login_required
+@platform_admin_required
+def vraagcategorie_toggle(cat_id):
+    cat = db.get_or_404(QuestionCategory, cat_id)
+    cat.actief = not cat.actief
+    cat.gewijzigd_op = datetime.now(timezone.utc)
+    db.session.commit()
+    status_str = 'geactiveerd' if cat.actief else 'gedeactiveerd'
+    flash(f'Categorie "{cat.naam}" is {status_str}.', 'info')
+    return redirect(url_for('platform.vraagcategorieen'))
+
+
+@platform_bp.route('/vraagcategorieen/<int:cat_id>/verwijderen', methods=['POST'])
+@login_required
+@platform_admin_required
+def vraagcategorie_verwijderen(cat_id):
+    cat = db.get_or_404(QuestionCategory, cat_id)
+    gekoppeld = QuestionClassification.query.filter_by(category_id=cat.id).count()
+    if gekoppeld > 0:
+        flash(f'Categorie "{cat.naam}" kan niet worden verwijderd omdat er nog {gekoppeld} vraagclassificaties aan gekoppeld zijn. Deactiveer de categorie in plaats daarvan.', 'danger')
+        return redirect(url_for('platform.vraagcategorieen'))
+
+    db.session.delete(cat)
+    db.session.commit()
+    flash(f'Categorie "{cat.naam}" is verwijderd.', 'success')
+    return redirect(url_for('platform.vraagcategorieen'))
+
+
+@platform_bp.route('/vraagcategorieen/<int:cat_id>/volgorde/<richting>')
+@login_required
+@platform_admin_required
+def vraagcategorie_volgorde(cat_id, richting):
+    cat = db.get_or_404(QuestionCategory, cat_id)
+    if richting == 'omhoog':
+        ander = QuestionCategory.query.filter(QuestionCategory.volgorde < cat.volgorde).order_by(QuestionCategory.volgorde.desc()).first()
+    elif richting == 'omlaag':
+        ander = QuestionCategory.query.filter(QuestionCategory.volgorde > cat.volgorde).order_by(QuestionCategory.volgorde.asc()).first()
+    else:
+        ander = None
+
+    if ander:
+        cat.volgorde, ander.volgorde = ander.volgorde, cat.volgorde
+        db.session.commit()
+    return redirect(url_for('platform.vraagcategorieen'))
+
+
+# ─── Vraagclassificaties (Gemini Resultaten) ────────────────────────────────
+
+@platform_bp.route('/vraagclassificaties')
+@login_required
+@platform_admin_required
+def vraagclassificaties():
+    from flask_login import current_user
+    page = request.args.get('page', 1, type=int)
+    q = request.args.get('q', '').strip()
+    cat_id = request.args.get('categorie_id', '', type=str)
+    filter_onzeker = request.args.get('onzeker') == '1'
+    filter_handmatig = request.args.get('handmatig') == '1'
+    filter_org = request.args.get('organisatie_id', '', type=str)
+
+    query = (
+        QuestionClassification.query
+        .join(Registration, QuestionClassification.registration_id == Registration.id)
+        .outerjoin(QuestionCategory, QuestionClassification.category_id == QuestionCategory.id)
+        .join(Organisatie, Registration.organisatie_id == Organisatie.id)
+    )
+
+    if q:
+        query = query.filter(
+            db.or_(
+                Registration.onderwerp.ilike(f'%{q}%'),
+                Registration.registratienummer.ilike(f'%{q}%'),
+                QuestionClassification.toelichting.ilike(f'%{q}%')
+            )
+        )
+
+    if cat_id and cat_id.isdigit():
+        query = query.filter(QuestionClassification.category_id == int(cat_id))
+
+    if filter_onzeker:
+        query = query.filter(QuestionClassification.zekerheid < 0.8)
+
+    if filter_handmatig:
+        query = query.filter(QuestionClassification.is_handmatig_aangepast == True)
+
+    if filter_org and filter_org.isdigit():
+        query = query.filter(Registration.organisatie_id == int(filter_org))
+
+    query = query.order_by(Registration.datum.desc(), Registration.id.desc())
+    pagination = query.paginate(page=page, per_page=40, error_out=False)
+
+    ongeclassificeerd_aantal = (
+        Registration.query
+        .outerjoin(QuestionClassification, Registration.id == QuestionClassification.registration_id)
+        .filter(QuestionClassification.id.is_(None))
+        .filter(Registration.onderwerp.isnot(None), Registration.onderwerp != '')
+        .count()
+    )
+
+    totaal_geclassificeerd = QuestionClassification.query.count()
+    categorieen = QuestionCategory.query.order_by(QuestionCategory.volgorde.asc(), QuestionCategory.naam.asc()).all()
+    organisaties = Organisatie.query.filter(Organisatie.slug != 'sjabloon').order_by(Organisatie.naam.asc()).all()
+
+    return render_template(
+        'platform/vraagclassificaties.html',
+        pagination=pagination,
+        classificaties=pagination.items,
+        categorieen=categorieen,
+        organisaties=organisaties,
+        ongeclassificeerd_aantal=ongeclassificeerd_aantal,
+        totaal_geclassificeerd=totaal_geclassificeerd,
+        q=q,
+        geselecteerde_cat=cat_id,
+        filter_onzeker=filter_onzeker,
+        filter_handmatig=filter_handmatig,
+        geselecteerde_org=filter_org
+    )
+
+
+@platform_bp.route('/vraagclassificaties/<int:classif_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@platform_admin_required
+def vraagclassificatie_wijzigen(classif_id):
+    from flask_login import current_user
+    cls = db.get_or_404(QuestionClassification, classif_id)
+    categorieen = QuestionCategory.query.filter_by(actief=True).order_by(QuestionCategory.volgorde.asc()).all()
+
+    if request.method == 'POST':
+        nieuwe_cat_id = request.form.get('category_id', type=int)
+        toelichting = request.form.get('toelichting', '').strip()
+
+        cls.category_id = nieuwe_cat_id
+        cls.toelichting = toelichting
+        cls.is_handmatig_aangepast = True
+        cls.aangepast_door_id = current_user.id
+        cls.gewijzigd_op = datetime.now(timezone.utc)
+        db.session.commit()
+        flash(f'Classificatie voor consultatie {cls.registration.registratienummer} handmatig bijgewerkt.', 'success')
+        return redirect(url_for('platform.vraagclassificaties'))
+
+    return render_template('platform/vraagclassificatie_form.html', classificatie=cls, categorieen=categorieen)
+
+
+@platform_bp.route('/vraagclassificaties/<int:classif_id>/heranalyse', methods=['POST'])
+@login_required
+@platform_admin_required
+def vraagclassificatie_heranalyse(classif_id):
+    from utils.ai_classifier import classificeer_enkele_registratie
+    cls = db.get_or_404(QuestionClassification, classif_id)
+    try:
+        updated = classificeer_enkele_registratie(cls.registration_id)
+        if updated:
+            flash(f'Consultatie {cls.registration.registratienummer} opnieuw geanalyseerd met {updated.model_naam}.', 'success')
+        else:
+            flash('Heranalyse kon niet worden voltooid.', 'warning')
+    except Exception as e:
+        flash(f'Fout bij heranalyse: {str(e)}', 'danger')
+
+    return redirect(request.referrer or url_for('platform.vraagclassificaties'))
+
+
+@platform_bp.route('/vraagclassificaties/batch-analyse', methods=['POST'])
+@login_required
+@platform_admin_required
+def vraagclassificaties_batch_analyse():
+    from utils.ai_classifier import seed_retroactieve_classificaties
+    try:
+        verwerkt, fouten = seed_retroactieve_classificaties(batch_size=25)
+        if verwerkt > 0:
+            flash(f'Succesvol {verwerkt} consultaties geclassificeerd met Gemini AI (mislukt: {fouten}).', 'success')
+        else:
+            flash('Geen ongeclassificeerde consultaties gevonden om te verwerken.', 'info')
+    except Exception as e:
+        flash(f'Fout tijdens batch-analyse: {str(e)}', 'danger')
+
+    return redirect(url_for('platform.vraagclassificaties'))
+
 

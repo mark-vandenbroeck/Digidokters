@@ -222,24 +222,28 @@ class TestVraagcategorieen(BaseTestCase):
 
     def test_asynchrone_classificatie_bij_nieuwe_registratie(self):
         from unittest.mock import patch
-        with patch('utils.ai_classifier.classificeer_enkele_registratie') as mock_classify:
-            self.login("AdminMark", "password123")
-            self.select_organisatie(self.org.id)
+        self.app.config['ENABLE_ASYNC_CLASSIFIER_TEST'] = True
+        try:
+            with patch('utils.ai_classifier.classificeer_enkele_registratie') as mock_classify:
+                self.login("AdminMark", "password123")
+                self.select_organisatie(self.org.id)
 
-            data = {
-                'datum': '2026-03-15',
-                'client': 'Nieuwe Bezoeker',
-                'digidokter_id': self.digidokter.id,
-                'nieuwe_klant': 'nee',
-                'geslacht': 'vrouw',
-                'onderwerp': 'Probleem met WhatsApp op iPhone',
-                'leeftijdscategorie_id': self.age_category.id,
-                'toestel_id': self.device.id
-            }
-            res = self.client.post('/registraties/nieuw', data=data, follow_redirects=True)
-            self.assertEqual(res.status_code, 200)
+                data = {
+                    'datum': '2026-03-15',
+                    'client': 'Nieuwe Bezoeker',
+                    'digidokter_id': self.digidokter.id,
+                    'nieuwe_klant': 'nee',
+                    'geslacht': 'vrouw',
+                    'onderwerp': 'Probleem met WhatsApp op iPhone',
+                    'leeftijdscategorie_id': self.age_category.id,
+                    'toestel_id': self.device.id
+                }
+                res = self.client.post('/registraties/nieuw', data=data, follow_redirects=True)
+                self.assertEqual(res.status_code, 200)
 
-            # Controleer of thread is gestart en mock_classify is aangeroepen
-            import time
-            time.sleep(0.2)
-            self.assertTrue(mock_classify.called)
+                # Controleer of thread is gestart en mock_classify is aangeroepen
+                import time
+                time.sleep(0.2)
+                self.assertTrue(mock_classify.called)
+        finally:
+            self.app.config['ENABLE_ASYNC_CLASSIFIER_TEST'] = False

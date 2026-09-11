@@ -307,6 +307,9 @@ def trigger_asynchrone_classificatie(registration_id, app=None):
         except RuntimeError:
             return None
 
+    if app.config.get('TESTING') and not app.config.get('ENABLE_ASYNC_CLASSIFIER_TEST'):
+        return None
+
     def _async_worker():
         with app.app_context():
             try:

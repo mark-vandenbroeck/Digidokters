@@ -106,7 +106,8 @@ class TestAuth(BaseTestCase):
         self.assertEqual(response.status_code, 200)
         html = response.data.decode('utf-8')
         # Data section header must be visible in sidebar
-        self.assertIn('<div class="dd-nav-section mt-3">Data</div>', html)
+        self.assertIn('data-bs-target="#nav-data"', html)
+        self.assertIn('Data', html)
         # Exporteren, Statistieken and Privacy must be visible
         self.assertIn('Exporteren', html)
         self.assertIn('Statistieken', html)
@@ -114,7 +115,7 @@ class TestAuth(BaseTestCase):
         # Importeren should NOT be visible for medewerker
         self.assertNotIn('Importeren', html)
         # Beheer section should NOT be visible for medewerker
-        self.assertNotIn('<div class="dd-nav-section mt-3">Beheer</div>', html)
+        self.assertNotIn('data-bs-target="#nav-beheer"', html)
 
     def test_privacy_modal_comprehensive_sections(self):
         self.login("tim@test.com", "password123")
@@ -127,4 +128,26 @@ class TestAuth(BaseTestCase):
         self.assertIn('4. Feedback & Schermafbeeldingen', html)
         self.assertIn('5. Documentbeheer', html)
         self.assertIn('6. Recht op Vergetelheid & Inzage', html)
+
+    def test_sidebar_collapsible_sections(self):
+        self.login("AdminMark", "password123")
+        response = self.client.get('/registraties')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+
+        # Controleer aanwezigheid van inklapbare rubrieken voor beheerder
+        expected_sections = [
+            ('#nav-registraties', 'Registraties'),
+            ('#nav-documentbeheer', 'Documentbeheer'),
+            ('#nav-beheer', 'Beheer'),
+            ('#nav-data', 'Data'),
+            ('#nav-algemeen', 'Algemeen')
+        ]
+        for target, title in expected_sections:
+            self.assertIn(f'data-bs-target="{target}"', html)
+            self.assertIn(f'id="{target[1:]}"', html)
+            self.assertIn(title, html)
+
+        self.assertIn('dd-nav-chevron', html)
+        self.assertIn('sidebar_collapse_', html)
 

@@ -98,175 +98,204 @@
         <nav class="dd-sidebar-nav">
             {% if current_user.rol == 'platformbeheerder' %}
             <!-- Platformbeheer -->
-            <div class="dd-nav-section">Platformbeheer</div>
-            <a href="{{ url_for('platform.dashboard') }}"
-               class="dd-nav-link {% if request.endpoint and request.endpoint == 'platform.dashboard' %}active{% endif %}">
-                <i class="bi bi-speedometer2"></i>
-                <span>Dashboard</span>
-            </a>
-            <a href="{{ url_for('platform.organisaties') }}"
-               class="dd-nav-link {% if request.endpoint and 'organisatie' in request.endpoint and 'platform.' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-building"></i>
-                <span>Organisaties</span>
-            </a>
-            <a href="{{ url_for('platform.koppelingen') }}"
-               class="dd-nav-link {% if request.endpoint and 'koppeling' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-link-45deg"></i>
-                <span>Koppelingen</span>
-            </a>
-            <a href="{{ url_for('platform.emailsjablonen') }}"
-               class="dd-nav-link {% if request.endpoint and 'emailsjabloon' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-envelope-paper"></i>
-                <span>E-mailsjablonen</span>
-            </a>
-            <a href="{{ url_for('platform.vraagcategorieen') }}"
-               class="dd-nav-link {% if request.endpoint and 'vraagcategorie' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-tags"></i>
-                <span>Vraagcategorieën</span>
-            </a>
-            <a href="{{ url_for('platform.vraagclassificaties') }}"
-               class="dd-nav-link {% if request.endpoint and 'vraagclassificatie' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-stars"></i>
-                <span>Vraagclassificaties</span>
-            </a>
-            <a href="{{ url_for('admin.audit_log') }}"
-               class="dd-nav-link {% if request.endpoint == 'admin.audit_log' %}active{% endif %}">
-                <i class="bi bi-shield-shaded"></i>
-                <span>Audit Logs</span>
-            </a>
+            <div class="dd-nav-section" data-bs-toggle="collapse" data-bs-target="#nav-platformbeheer" role="button" aria-expanded="true" aria-controls="nav-platformbeheer">
+                <span>Platformbeheer</span>
+                <i class="bi bi-chevron-down dd-nav-chevron"></i>
+            </div>
+            <div class="collapse show" id="nav-platformbeheer">
+                <a href="{{ url_for('platform.dashboard') }}"
+                   class="dd-nav-link {% if request.endpoint and request.endpoint == 'platform.dashboard' %}active{% endif %}">
+                    <i class="bi bi-speedometer2"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('platform.organisaties') }}"
+                   class="dd-nav-link {% if request.endpoint and 'organisatie' in request.endpoint and 'platform.' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-building"></i>
+                    <span>Organisaties</span>
+                </a>
+                <a href="{{ url_for('platform.koppelingen') }}"
+                   class="dd-nav-link {% if request.endpoint and 'koppeling' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-link-45deg"></i>
+                    <span>Koppelingen</span>
+                </a>
+                <a href="{{ url_for('platform.emailsjablonen') }}"
+                   class="dd-nav-link {% if request.endpoint and 'emailsjabloon' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-envelope-paper"></i>
+                    <span>E-mailsjablonen</span>
+                </a>
+                <a href="{{ url_for('platform.vraagcategorieen') }}"
+                   class="dd-nav-link {% if request.endpoint and 'vraagcategorie' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-tags"></i>
+                    <span>Vraagcategorieën</span>
+                </a>
+                <a href="{{ url_for('platform.vraagclassificaties') }}"
+                   class="dd-nav-link {% if request.endpoint and 'vraagclassificatie' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-stars"></i>
+                    <span>Vraagclassificaties</span>
+                </a>
+                <a href="{{ url_for('admin.audit_log') }}"
+                   class="dd-nav-link {% if request.endpoint == 'admin.audit_log' %}active{% endif %}">
+                    <i class="bi bi-shield-shaded"></i>
+                    <span>Audit Logs</span>
+                </a>
+            </div>
             {% endif %}
 
             <!-- Registraties -->
-            <div class="dd-nav-section mt-3">Registraties</div>
-            <a href="{{ url_for('reg.lijst') }}"
-               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('reg.') %}active{% endif %}">
-                <i class="bi bi-clipboard2-pulse"></i>
+            <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-registraties" role="button" aria-expanded="true" aria-controls="nav-registraties">
                 <span>Registraties</span>
-            </a>
-            {% if not current_user.is_lezer() %}
-            <a href="{{ url_for('reg.nieuw') }}"
-               class="dd-nav-link {% if request.endpoint == 'reg.nieuw' %}active{% endif %}">
-                <i class="bi bi-plus-circle"></i>
-                <span>Nieuw bezoek</span>
-            </a>
-            {% endif %}
-            <a href="{{ url_for('agenda.lijst') }}"
-               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('agenda.') %}active{% endif %}">
-                <i class="bi bi-calendar-event"></i>
-                <span>Agenda</span>
-            </a>
-            {% if not current_user.is_lezer() %}
-            <a href="{{ url_for('eval.resultaten') }}"
-               class="dd-nav-link {% if request.endpoint and request.endpoint in ('eval.resultaten', 'eval.sessie_detail') %}active{% endif %}">
-                <i class="bi bi-chat-square-quote"></i>
-                <span>Evaluaties</span>
-            </a>
-            {% endif %}
+                <i class="bi bi-chevron-down dd-nav-chevron"></i>
+            </div>
+            <div class="collapse show" id="nav-registraties">
+                <a href="{{ url_for('reg.lijst') }}"
+                   class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('reg.') %}active{% endif %}">
+                    <i class="bi bi-clipboard2-pulse"></i>
+                    <span>Registraties</span>
+                </a>
+                {% if not current_user.is_lezer() %}
+                <a href="{{ url_for('reg.nieuw') }}"
+                   class="dd-nav-link {% if request.endpoint == 'reg.nieuw' %}active{% endif %}">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>Nieuw bezoek</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('agenda.lijst') }}"
+                   class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('agenda.') %}active{% endif %}">
+                    <i class="bi bi-calendar-event"></i>
+                    <span>Agenda</span>
+                </a>
+                {% if not current_user.is_lezer() %}
+                <a href="{{ url_for('eval.resultaten') }}"
+                   class="dd-nav-link {% if request.endpoint and request.endpoint in ('eval.resultaten', 'eval.sessie_detail') %}active{% endif %}">
+                    <i class="bi bi-chat-square-quote"></i>
+                    <span>Evaluaties</span>
+                </a>
+                {% endif %}
+            </div>
 
             {% if not current_user.is_lezer() %}
             <!-- Documentbeheer -->
-            <div class="dd-nav-section mt-3">Documentbeheer</div>
-            <a href="{{ url_for('doc.index') }}"
-               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('doc.') %}active{% endif %}">
-                <i class="bi bi-folder-symlink"></i>
-                <span>Documenten</span>
-            </a>
+            <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-documentbeheer" role="button" aria-expanded="true" aria-controls="nav-documentbeheer">
+                <span>Documentbeheer</span>
+                <i class="bi bi-chevron-down dd-nav-chevron"></i>
+            </div>
+            <div class="collapse show" id="nav-documentbeheer">
+                <a href="{{ url_for('doc.index') }}"
+                   class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('doc.') %}active{% endif %}">
+                    <i class="bi bi-folder-symlink"></i>
+                    <span>Documenten</span>
+                </a>
+            </div>
             {% endif %}
-
 
             {% if current_user.is_beheerder() and session.get('organisatie_id') %}
-
             <!-- Beheer -->
-            <div class="dd-nav-section mt-3">Beheer</div>
-            <a href="{{ url_for('admin.gebruikers') }}"
-               class="dd-nav-link {% if request.endpoint and 'gebruiker' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-people"></i>
-                <span>Gebruikers</span>
-            </a>
-            <a href="{{ url_for('admin.digidokters') }}"
-               class="dd-nav-link {% if request.endpoint and 'digidokter' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-person-badge"></i>
-                <span>Digidokters</span>
-            </a>
-            <a href="{{ url_for('admin.activiteitstypes') }}"
-               class="dd-nav-link {% if request.endpoint and 'activiteitstype' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-tags"></i>
-                <span>Activiteitstypes</span>
-            </a>
-            <a href="{{ url_for('eval.overzicht') }}"
-               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('eval.') and request.endpoint not in ('eval.resultaten', 'eval.sessie_detail') %}active{% endif %}">
-                <i class="bi bi-clipboard-check"></i>
-                <span>Evaluatieformulieren</span>
-            </a>
-            <a href="{{ url_for('admin.locaties') }}"
-               class="dd-nav-link {% if request.endpoint and 'locatie' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-geo-alt"></i>
-                <span>Locaties</span>
-            </a>
-            <a href="{{ url_for('admin.leeftijdscategorieën') }}"
-               class="dd-nav-link {% if request.endpoint and 'leeftijd' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-bar-chart-steps"></i>
-                <span>Leeftijdscategorieën</span>
-            </a>
-            <a href="{{ url_for('admin.toestellen') }}"
-               class="dd-nav-link {% if request.endpoint and 'toestel' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-phone"></i>
-                <span>Toestellen</span>
-            </a>
-            <a href="{{ url_for('admin.herkomsten') }}"
-               class="dd-nav-link {% if request.endpoint and 'herkomst' in request.endpoint %}active{% endif %}">
-                <i class="bi bi-compass"></i>
-                <span>Herkomst</span>
-            </a>
-            <a href="{{ url_for('admin.backup') }}"
-               class="dd-nav-link {% if request.endpoint == 'admin.backup' %}active{% endif %}">
-                <i class="bi bi-download"></i>
-                <span>Backup</span>
-            </a>
-            <a href="{{ url_for('admin.restore') }}"
-               class="dd-nav-link {% if request.endpoint == 'admin.restore' %}active{% endif %}">
-                <i class="bi bi-upload"></i>
-                <span>Restore</span>
-            </a>
-            {% if current_user.rol != 'platformbeheerder' %}
-            <a href="{{ url_for('admin.audit_log') }}"
-               class="dd-nav-link {% if request.endpoint == 'admin.audit_log' %}active{% endif %}">
-                <i class="bi bi-shield-shaded"></i>
-                <span>Audit Logs</span>
-            </a>
-            {% endif %}
+            <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-beheer" role="button" aria-expanded="true" aria-controls="nav-beheer">
+                <span>Beheer</span>
+                <i class="bi bi-chevron-down dd-nav-chevron"></i>
+            </div>
+            <div class="collapse show" id="nav-beheer">
+                <a href="{{ url_for('admin.gebruikers') }}"
+                   class="dd-nav-link {% if request.endpoint and 'gebruiker' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-people"></i>
+                    <span>Gebruikers</span>
+                </a>
+                <a href="{{ url_for('admin.digidokters') }}"
+                   class="dd-nav-link {% if request.endpoint and 'digidokter' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-person-badge"></i>
+                    <span>Digidokters</span>
+                </a>
+                <a href="{{ url_for('admin.activiteitstypes') }}"
+                   class="dd-nav-link {% if request.endpoint and 'activiteitstype' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-tags"></i>
+                    <span>Activiteitstypes</span>
+                </a>
+                <a href="{{ url_for('eval.overzicht') }}"
+                   class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('eval.') and request.endpoint not in ('eval.resultaten', 'eval.sessie_detail') %}active{% endif %}">
+                    <i class="bi bi-clipboard-check"></i>
+                    <span>Evaluatieformulieren</span>
+                </a>
+                <a href="{{ url_for('admin.locaties') }}"
+                   class="dd-nav-link {% if request.endpoint and 'locatie' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-geo-alt"></i>
+                    <span>Locaties</span>
+                </a>
+                <a href="{{ url_for('admin.leeftijdscategorieën') }}"
+                   class="dd-nav-link {% if request.endpoint and 'leeftijd' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-bar-chart-steps"></i>
+                    <span>Leeftijdscategorieën</span>
+                </a>
+                <a href="{{ url_for('admin.toestellen') }}"
+                   class="dd-nav-link {% if request.endpoint and 'toestel' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-phone"></i>
+                    <span>Toestellen</span>
+                </a>
+                <a href="{{ url_for('admin.herkomsten') }}"
+                   class="dd-nav-link {% if request.endpoint and 'herkomst' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-compass"></i>
+                    <span>Herkomst</span>
+                </a>
+                <a href="{{ url_for('admin.backup') }}"
+                   class="dd-nav-link {% if request.endpoint == 'admin.backup' %}active{% endif %}">
+                    <i class="bi bi-download"></i>
+                    <span>Backup</span>
+                </a>
+                <a href="{{ url_for('admin.restore') }}"
+                   class="dd-nav-link {% if request.endpoint == 'admin.restore' %}active{% endif %}">
+                    <i class="bi bi-upload"></i>
+                    <span>Restore</span>
+                </a>
+                {% if current_user.rol != 'platformbeheerder' %}
+                <a href="{{ url_for('admin.audit_log') }}"
+                   class="dd-nav-link {% if request.endpoint == 'admin.audit_log' %}active{% endif %}">
+                    <i class="bi bi-shield-shaded"></i>
+                    <span>Audit Logs</span>
+                </a>
+                {% endif %}
+            </div>
             {% endif %}
 
             <!-- Data -->
-            <div class="dd-nav-section mt-3">Data</div>
-            {% if current_user.is_beheerder() and session.get('organisatie_id') %}
-            <a href="{{ url_for('ie.importeer') }}"
-               class="dd-nav-link {% if request.endpoint == 'ie.importeer' %}active{% endif %}">
-                <i class="bi bi-cloud-upload"></i>
-                <span>Importeren</span>
-            </a>
-            {% endif %}
-            <a href="{{ url_for('ie.exporteer') }}"
-               class="dd-nav-link {% if request.endpoint == 'ie.exporteer' %}active{% endif %}">
-                <i class="bi bi-cloud-download"></i>
-                <span>Exporteren</span>
-            </a>
-            <a href="{{ url_for('stats.overzicht') }}"
-               class="dd-nav-link {% if request.endpoint == 'stats.overzicht' %}active{% endif %}">
-                <i class="bi bi-graph-up"></i>
-                <span>Statistieken</span>
-            </a>
+            <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-data" role="button" aria-expanded="true" aria-controls="nav-data">
+                <span>Data</span>
+                <i class="bi bi-chevron-down dd-nav-chevron"></i>
+            </div>
+            <div class="collapse show" id="nav-data">
+                {% if current_user.is_beheerder() and session.get('organisatie_id') %}
+                <a href="{{ url_for('ie.importeer') }}"
+                   class="dd-nav-link {% if request.endpoint == 'ie.importeer' %}active{% endif %}">
+                    <i class="bi bi-cloud-upload"></i>
+                    <span>Importeren</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('ie.exporteer') }}"
+                   class="dd-nav-link {% if request.endpoint == 'ie.exporteer' %}active{% endif %}">
+                    <i class="bi bi-cloud-download"></i>
+                    <span>Exporteren</span>
+                </a>
+                <a href="{{ url_for('stats.overzicht') }}"
+                   class="dd-nav-link {% if request.endpoint == 'stats.overzicht' %}active{% endif %}">
+                    <i class="bi bi-graph-up"></i>
+                    <span>Statistieken</span>
+                </a>
+            </div>
+
             <!-- Algemeen -->
-            <div class="dd-nav-section mt-3">Algemeen</div>
-            <a href="{{ url_for('feedback.lijst') }}"
-               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('feedback.') %}active{% endif %}">
-                <i class="bi bi-chat-heart"></i>
-                <span>Feedback</span>
-            </a>
-            <a href="#" data-bs-toggle="modal" data-bs-target="#privacyModal" class="dd-nav-link">
-                <i class="bi bi-shield-lock"></i>
-                <span>Privacy & AVG</span>
-            </a>
+            <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-algemeen" role="button" aria-expanded="true" aria-controls="nav-algemeen">
+                <span>Algemeen</span>
+                <i class="bi bi-chevron-down dd-nav-chevron"></i>
+            </div>
+            <div class="collapse show" id="nav-algemeen">
+                <a href="{{ url_for('feedback.lijst') }}"
+                   class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('feedback.') %}active{% endif %}">
+                    <i class="bi bi-chat-heart"></i>
+                    <span>Feedback</span>
+                </a>
+                <a href="#" data-bs-toggle="modal" data-bs-target="#privacyModal" class="dd-nav-link">
+                    <i class="bi bi-shield-lock"></i>
+                    <span>Privacy & AVG</span>
+                </a>
+            </div>
         </nav>
 
         <!-- Sidebar footer -->
@@ -346,6 +375,43 @@ if (overlay) {
     overlay.addEventListener('click', () => {
         sidebar.classList.remove('open');
         overlay.classList.remove('active');
+    });
+}
+
+// Collapsible sidebar sections (herstel en bewaar voorkeur via localStorage)
+const sidebarNav = document.querySelector('.dd-sidebar-nav');
+if (sidebarNav) {
+    sidebarNav.querySelectorAll('.collapse').forEach(collapseEl => {
+        const id = collapseEl.id;
+        const toggleBtn = document.querySelector(`[data-bs-target="#${id}"]`);
+        const hasActive = collapseEl.querySelector('.dd-nav-link.active') !== null;
+        const savedState = localStorage.getItem('sidebar_collapse_' + id);
+
+        if (hasActive) {
+            // Als de actieve pagina in deze rubriek zit: altijd uitgeklapt houden
+            collapseEl.classList.add('show');
+            if (toggleBtn) {
+                toggleBtn.classList.remove('collapsed');
+                toggleBtn.setAttribute('aria-expanded', 'true');
+            }
+        } else if (savedState === 'collapsed') {
+            // Door gebruiker eerder ingeklapt
+            collapseEl.classList.remove('show');
+            if (toggleBtn) {
+                toggleBtn.classList.add('collapsed');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        }
+    });
+
+    // Luister naar inklappen / uitklappen om de voorkeur op te slaan
+    sidebarNav.querySelectorAll('.collapse').forEach(collapseEl => {
+        collapseEl.addEventListener('hidden.bs.collapse', () => {
+            localStorage.setItem('sidebar_collapse_' + collapseEl.id, 'collapsed');
+        });
+        collapseEl.addEventListener('shown.bs.collapse', () => {
+            localStorage.setItem('sidebar_collapse_' + collapseEl.id, 'expanded');
+        });
     });
 }
 

@@ -173,7 +173,7 @@ def nieuw():
 
         fouten = []
         if not client:
-            fouten.append('Cliëntnaam is verplicht.')
+            fouten.append('Naam van de bezoeker is verplicht.')
         
         if not digidokter_id:
             fouten.append('Digidokter is verplicht.')
@@ -289,7 +289,7 @@ def wijzigen(reg_id):
         # Verplichte velden en cross-tenant validatie
         fouten = []
         if not client:
-            fouten.append('Cliëntnaam is verplicht.')
+            fouten.append('Naam van de bezoeker is verplicht.')
         
         if not digidokter_id:
             fouten.append('Digidokter is verplicht.')

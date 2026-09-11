@@ -40,18 +40,18 @@
                         </select>
                     </div>
 
-                    <!-- Cliënt -->
+                    <!-- Bezoeker -->
                     <div class="col-12">
-                        <label for="client" class="form-label">Cliënt (Voornaam of initialen) <span class="text-danger">*</span></label>
+                        <label for="client" class="form-label">Bezoeker (Voornaam of initialen) <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="client" name="client"
                                value="{{ form_data.client if form_data else '' }}"
                                placeholder="Bijv. Jan of J.P." maxlength="150" required>
                         <div class="form-text text-muted small">Om privacyredenen (AVG/GDPR) gelieve geen volledige namen in te voeren. Voornaam of initialen volstaan.</div>
                     </div>
 
-                    <!-- Nieuwe klant -->
+                    <!-- Nieuwe bezoeker -->
                     <div class="col-12 col-sm-6">
-                        <label class="form-label">Nieuwe klant <span class="text-danger">*</span></label>
+                        <label class="form-label">Nieuwe bezoeker <span class="text-danger">*</span></label>
                         <div class="d-flex gap-3 mt-1">
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="nieuwe_klant"

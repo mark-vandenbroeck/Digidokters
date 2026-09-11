@@ -28,7 +28,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 1.  **Organisaties (`organisaties`):** Beheert de verschillende tenants (bijv. Londerzeel).
 2.  **Gebruikers (`users`):** Beheert beheerders en medewerkers. Gekoppeld aan organisaties via `user_organisaties`. Tevens voorzien van wachtwoord-resetkolommen (`reset_code`, `reset_code_verloopt_op`).
 3.  **Digidokters (`digidokters`):** Vrijwilligers binnen een specifieke organisatie.
-4.  **Registraties (`registrations`):** Registratie van een cliëntbezoek met foreign keys naar digidokter, leeftijdscategorie, toestel en herkomst.
+4.  **Registraties (`registrations`):** Registratie van een bezoekerssessie met foreign keys naar digidokter, leeftijdscategorie, toestel en herkomst.
 5.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
 6.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
 7.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering en geïndexeerde tekstinhoud (`tekst_inhoud`).
@@ -43,7 +43,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 ## 📋 Features & Functionaliteiten
 
 ### 1. Bezoekenregistratie
-*   Medewerkers en beheerders kunnen snel binnenlopende cliënten registreren.
+*   Medewerkers en beheerders kunnen snel binnenlopende bezoekers registreren.
 *   Vrijwilligers (digidokters) met de rol `medewerker` hebben ook de mogelijkheid om registraties te wissen bij foutieve invoer.
 
 ### 2. Agenda & Planning

@@ -19,12 +19,14 @@ KOLOM_MAP = {
     'client': 'client',
     'cliënt': 'client',
     'klant': 'client',
+    'bezoeker': 'client',
     'voornaam deelnemer': 'client',
     'naam': 'client',
     'digidokter': 'digidokter',
     'vrijwilliger': 'digidokter',
     'aantal bezoeken digidokter': 'nieuwe_klant',
     'nieuwe klant': 'nieuwe_klant',
+    'nieuwe bezoeker': 'nieuwe_klant',
     'nieuwe_pad': 'nieuwe_klant',
     'nieuw': 'nieuwe_klant',
     'van waar ken je de digidokter?': 'herkomst',
@@ -59,7 +61,7 @@ def _parse_nieuwe_klant(waarde) -> bool:
     if pd.isna(waarde) or waarde is None:
         return False
     s = str(waarde).strip().lower()
-    return s in ('nieuwe klant', '1', 'ja', 'yes', 'true', 'j', 'waar')
+    return s in ('nieuwe klant', 'nieuwe bezoeker', '1', 'ja', 'yes', 'true', 'j', 'waar')
 
 
 def _parse_geslacht(waarde) -> str | None:
@@ -183,7 +185,7 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
 
         client = str(rij.get('client', '')).strip()
         if not client:
-            msg = f'Rij {rijnr}: Cliëntnaam ontbreekt'
+            msg = f'Rij {rijnr}: Naam van bezoeker ontbreekt'
             logger.warning(msg)
             resultaat['fouten'].append(msg)
             resultaat['overgeslagen'] += 1

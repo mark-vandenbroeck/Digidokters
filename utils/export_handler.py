@@ -36,9 +36,9 @@ def _haal_registraties(
         rijen.append({
             'Registratienummer': reg.registratienummer,
             'Datum': reg.datum.strftime('%d/%m/%Y') if reg.datum else '',
-            'Cliënt': reg.client,
+            'Bezoeker': reg.client,
             'Digidokter': reg.digidokter.naam if reg.digidokter else '',
-            'Nieuwe klant': 'Ja' if reg.nieuwe_klant else 'Nee',
+            'Nieuwe bezoeker': 'Ja' if reg.nieuwe_klant else 'Nee',
             'Herkomst': reg.herkomst.naam if reg.herkomst else '',
             'Geslacht': reg.geslacht or '',
             'Onderwerp': reg.onderwerp,
@@ -55,8 +55,8 @@ def exporteer_csv(
     """Genereer CSV als bytes."""
     rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
     df = pd.DataFrame(rijen) if rijen else pd.DataFrame(
-        columns=['Registratienummer', 'Datum', 'Cliënt', 'Digidokter',
-                 'Nieuwe klant', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel']
+        columns=['Registratienummer', 'Datum', 'Bezoeker', 'Digidokter',
+                 'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel']
     )
     output = io.StringIO()
     df.to_csv(output, index=False, encoding='utf-8-sig')
@@ -70,8 +70,8 @@ def exporteer_xlsx(
     """Genereer XLSX als bytes."""
     rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
     df = pd.DataFrame(rijen) if rijen else pd.DataFrame(
-        columns=['Registratienummer', 'Datum', 'Cliënt', 'Digidokter',
-                 'Nieuwe klant', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel']
+        columns=['Registratienummer', 'Datum', 'Bezoeker', 'Digidokter',
+                 'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel']
     )
 
     output = io.BytesIO()

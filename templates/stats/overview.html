@@ -114,7 +114,7 @@
                     </div>
                     <div>
                         <div class="dd-stat-value">{{ nieuwe_klanten }}</div>
-                        <div class="dd-stat-label">Nieuwe klanten</div>
+                        <div class="dd-stat-label">Nieuwe bezoekers</div>
                     </div>
                 </div>
             </div>
@@ -125,7 +125,7 @@
                     </div>
                     <div>
                         <div class="dd-stat-value">{{ terugkerende_klanten }}</div>
-                        <div class="dd-stat-label">Terugkerende klanten</div>
+                        <div class="dd-stat-label">Terugkerende bezoekers</div>
                     </div>
                 </div>
             </div>
@@ -486,11 +486,11 @@
                                         </td>
                                         <td class="pe-3 text-end fw-medium">
                                             {% if s.ratio >= 4.0 %}
-                                            <span class="text-danger" title="Hoge druk: veel cliënten per vrijwilliger">
+                                            <span class="text-danger" title="Hoge druk: veel bezoekers per vrijwilliger">
                                                 <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ s.ratio }}
                                             </span>
                                             {% elif s.ratio <= 1.0 and s.ratio > 0 %}
-                                            <span class="text-warning" title="Lage bezetting: veel vrijwilligers voor weinig cliënten">
+                                            <span class="text-warning" title="Lage bezetting: veel vrijwilligers voor weinig bezoekers">
                                                 {{ s.ratio }}
                                             </span>
                                             {% else %}

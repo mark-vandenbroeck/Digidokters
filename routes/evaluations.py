@@ -47,7 +47,7 @@ def get_or_create_evaluation_form(activity_type_id, org_id):
                 'verplicht': True
             },
             {
-                'vraag_tekst': 'Zou je dit Digicafé ook aan andere klanten van de Digidokters aanraden?',
+                'vraag_tekst': 'Zou je dit Digicafé ook aan andere bezoekers van de Digidokters aanraden?',
                 'type': 'multiple_choice',
                 'opties': ['Ja', 'Ik twijfel', 'Nee'],
                 'volgorde': 2,

@@ -331,6 +331,12 @@ def create_app(config_class=Config):
             db.session.commit()
             print("✓ Herkomsten geïnitialiseerd voor standaard organisatie")
 
+        # 10. Seed Vraagcategorieën (AI)
+        from utils.ai_classifier import seed_standaard_categorieen
+        n_cats = seed_standaard_categorieen()
+        if n_cats > 0:
+            print(f"✓ {n_cats} nieuwe vraagcategorieën geïnitialiseerd")
+
     # CLI-commando: flask create-org <naam> <slug>
     import click
     @app.cli.command('create-org')

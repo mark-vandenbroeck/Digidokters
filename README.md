@@ -37,6 +37,9 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 10. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
 11. **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
 12. **Feedback & Conversatie (`feedback_items`, `feedback_votes`, `feedback_comments`):** Beheer van gebruikersfeedback ("Voorstel" of "Foutje?"), stemmen met duimpjes (+1/-1), screenshot-opslag, conversatiereacties en beheerderstatus (open/afgesloten).
+13. **Vraagcategorieën (`question_categories`):** Centrale lijst van 10 gestandaardiseerde hoofdcategorieën met AI-richtlijnen en actieve status.
+14. **Vraagclassificaties (`question_classifications`):** 1-op-1 gekoppeld aan registraties met AI-categorietoewijzing, betrouwbaarheidsscore (zekerheid %), toelichting en handmatige override-auditering.
+15. **App Mappen & App Documenten (`app_mappen`, `app_documenten`):** Centrale, platformbrede documentenopslag gedeeld door alle organisaties (zonder `organisatie_id`).
 
 ---
 
@@ -44,6 +47,8 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 
 ### 1. Bezoekenregistratie
 *   Medewerkers en beheerders kunnen snel binnenlopende bezoekers registreren.
+*   Bij het openen van het formulier wordt de ingelogde gebruiker automatisch geselecteerd als Digidokter.
+*   **Realtime Asynchrone AI-classificatie:** Zodra een consultatie wordt opgeslagen of bewerkt, wordt de vraag op de achtergrond binnen 1-2 seconden geanalyseerd via Google Gemini AI en toegekend aan de passende categorie.
 *   Vrijwilligers (digidokters) met de rol `medewerker` hebben ook de mogelijkheid om registraties te wissen bij foutieve invoer.
 
 ### 2. Agenda & Planning
@@ -53,9 +58,11 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   Aanpasbare status (actief/gedeactiveerd) en badgekleur per activiteitstype (Blauw, Teal, Paars, Oranje) die direct in de agenda-lijst worden getoond.
 
 ### 3. Statistieken & Dashboard
-Gepresenteerd via twee duidelijke tabbladen op de `/statistieken` pagina:
-*   **Bezoekers & Consultaties:** Tijdlijn per week (jaar-op-jaar), maandelijkse verdelingen, meest populaire leeftijdscategorieën, toestellen, geslachtsverdeling en drukste dagen.
+Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
+*   **Bezoekers & Consultaties:** Tijdlijn per week (jaar-op-jaar), maandelijkse verdelingen, nieuwe vs. terugkerende bezoekers, meest populaire leeftijdscategorieën, toestellen, geslachtsverdeling en drukste dagen.
 *   **Vrijwilligers & Agenda:** Totaal aantal gepresteerde uren per digidokter, sessies per locatie en activiteitstype, urentrend per maand en de **Druktest ratio** (gemiddeld aantal bezoeken per aanwezige vrijwilliger per sessie, uitsluitend berekend voor activiteiten in het verleden).
+*   **Vragen & AI-Analyse:** AI-gestuurde analyse van consultaties met realtime KPI's (dekkingsgraad, populairste categorie, gemiddelde zekerheid), categorie-staafdiagram, top-5 maandelijkse evolutiegrafiek en kruistabellen per apparaat en leeftijdscategorie.
+*   **Filter 'Alle jaren' & Tab-behoud:** Ondersteunt filteren per specifiek jaar én over 'Alle jaren' heen, waarbij het geopende tabblad altijd actief blijft bij filterwijzigingen.
 
 ### 4. Documentbeheer
 *   Volledige hiërarchische mappenstructuur per organisatie.
@@ -140,6 +147,24 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
     *   *Lezers:* Hebben enkel leesrechten (kunnen de items en reacties raadplegen, maar kunnen niets toevoegen, stemmen of reageren).
 *   **Afsluiten door Beheerders:** Beheerders kunnen een item met één klik **afsluiten** (waarna er niet meer op gestemd of gereageerd kan worden) of heropenen.
 *   **Overzichtslijst:** Standaard chronologisch gesorteerd (nieuwste items bovenaan). Afgesloten items worden herkenbaar grijs getoond (*greyed out*). Snelfilters voor Alle / Open / Afgesloten, type-selectie en realtime zoekfilter.
+
+### 13. AI-Vraaganalyse & Monitoring (Gemini AI)
+*   **Automatische Real-time Classificatie:** Consultatievragen worden bij het opslaan op de achtergrond (asynchroon via daemon threads) geanalyseerd door Google Gemini AI (`gemini-2.5-flash`) en ingedeeld in 10 gestandaardiseerde hoofdcategorieën.
+*   **Betrouwbaarheid & Motivatie:** Ieder resultaat bevat een zekerheidsscore (0–100%) en een motivatie/toelichting van het model.
+*   **Beheer van Vraagcategorieën (`/platform/vraagcategorieen`):** Centrale lijst van categorieën met AI-richtlijnen en definities. Alleen toegankelijk voor platformbeheerders.
+*   **Monitoring & Handmatige Correcties (`/platform/vraagclassificaties`):** Overzichtstabel met filters op onzekere AI-scores (< 80%), organisatie en categorie. Platformbeheerders kunnen classificaties handmatig overriden of met één klik opnieuw laten analyseren door de AI.
+*   **Batch- & CLI-seeding:** Ondersteunt batchverwerking van historische consultaties via `flask seed-vragenanalyse` of de batchknop in de webinterface.
+
+### 14. App Documentatie (Centraal & Gemeenschappelijk)
+*   **Platformbrede Kennisbank (`/app-documentatie`):** Bevindt zich in de rubriek `Algemeen` tussen *Feedback* en *Privacy & AVG*.
+*   **Gedeeld over alle Organisaties:** Documenten (zoals gebruikershandleidingen, security-audits en technische documentatie) worden één keer geplaatst en zijn direct beschikbaar voor alle aangesloten gemeenten.
+*   **Mappen & Full-text Zoeken:** Hiërarchische mappen, documentupload tot 16 MB, inline preview (PDF/afbeeldingen), versiebeheer bij overschrijven (`v1`, `v2`...) en full-text doorzoeking van documentinhoud.
+*   **Rechten:** Alle gebruikers (lezers, medewerkers, beheerders) kunnen documenten inzien en downloaden; beheeracties (uploaden, mappen, bewerken, wissen) zijn gereserveerd voor platformbeheerders.
+
+### 15. Inklapbare Navigatie & Interface-ergonomie
+*   **Inklapbare Rubrieken:** Alle rubrieken in de linker zijbalk zijn inklapbaar met geanimeerde indicators. De actieve inklapstatus wordt automatisch per gebruiker/browser bewaard in `localStorage`.
+*   **Consequente 'Bezoeker'-terminologie:** Overal in formulieren, exports en statistieken is overgeschakeld op de gastvrije en AVG-conforme term "Bezoeker" (i.p.v. "Klant" of "Cliënt").
+*   **Digidokter-voorselectie:** Bij een nieuw bezoek wordt de ingelogde gebruiker automatisch als actieve Digidokter ingesteld om herhaald klikwerk te vermijden.
 
 ---
 
@@ -226,3 +251,5 @@ Het platform is geconfigureerd om direct te deployen naar Render.com.
 *   **Build-commando:** `pip install -r requirements.txt && flask db upgrade && flask seed`
 *   **Start-commando:** `gunicorn app:app`
 *   **Database:** PostgreSQL (Render PostgreSQL add-on). De `DATABASE_URL` omgevingsvariabele wordt door Render automatisch gekoppeld.
+*   **AI-integratie:** Voeg in het Render Dashboard onder **Environment Variables** de variabele `GEMINI_API_KEY` toe voor automatische vraagcategorisatie via Google Gemini AI.
+*   **Historische AI-seeding:** Voer eenmalig in de Render Shell `flask seed-vragenanalyse` uit om alle historische consultaties te analyseren.

@@ -6,6 +6,9 @@ from models.agenda import AgendaItem
 from models.digidokter import Digidokter
 from models.evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
 from models.location import Location
+from models.user import User
+from models.organisatie import UserOrganisatie
+from werkzeug.security import generate_password_hash
 
 
 class TestEvaluations(BaseTestCase):
@@ -298,6 +301,87 @@ class TestEvaluations(BaseTestCase):
         resp_dash = self.client.get('/admin/evaluaties')
         self.assertEqual(resp_dash.status_code, 200)
         self.assertIn(b'Formulieren per Activiteitstype', resp_dash.data)
+
+    def test_medewerker_can_view_results_but_not_edit_forms(self):
+        """Test dat medewerkers evaluatieresultaten en sessiedetails kunnen inzien, maar formulieren niet kunnen beheren/bewerken."""
+        # 1. Maak sessie en evaluatie aan
+        gisteren = date.today() - timedelta(days=1)
+        sessie = AgendaItem(datum=gisteren, uur_van="10:00", uur_tot="12:00", type_id=self.type_digicafe.id, locatie_id=self.locatie.id, organisatie_id=self.org.id)
+        db.session.add(sessie)
+        db.session.commit()
+
+        form = EvaluationForm(organisatie_id=self.org.id, activity_type_id=self.type_digicafe.id, titel="Digicafé Evaluatie")
+        db.session.add(form)
+        db.session.flush()
+        vraag = EvaluationQuestion(form_id=form.id, vraag_tekst="Hoe tevreden was je?", type="open_tekst", opties=[], volgorde=1, verplicht=False)
+        db.session.add(vraag)
+        db.session.commit()
+
+        reactie = EvaluationResponse(organisatie_id=self.org.id, agenda_item_id=sessie.id, form_id=form.id, digidokter_id=self.digidokter.id, antwoorden={"1": "Heel tevreden"})
+        db.session.add(reactie)
+        db.session.commit()
+
+        # 2. Log in als reguliere medewerker
+        self.login("tim@test.com", "password123")
+
+        # A. Medewerker kan overzicht van resultaten raadplegen via beide routes
+        res_res = self.client.get('/evaluaties/resultaten')
+        self.assertEqual(res_res.status_code, 200)
+        self.assertIn('Evaluatieresultaten', res_res.get_data(as_text=True))
+        self.assertIn('10:00 - 12:00', res_res.get_data(as_text=True))
+        # Knop 'Formulieren beheren' is verborgen voor medewerkers
+        self.assertNotIn('Formulieren beheren', res_res.get_data(as_text=True))
+
+        res_res_admin_url = self.client.get('/admin/evaluaties/resultaten')
+        self.assertEqual(res_res_admin_url.status_code, 200)
+
+        # B. Medewerker kan specifieke sessie-evaluatieantwoorden bekijken
+        res_detail = self.client.get(f'/evaluaties/sessie/{sessie.id}')
+        self.assertEqual(res_detail.status_code, 200)
+        self.assertIn('Heel tevreden', res_detail.get_data(as_text=True))
+        self.assertIn('Hoe tevreden was je?', res_detail.get_data(as_text=True))
+
+        res_detail_admin_url = self.client.get(f'/admin/evaluaties/sessie/{sessie.id}')
+        self.assertEqual(res_detail_admin_url.status_code, 200)
+
+        # C. Navigatie toont 'Evaluaties' in het linkermenu voor medewerkers
+        self.assertIn('Evaluaties', res_res.get_data(as_text=True))
+
+        # D. Medewerker mag formulieren NIET aanpassen of beheren
+        # 1) Formulierbeheer dashboard -> verboden (redirect naar reg.lijst)
+        res_overview = self.client.get('/admin/evaluaties', follow_redirects=True)
+        self.assertIn('U heeft geen toegang tot deze pagina.', res_overview.get_data(as_text=True))
+
+        # 2) Formulier-editor -> verboden
+        res_edit = self.client.get(f'/admin/evaluaties/{self.type_digicafe.id}/bewerken', follow_redirects=True)
+        self.assertIn('U heeft geen toegang tot deze pagina.', res_edit.get_data(as_text=True))
+
+        # 3) Vraag toevoegen -> verboden
+        res_add_q = self.client.post(f'/admin/evaluaties/formulier/{form.id}/vraag/toevoegen', data={
+            'vraag_tekst': 'Nieuwe illegale vraag',
+            'type': 'open_tekst'
+        }, follow_redirects=True)
+        self.assertIn('U heeft geen toegang tot deze pagina.', res_add_q.get_data(as_text=True))
+
+        # E. Lezer rol mag ook geen resultaten bekijken
+        self.logout()
+        # Maak lezer aan
+        lezer = User(
+            naam="UserLezer",
+            email="lezer@test.com",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="lezer",
+            actief=True
+        )
+        db.session.add(lezer)
+        db.session.commit()
+        db.session.add(UserOrganisatie(user_id=lezer.id, organisatie_id=self.org.id, rol="lezer", actief=True))
+        db.session.commit()
+
+        self.login("lezer@test.com", "password123")
+        res_lezer = self.client.get('/evaluaties/resultaten', follow_redirects=True)
+        self.assertIn('U heeft geen schrijfrechten voor deze organisatie.', res_lezer.get_data(as_text=True))
+
 
     def test_invitation_email_contains_omschrijving(self):
         """Test dat de uitnodigingsmail de omschrijving van het agenda-item bevat."""

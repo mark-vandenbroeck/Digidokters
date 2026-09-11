@@ -145,6 +145,13 @@
                 <i class="bi bi-calendar-event"></i>
                 <span>Agenda</span>
             </a>
+            {% if not current_user.is_lezer() %}
+            <a href="{{ url_for('eval.resultaten') }}"
+               class="dd-nav-link {% if request.endpoint and request.endpoint in ('eval.resultaten', 'eval.sessie_detail') %}active{% endif %}">
+                <i class="bi bi-chat-square-quote"></i>
+                <span>Evaluaties</span>
+            </a>
+            {% endif %}
 
             {% if not current_user.is_lezer() %}
             <!-- Documentbeheer -->
@@ -177,7 +184,7 @@
                 <span>Activiteitstypes</span>
             </a>
             <a href="{{ url_for('eval.overzicht') }}"
-               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('eval.') %}active{% endif %}">
+               class="dd-nav-link {% if request.endpoint and request.endpoint.startswith('eval.') and request.endpoint not in ('eval.resultaten', 'eval.sessie_detail') %}active{% endif %}">
                 <i class="bi bi-clipboard-check"></i>
                 <span>Evaluatieformulieren</span>
             </a>

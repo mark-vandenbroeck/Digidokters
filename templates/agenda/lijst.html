@@ -141,8 +141,8 @@
                             <div class="mt-1">
                                 {% set resp_count = item.evaluatie_reacties|length %}
                                 {% if resp_count > 0 %}
-                                    <a href="{{ url_for('eval.sessie_detail', agenda_id=item.id) if current_user.is_beheerder() else url_for('eval.invullen_sessie', agenda_id=item.id) }}" 
-                                       class="badge bg-success-subtle text-success text-decoration-none border border-success-subtle" title="Evaluaties bekijken">
+                                    <a href="{{ url_for('eval.sessie_detail', agenda_id=item.id) }}" 
+                                       class="badge bg-success-subtle text-success text-decoration-none border border-success-subtle" title="Evaluatieresultaten bekijken">
                                         <i class="bi bi-clipboard-check me-1"></i>{{ resp_count }} ingevuld
                                     </a>
                                 {% else %}

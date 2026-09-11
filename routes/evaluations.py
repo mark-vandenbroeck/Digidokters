@@ -592,12 +592,13 @@ def vraag_volgorde(vraag_id, richting):
 
 
 # ═══════════════════════════════════════════════════════════════
-# BEHEER: RESULTATEN & OVERZICHT
+# RESULTATEN & OVERZICHT (BEHEERDERS & MEDEWERKERS)
 # ═══════════════════════════════════════════════════════════════
 
+@eval_bp.route('/evaluaties/resultaten')
 @eval_bp.route('/admin/evaluaties/resultaten')
 @login_required
-@admin_required
+@writer_required
 def resultaten():
     """Overzicht van ingevulde evaluaties per sessie."""
     org_id = get_huidige_organisatie_id()
@@ -629,9 +630,10 @@ def resultaten():
     )
 
 
+@eval_bp.route('/evaluaties/sessie/<int:agenda_id>')
 @eval_bp.route('/admin/evaluaties/sessie/<int:agenda_id>')
 @login_required
-@admin_required
+@writer_required
 def sessie_detail(agenda_id):
     """Toont alle ingevulde reacties voor een specifieke sessie."""
     org_id = get_huidige_organisatie_id()

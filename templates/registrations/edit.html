@@ -97,7 +97,7 @@
                         <select class="form-select" id="leeftijdscategorie_id" name="leeftijdscategorie_id" required>
                             <option value="">— Kies —</option>
                             {% for l in leeftijdscategorieën %}
-                            <option value="{{ l.id }}" {{ 'selected' if l.id == reg.leeftijdscategorie_id }}>{{ l.naam }}</option>
+                            <option value="{{ l.id }}" {{ 'selected' if l.id == reg.leeftijdscategorie_id or (reg.leeftijdscategorie and reg.leeftijdscategorie.mapped_to_id == l.id) }}>{{ l.naam }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -107,7 +107,7 @@
                         <select class="form-select" id="toestel_id" name="toestel_id" required>
                             <option value="">— Kies —</option>
                             {% for t in toestellen %}
-                            <option value="{{ t.id }}" {{ 'selected' if t.id == reg.toestel_id }}>{{ t.naam }}</option>
+                            <option value="{{ t.id }}" {{ 'selected' if t.id == reg.toestel_id or (reg.toestel and reg.toestel.mapped_to_id == t.id) }}>{{ t.naam }}</option>
                             {% endfor %}
                         </select>
                     </div>

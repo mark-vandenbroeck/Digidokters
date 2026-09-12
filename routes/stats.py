@@ -100,27 +100,34 @@ def overzicht():
     )
 
     # Per leeftijdscategorie
+    from sqlalchemy.orm import aliased
+    MappedAgeCategory = aliased(AgeCategory)
+    eff_leeftijd_naam = func.coalesce(MappedAgeCategory.naam, AgeCategory.naam)
     per_leeftijd = (
         jaar_filter(
             db.session.query(
-                AgeCategory.naam,
+                eff_leeftijd_naam,
                 func.count(Registration.id).label('aantal')
             ).join(AgeCategory, Registration.leeftijdscategorie_id == AgeCategory.id)
+             .outerjoin(MappedAgeCategory, AgeCategory.mapped_to_id == MappedAgeCategory.id)
         )
-        .group_by(AgeCategory.naam)
+        .group_by(eff_leeftijd_naam)
         .order_by(func.count(Registration.id).desc())
         .all()
     )
 
     # Per toestel
+    MappedDevice = aliased(Device)
+    eff_toestel_naam = func.coalesce(MappedDevice.naam, Device.naam)
     per_toestel = (
         jaar_filter(
             db.session.query(
-                Device.naam,
+                eff_toestel_naam,
                 func.count(Registration.id).label('aantal')
             ).join(Device, Registration.toestel_id == Device.id)
+             .outerjoin(MappedDevice, Device.mapped_to_id == MappedDevice.id)
         )
-        .group_by(Device.naam)
+        .group_by(eff_toestel_naam)
         .order_by(func.count(Registration.id).desc())
         .all()
     )
@@ -419,19 +426,22 @@ def overzicht():
         trend_per_maand_cats[cat_naam] = [maand_tellingen.get(m, 0) for m in range(1, 13)]
 
     # Kruisanalyse per toestel
+    MappedDeviceStats = aliased(Device)
+    eff_tst_naam = func.coalesce(MappedDeviceStats.naam, Device.naam).label('toestel_naam')
     cat_toestel_raw = (
         jaar_filter(
             db.session.query(
                 QuestionCategory.naam.label('cat_naam'),
-                Device.naam.label('toestel_naam'),
+                eff_tst_naam,
                 func.count(Registration.id).label('aantal')
             )
             .select_from(Registration)
             .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
             .join(QuestionCategory, QuestionClassification.category_id == QuestionCategory.id)
             .join(Device, Registration.toestel_id == Device.id)
+            .outerjoin(MappedDeviceStats, Device.mapped_to_id == MappedDeviceStats.id)
         )
-        .group_by(QuestionCategory.naam, Device.naam)
+        .group_by(QuestionCategory.naam, eff_tst_naam)
         .order_by(func.count(Registration.id).desc())
         .all()
     )
@@ -440,19 +450,22 @@ def overzicht():
         cat_toestel_dict.setdefault(r.cat_naam, []).append({'toestel': r.toestel_naam, 'aantal': r.aantal})
 
     # Kruisanalyse per leeftijd
+    MappedAgeStats = aliased(AgeCategory)
+    eff_lft_naam = func.coalesce(MappedAgeStats.naam, AgeCategory.naam).label('leeftijd_naam')
     cat_leeftijd_raw = (
         jaar_filter(
             db.session.query(
                 QuestionCategory.naam.label('cat_naam'),
-                AgeCategory.naam.label('leeftijd_naam'),
+                eff_lft_naam,
                 func.count(Registration.id).label('aantal')
             )
             .select_from(Registration)
             .join(QuestionClassification, Registration.id == QuestionClassification.registration_id)
             .join(QuestionCategory, QuestionClassification.category_id == QuestionCategory.id)
             .join(AgeCategory, Registration.leeftijdscategorie_id == AgeCategory.id)
+            .outerjoin(MappedAgeStats, AgeCategory.mapped_to_id == MappedAgeStats.id)
         )
-        .group_by(QuestionCategory.naam, AgeCategory.naam)
+        .group_by(QuestionCategory.naam, eff_lft_naam)
         .order_by(func.count(Registration.id).desc())
         .all()
     )

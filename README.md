@@ -97,6 +97,8 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 
 ### 8. Stamgegevensbeheer & Veilig Wissen
 *   **Volledig beheer van keuzelijsten:** Beheerders en platformbeheerders kunnen binnen hun organisatie locaties, activiteitstypes, leeftijdscategorieën, toestellen en herkomstbronnen aanmaken, bewerken, activeren/deactiveren en handmatig van volgorde veranderen.
+*   **Mapping van gedeactiveerde entries:** Gedeactiveerde leeftijdscategorieën en toesteltypes kunnen in het beheer worden gekoppeld (gemapt) naar een actieve categorie. Historische consultaties blijven intact in de database, maar worden in overzichten, filters, detailweergaven, statistieken en exports automatisch getoond en geaggregeerd onder de gemapte actieve categorie.
+*   **Geavanceerde filters in het consultatieoverzicht:** De overzichtspagina van registraties bevat filters op zoekterm, digidokter, toesteltype, geslacht, leeftijdscategorie en datum (van-tot). De dropdowns tonen enkel actieve opties; filteren op een optie matcht automatisch ook historische registraties met een gekoppelde inactieve entry.
 *   **Referentiecontroles bij wissen:** Stamgegevens kunnen uitsluitend permanent gewist worden als er **geen enkele andere data naar verwijst**:
     *   *Locaties:* Mag niet gewist worden zolang er nog gekoppelde agenda-activiteiten zijn.
     *   *Activiteitstypes:* Mag niet gewist worden zolang er gekoppelde agenda-activiteiten of ingevulde evaluaties zijn.

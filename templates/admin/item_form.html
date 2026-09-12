@@ -34,6 +34,42 @@
                     </label>
                 </div>
 
+                {% if toon_mapping %}
+                <div id="mappingContainer" class="mb-4 p-3 bg-light rounded border" style="{% if item is none or item.actief %}display: none;{% endif %}">
+                    <label for="mapped_to_id" class="form-label fw-semibold text-dark">
+                        <i class="bi bi-arrow-right text-primary me-1"></i>Koppel / map naar actieve entry
+                    </label>
+                    <select class="form-select" id="mapped_to_id" name="mapped_to_id">
+                        <option value="">— Geen mapping (originele naam behouden) —</option>
+                        {% for opt in actieve_items %}
+                        <option value="{{ opt.id }}" {% if item and item.mapped_to_id == opt.id %}selected{% endif %}>
+                            {{ opt.naam }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text text-muted mt-1 small">
+                        Kies naar welk actief item historische registraties met deze entry moeten worden gemapt in de overzichten, filters en statistieken.
+                    </div>
+                </div>
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    var actiefCheckbox = document.getElementById('actief');
+                    var mappingContainer = document.getElementById('mappingContainer');
+                    if (actiefCheckbox && mappingContainer) {
+                        actiefCheckbox.addEventListener('change', function() {
+                            if (this.checked) {
+                                mappingContainer.style.display = 'none';
+                                var select = document.getElementById('mapped_to_id');
+                                if (select) select.value = '';
+                            } else {
+                                mappingContainer.style.display = 'block';
+                            }
+                        });
+                    }
+                });
+                </script>
+                {% endif %}
+
                 {% if titel == 'Activiteitstype' %}
                 <div class="form-check mb-3 p-3 bg-light rounded border">
                     <input class="form-check-input" type="checkbox" id="heeft_evaluatie" name="heeft_evaluatie" 

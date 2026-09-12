@@ -39,6 +39,9 @@ def lijst():
     pagina = request.args.get('pagina', 1, type=int)
     zoek = request.args.get('zoek', '').strip()
     filter_digidokter = request.args.get('digidokter', 0, type=int)
+    filter_toestel = request.args.get('toestel', type=int) or request.args.get('toesteltype', 0, type=int)
+    filter_leeftijd = request.args.get('leeftijd', type=int) or request.args.get('leeftijdscategorie', 0, type=int)
+    filter_geslacht = request.args.get('geslacht', '').strip().lower()
     filter_datum_van = request.args.get('datum_van', '')
     filter_datum_tot = request.args.get('datum_tot', '')
     sort_by = request.args.get('sort_by', 'datum').strip()
@@ -49,8 +52,8 @@ def lijst():
         filter_op_organisatie(Registration.query, Registration)
         .options(
             joinedload(Registration.digidokter),
-            joinedload(Registration.leeftijdscategorie),
-            joinedload(Registration.toestel),
+            joinedload(Registration.leeftijdscategorie).joinedload(AgeCategory.mapped_to),
+            joinedload(Registration.toestel).joinedload(Device.mapped_to),
             joinedload(Registration.herkomst)
         )
     )
@@ -66,6 +69,22 @@ def lijst():
         )
     if filter_digidokter:
         query = query.filter(Registration.digidokter_id == filter_digidokter)
+    if filter_toestel:
+        mapped_toestel_ids = [t.id for t in Device.query.filter_by(mapped_to_id=filter_toestel).all()]
+        query = query.filter(Registration.toestel_id.in_([filter_toestel] + mapped_toestel_ids))
+    if filter_leeftijd:
+        mapped_leeftijd_ids = [c.id for c in AgeCategory.query.filter_by(mapped_to_id=filter_leeftijd).all()]
+        query = query.filter(Registration.leeftijdscategorie_id.in_([filter_leeftijd] + mapped_leeftijd_ids))
+    if filter_geslacht in ('man', 'vrouw'):
+        query = query.filter(Registration.geslacht == filter_geslacht)
+    elif filter_geslacht in ('onbekend', 'geen'):
+        query = query.filter(
+            db.or_(
+                Registration.geslacht.is_(None),
+                Registration.geslacht == '',
+                Registration.geslacht == 'onbekend'
+            )
+        )
     if filter_datum_van:
         try:
             query = query.filter(Registration.datum >= date.fromisoformat(filter_datum_van))
@@ -89,14 +108,23 @@ def lijst():
         order_col = Digidokter.naam.desc() if direction == 'desc' else Digidokter.naam.asc()
         query = query.order_by(order_col)
     elif sort_by == 'leeftijd':
-        query = query.outerjoin(AgeCategory, Registration.leeftijdscategorie_id == AgeCategory.id)
+        from sqlalchemy.orm import aliased
+        MappedAgeCategory = aliased(AgeCategory)
+        query = query.outerjoin(AgeCategory, Registration.leeftijdscategorie_id == AgeCategory.id)\
+                     .outerjoin(MappedAgeCategory, AgeCategory.mapped_to_id == MappedAgeCategory.id)
+        effective_volgorde = db.func.coalesce(MappedAgeCategory.volgorde, AgeCategory.volgorde)
+        effective_naam = db.func.coalesce(MappedAgeCategory.naam, AgeCategory.naam)
         if direction == 'desc':
-            query = query.order_by(AgeCategory.volgorde.desc(), AgeCategory.naam.desc())
+            query = query.order_by(effective_volgorde.desc(), effective_naam.desc())
         else:
-            query = query.order_by(AgeCategory.volgorde.asc(), AgeCategory.naam.asc())
+            query = query.order_by(effective_volgorde.asc(), effective_naam.asc())
     elif sort_by == 'toestel':
-        query = query.outerjoin(Device, Registration.toestel_id == Device.id)
-        order_col = Device.naam.desc() if direction == 'desc' else Device.naam.asc()
+        from sqlalchemy.orm import aliased
+        MappedDevice = aliased(Device)
+        query = query.outerjoin(Device, Registration.toestel_id == Device.id)\
+                     .outerjoin(MappedDevice, Device.mapped_to_id == MappedDevice.id)
+        effective_naam = db.func.coalesce(MappedDevice.naam, Device.naam)
+        order_col = effective_naam.desc() if direction == 'desc' else effective_naam.asc()
         query = query.order_by(order_col)
     elif sort_by == 'nieuw':
         order_col = Registration.nieuwe_klant.desc() if direction == 'desc' else Registration.nieuwe_klant.asc()
@@ -108,7 +136,7 @@ def lijst():
             query = query.order_by(Registration.datum.desc(), Registration.id.desc())
 
     paginatie = query.paginate(page=pagina, per_page=PAGINA_GROOTTE, error_out=False)
-    digidokters = filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.naam).all()
+    keuzes = _keuzelijsten()
 
     return render_template(
         'registrations/list.html',
@@ -116,9 +144,14 @@ def lijst():
         paginatie=paginatie,
         zoek=zoek,
         filter_digidokter=filter_digidokter,
+        filter_toestel=filter_toestel,
+        filter_leeftijd=filter_leeftijd,
+        filter_geslacht=filter_geslacht,
         filter_datum_van=filter_datum_van,
         filter_datum_tot=filter_datum_tot,
-        digidokters=digidokters,
+        digidokters=keuzes['digidokters'],
+        toestellen=keuzes['toestellen'],
+        leeftijdscategorieën=keuzes['leeftijdscategorieën'],
         sort_by=sort_by,
         direction=direction,
     )

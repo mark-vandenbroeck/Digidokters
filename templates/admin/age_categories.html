@@ -22,6 +22,7 @@
                         <th class="ps-3" style="width:60px">Sortering</th>
                         <th>Categorie</th>
                         <th>Status</th>
+                        <th>Gemapt naar</th>
                         <th class="pe-3 text-end">Acties</th>
                     </tr>
                 </thead>
@@ -49,6 +50,21 @@
                             <span class="badge bg-success">Actief</span>
                             {% else %}
                             <span class="badge bg-dark">Gedeactiveerd</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not item.actief %}
+                                {% if item.mapped_to %}
+                                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">
+                                    <i class="bi bi-arrow-right-short"></i> {{ item.mapped_to.naam }}
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" title="Nog niet gekoppeld aan een actieve optie">
+                                    <i class="bi bi-exclamation-circle me-1"></i>Niet gemapt
+                                </span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted small">–</span>
                             {% endif %}
                         </td>
                         <td class="pe-3 text-end text-nowrap">

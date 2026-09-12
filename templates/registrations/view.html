@@ -72,10 +72,20 @@
                 <dd class="col-sm-8">{{ reg.onderwerp }}</dd>
 
                 <dt class="col-sm-4 text-muted fw-normal small">Leeftijdscategorie</dt>
-                <dd class="col-sm-8">{{ reg.leeftijdscategorie.naam if reg.leeftijdscategorie else '–' }}</dd>
+                <dd class="col-sm-8">
+                    {{ reg.leeftijdscategorie.effectieve_naam if reg.leeftijdscategorie else '–' }}
+                    {% if reg.leeftijdscategorie and not reg.leeftijdscategorie.actief and reg.leeftijdscategorie.mapped_to %}
+                    <span class="text-muted small ms-1">(historisch: {{ reg.leeftijdscategorie.naam }})</span>
+                    {% endif %}
+                </dd>
 
                 <dt class="col-sm-4 text-muted fw-normal small">Toestel</dt>
-                <dd class="col-sm-8">{{ reg.toestel.naam if reg.toestel else '–' }}</dd>
+                <dd class="col-sm-8">
+                    {{ reg.toestel.effectieve_naam if reg.toestel else '–' }}
+                    {% if reg.toestel and not reg.toestel.actief and reg.toestel.mapped_to %}
+                    <span class="text-muted small ms-1">(historisch: {{ reg.toestel.naam }})</span>
+                    {% endif %}
+                </dd>
 
                 <dt class="col-sm-4 text-muted fw-normal small">Aangemaakt op</dt>
                 <dd class="col-sm-8 text-muted small">

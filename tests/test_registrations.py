@@ -89,3 +89,132 @@ class TestRegistrations(BaseTestCase):
         self.assertIn(f'value="{self.digidokter.id}"', html)
         self.assertIn('selected', html)
         self.assertIn(self.digidokter.naam, html)
+
+    def test_registraties_filters(self):
+        """Test filters op toesteltype, digidokter, leeftijdscategorie en geslacht."""
+        from models.device import Device
+        from models.age_category import AgeCategory
+        from models.digidokter import Digidokter
+
+        # Tweede toestel, leeftijdscategorie en digidokter aanmaken (actief)
+        toestel_smartphone = Device(naam="Smartphone", actief=True, organisatie_id=self.org.id)
+        leeftijd_jong = AgeCategory(naam="18-64 jaar", actief=True, organisatie_id=self.org.id)
+        digidokter2 = Digidokter(naam="Tweede Dokter", actief=True, organisatie_id=self.org.id)
+
+        # Inactieve items (mogen NIET in de filter-dropdowns verschijnen)
+        toestel_inactief = Device(naam="Oude Faxmachine", actief=False, organisatie_id=self.org.id)
+        leeftijd_inactief = AgeCategory(naam="Antieke Leeftijd", actief=False, organisatie_id=self.org.id)
+        digidokter_inactief = Digidokter(naam="Inactieve Dokter", actief=False, organisatie_id=self.org.id)
+
+        db.session.add_all([
+            toestel_smartphone, leeftijd_jong, digidokter2,
+            toestel_inactief, leeftijd_inactief, digidokter_inactief
+        ])
+        db.session.commit()
+
+        # Drie registraties aanmaken
+        r1 = Registration(
+            registratienummer="2026-0101",
+            datum=date.today(),
+            client="Jan Man",
+            digidokter_id=self.digidokter.id,
+            toestel_id=self.device.id,
+            leeftijdscategorie_id=self.age_category.id,
+            geslacht="man",
+            onderwerp="Probleem met laptop",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        r2 = Registration(
+            registratienummer="2026-0102",
+            datum=date.today(),
+            client="Els Vrouw",
+            digidokter_id=digidokter2.id,
+            toestel_id=toestel_smartphone.id,
+            leeftijdscategorie_id=leeftijd_jong.id,
+            geslacht="vrouw",
+            onderwerp="Probleem met smartphone",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        r3 = Registration(
+            registratienummer="2026-0103",
+            datum=date.today(),
+            client="Sam Onbekend",
+            digidokter_id=self.digidokter.id,
+            toestel_id=toestel_smartphone.id,
+            leeftijdscategorie_id=self.age_category.id,
+            geslacht=None,
+            onderwerp="Algemene vraag",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        db.session.add_all([r1, r2, r3])
+        db.session.commit()
+
+        # 1. Test filter op toesteltype
+        res = self.client.get(f"/registraties?toestel={self.device.id}")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Jan Man", html)
+        self.assertNotIn("Els Vrouw", html)
+        self.assertNotIn("Sam Onbekend", html)
+
+        # 2. Test filter op digidokter
+        res = self.client.get(f"/registraties?digidokter={digidokter2.id}")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Els Vrouw", html)
+        self.assertNotIn("Jan Man", html)
+
+        # 3. Test filter op leeftijdscategorie
+        res = self.client.get(f"/registraties?leeftijd={leeftijd_jong.id}")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Els Vrouw", html)
+        self.assertNotIn("Jan Man", html)
+        self.assertNotIn("Sam Onbekend", html)
+
+        # 4. Test filter op geslacht (man)
+        res = self.client.get("/registraties?geslacht=man")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Jan Man", html)
+        self.assertNotIn("Els Vrouw", html)
+        self.assertNotIn("Sam Onbekend", html)
+
+        # 5. Test filter op geslacht (vrouw)
+        res = self.client.get("/registraties?geslacht=vrouw")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Els Vrouw", html)
+        self.assertNotIn("Jan Man", html)
+
+        # 6. Test filter op geslacht (onbekend)
+        res = self.client.get("/registraties?geslacht=onbekend")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Sam Onbekend", html)
+        self.assertNotIn("Jan Man", html)
+        self.assertNotIn("Els Vrouw", html)
+
+        # 7. Test gecombineerde filters: digidokter 1 + smartphone
+        res = self.client.get(f"/registraties?digidokter={self.digidokter.id}&toestel={toestel_smartphone.id}")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Sam Onbekend", html)
+        self.assertNotIn("Jan Man", html)
+        self.assertNotIn("Els Vrouw", html)
+
+        # 8. Test dat inactieve opties NIET in de filter dropdowns verschijnen
+        res = self.client.get("/registraties")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn(self.device.naam, html)
+        self.assertIn("Smartphone", html)
+        self.assertNotIn("Oude Faxmachine", html)
+        self.assertIn("18-64 jaar", html)
+        self.assertNotIn("Antieke Leeftijd", html)
+        self.assertIn(self.digidokter.naam, html)
+        self.assertNotIn("Inactieve Dokter", html)
+

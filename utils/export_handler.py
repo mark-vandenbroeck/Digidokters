@@ -27,9 +27,13 @@ def _haal_registraties(
     if digidokter_id:
         query = query.filter(Registration.digidokter_id == digidokter_id)
     if leeftijdscategorie_id:
-        query = query.filter(Registration.leeftijdscategorie_id == leeftijdscategorie_id)
+        from models.age_category import AgeCategory
+        mapped_l_ids = [c.id for c in AgeCategory.query.filter_by(mapped_to_id=leeftijdscategorie_id).all()]
+        query = query.filter(Registration.leeftijdscategorie_id.in_([leeftijdscategorie_id] + mapped_l_ids))
     if toestel_id:
-        query = query.filter(Registration.toestel_id == toestel_id)
+        from models.device import Device
+        mapped_t_ids = [t.id for t in Device.query.filter_by(mapped_to_id=toestel_id).all()]
+        query = query.filter(Registration.toestel_id.in_([toestel_id] + mapped_t_ids))
 
     rijen = []
     for reg in query.all():
@@ -42,8 +46,8 @@ def _haal_registraties(
             'Herkomst': reg.herkomst.naam if reg.herkomst else '',
             'Geslacht': reg.geslacht or '',
             'Onderwerp': reg.onderwerp,
-            'Leeftijdscategorie': reg.leeftijdscategorie.naam if reg.leeftijdscategorie else '',
-            'Toestel': reg.toestel.naam if reg.toestel else '',
+            'Leeftijdscategorie': reg.leeftijdscategorie.effectieve_naam if reg.leeftijdscategorie else '',
+            'Toestel': reg.toestel.effectieve_naam if reg.toestel else '',
         })
     return rijen
 

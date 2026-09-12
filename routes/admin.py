@@ -376,6 +376,8 @@ def _beheer_toggle(model, item_id, redirect_endpoint):
         from flask import abort
         abort(403)
     item.actief = not item.actief
+    if item.actief and hasattr(item, 'mapped_to_id'):
+        item.mapped_to_id = None
     db.session.commit()
     status = 'geactiveerd' if item.actief else 'gedeactiveerd'
     flash(f'{item.naam} {status}.', 'info')
@@ -594,21 +596,30 @@ def leeftijdscategorieën():
 def leeftijdscategorie_nieuw():
     from utils.tenant import get_huidige_organisatie_id
     org_id = get_huidige_organisatie_id()
+    actieve_items = AgeCategory.query.filter_by(organisatie_id=org_id, actief=True).order_by(AgeCategory.volgorde, AgeCategory.naam).all()
 
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
         if not naam:
             flash('Naam is verplicht.', 'danger')
             return render_template('admin/item_form.html', titel='Leeftijdscategorie', actie='Nieuw',
-                                   item=None, terug_url=url_for('admin.leeftijdscategorieën'))
+                                   item=None, terug_url=url_for('admin.leeftijdscategorieën'),
+                                   actieve_items=actieve_items, toon_mapping=True)
         max_volgorde = db.session.query(db.func.max(AgeCategory.volgorde)).filter(AgeCategory.organisatie_id == org_id).scalar() or 0
+        is_actief = request.form.get('actief') == 'on' if 'actief' in request.form else True
+        mapped_to_id = request.form.get('mapped_to_id', type=int) or None if not is_actief else None
+        if mapped_to_id:
+            target = db.session.get(AgeCategory, mapped_to_id)
+            if not target or target.organisatie_id != org_id or not target.actief:
+                mapped_to_id = None
         db.session.add(AgeCategory(naam=naam, volgorde=max_volgorde + 1, organisatie_id=org_id,
-                                   actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
+                                   actief=is_actief, mapped_to_id=mapped_to_id))
         db.session.commit()
         flash(f'Leeftijdscategorie {naam} toegevoegd.', 'success')
         return redirect(url_for('admin.leeftijdscategorieën'))
     return render_template('admin/item_form.html', titel='Leeftijdscategorie', actie='Nieuw',
-                           item=None, terug_url=url_for('admin.leeftijdscategorieën'))
+                           item=None, terug_url=url_for('admin.leeftijdscategorieën'),
+                           actieve_items=actieve_items, toon_mapping=True)
 
 
 @admin_bp.route('/leeftijdscategorieën/<int:item_id>/wijzig', methods=['GET', 'POST'])
@@ -623,14 +634,29 @@ def leeftijdscategorie_wijzigen(item_id):
         from flask import abort
         abort(403)
         
+    actieve_items = AgeCategory.query.filter_by(organisatie_id=org_id, actief=True).filter(AgeCategory.id != item_id).order_by(AgeCategory.volgorde, AgeCategory.naam).all()
+
     if request.method == 'POST':
         item.naam = request.form.get('naam', item.naam).strip()
         item.actief = request.form.get('actief') == 'on'
+        if item.actief:
+            item.mapped_to_id = None
+        else:
+            mapped_to_id = request.form.get('mapped_to_id', type=int) or None
+            if mapped_to_id and mapped_to_id != item.id:
+                target = db.session.get(AgeCategory, mapped_to_id)
+                if target and target.organisatie_id == org_id and target.actief:
+                    item.mapped_to_id = mapped_to_id
+                else:
+                    item.mapped_to_id = None
+            else:
+                item.mapped_to_id = None
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.leeftijdscategorieën'))
     return render_template('admin/item_form.html', titel='Leeftijdscategorie', actie='Wijzigen',
-                           item=item, terug_url=url_for('admin.leeftijdscategorieën'))
+                           item=item, terug_url=url_for('admin.leeftijdscategorieën'),
+                           actieve_items=actieve_items, toon_mapping=True)
 
 
 @admin_bp.route('/leeftijdscategorieën/<int:item_id>/toggle')
@@ -687,21 +713,30 @@ def toestellen():
 def toestel_nieuw():
     from utils.tenant import get_huidige_organisatie_id
     org_id = get_huidige_organisatie_id()
+    actieve_items = Device.query.filter_by(organisatie_id=org_id, actief=True).order_by(Device.volgorde, Device.naam).all()
 
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
         if not naam:
             flash('Naam is verplicht.', 'danger')
             return render_template('admin/item_form.html', titel='Toestel', actie='Nieuw',
-                                   item=None, terug_url=url_for('admin.toestellen'))
+                                   item=None, terug_url=url_for('admin.toestellen'),
+                                   actieve_items=actieve_items, toon_mapping=True)
         max_volgorde = db.session.query(db.func.max(Device.volgorde)).filter(Device.organisatie_id == org_id).scalar() or 0
+        is_actief = request.form.get('actief') == 'on' if 'actief' in request.form else True
+        mapped_to_id = request.form.get('mapped_to_id', type=int) or None if not is_actief else None
+        if mapped_to_id:
+            target = db.session.get(Device, mapped_to_id)
+            if not target or target.organisatie_id != org_id or not target.actief:
+                mapped_to_id = None
         db.session.add(Device(naam=naam, volgorde=max_volgorde + 1, organisatie_id=org_id,
-                              actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
+                              actief=is_actief, mapped_to_id=mapped_to_id))
         db.session.commit()
         flash(f'Toestel {naam} toegevoegd.', 'success')
         return redirect(url_for('admin.toestellen'))
     return render_template('admin/item_form.html', titel='Toestel', actie='Nieuw',
-                           item=None, terug_url=url_for('admin.toestellen'))
+                           item=None, terug_url=url_for('admin.toestellen'),
+                           actieve_items=actieve_items, toon_mapping=True)
 
 
 @admin_bp.route('/toestellen/<int:item_id>/wijzig', methods=['GET', 'POST'])
@@ -716,14 +751,30 @@ def toestel_wijzigen(item_id):
         from flask import abort
         abort(403)
         
+    actieve_items = Device.query.filter_by(organisatie_id=org_id, actief=True).filter(Device.id != item_id).order_by(Device.volgorde, Device.naam).all()
+
     if request.method == 'POST':
         item.naam = request.form.get('naam', item.naam).strip()
         item.actief = request.form.get('actief') == 'on'
+        if item.actief:
+            item.mapped_to_id = None
+        else:
+            mapped_to_id = request.form.get('mapped_to_id', type=int) or None
+            if mapped_to_id and mapped_to_id != item.id:
+                target = db.session.get(Device, mapped_to_id)
+                if target and target.organisatie_id == org_id and target.actief:
+                    item.mapped_to_id = mapped_to_id
+                else:
+                    item.mapped_to_id = None
+            else:
+                item.mapped_to_id = None
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.toestellen'))
     return render_template('admin/item_form.html', titel='Toestel', actie='Wijzigen',
-                           item=item, terug_url=url_for('admin.toestellen'))
+                           item=item, terug_url=url_for('admin.toestellen'),
+                           actieve_items=actieve_items, toon_mapping=True)
+
 
 
 @admin_bp.route('/toestellen/<int:item_id>/toggle')
@@ -905,7 +956,8 @@ def backup():
         age_cats_data.append({
             'naam': c.naam,
             'actief': c.actief,
-            'volgorde': c.volgorde
+            'volgorde': c.volgorde,
+            'mapped_to_naam': c.mapped_to.naam if c.mapped_to else None,
         })
         
     devices_data = []
@@ -913,7 +965,8 @@ def backup():
         devices_data.append({
             'naam': t.naam,
             'actief': t.actief,
-            'volgorde': t.volgorde
+            'volgorde': t.volgorde,
+            'mapped_to_naam': t.mapped_to.naam if t.mapped_to else None,
         })
 
     herkomsten_data = []
@@ -1096,6 +1149,25 @@ def restore():
                     db.session.add(t)
                     db.session.flush()
                     devices_map[t.naam] = t.id
+
+                # Herstel mappings voor leeftijdscategorieën en toestellen
+                for c_data in data.get('age_categories', []):
+                    mapped_name = c_data.get('mapped_to_naam')
+                    if mapped_name and mapped_name in age_cats_map:
+                        c_id = age_cats_map.get(c_data['naam'])
+                        if c_id:
+                            c_obj = db.session.get(AgeCategory, c_id)
+                            if c_obj:
+                                c_obj.mapped_to_id = age_cats_map[mapped_name]
+
+                for t_data in data.get('devices', []):
+                    mapped_name = t_data.get('mapped_to_naam')
+                    if mapped_name and mapped_name in devices_map:
+                        t_id = devices_map.get(t_data['naam'])
+                        if t_id:
+                            t_obj = db.session.get(Device, t_id)
+                            if t_obj:
+                                t_obj.mapped_to_id = devices_map[mapped_name]
                     
                 # 5b. Herstel herkomsten
                 herkomsten_map = {}

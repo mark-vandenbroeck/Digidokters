@@ -535,3 +535,45 @@ body {
 .dd-user-profile-link:hover .dd-user-name {
     text-decoration: underline;
 }
+
+/* ── Feedback Meldingen Banners ───────────────────────────── */
+.dd-feedback-meldingen-container {
+    max-width: 100%;
+}
+
+.dd-feedback-alert {
+    border-radius: var(--dd-radius, 8px);
+    border-left: 4px solid currentColor;
+    transition: all 0.2s ease;
+    padding: 0.65rem 1rem;
+}
+
+.dd-feedback-alert.alert-info {
+    background-color: #f0f9ff;
+    border-color: #0284c7;
+    color: #0369a1;
+}
+
+.dd-feedback-alert.alert-primary {
+    background-color: #eff6ff;
+    border-color: #2563eb;
+    color: #1d4ed8;
+}
+
+.dd-feedback-alert .alert-link {
+    color: inherit;
+}
+
+.dd-feedback-alert .alert-link:hover {
+    text-decoration: underline !important;
+}
+
+.dd-feedback-alert .btn-close {
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.dd-feedback-alert .btn-close:hover {
+    opacity: 1;
+}
+

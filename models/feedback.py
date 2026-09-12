@@ -95,3 +95,29 @@ class FeedbackComment(db.Model):
 
     def __repr__(self):
         return f'<FeedbackComment {self.id} on Feedback {self.feedback_id}>'
+
+
+class FeedbackView(db.Model):
+    """Houdt bij wanneer een gebruiker een feedback-pagina voor het laatst bekeken heeft.
+    
+    Als feedback_id None is, betreft het de algemene feedback-overzichtspagina (/feedback/).
+    Als feedback_id gevuld is, betreft het de detailpagina van dat specifieke feedback-item (/feedback/<id>).
+    """
+    __tablename__ = 'feedback_views'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    feedback_id = db.Column(db.Integer, db.ForeignKey('feedback_items.id', ondelete='CASCADE'), nullable=True, index=True)
+    bekeken_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'feedback_id', name='uq_user_feedback_view'),
+    )
+
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('feedback_views', lazy=True, cascade='all, delete-orphan'))
+    feedback = db.relationship('FeedbackItem', foreign_keys=[feedback_id], backref=db.backref('views', lazy=True, cascade='all, delete-orphan'))
+
+    def __repr__(self):
+        return f'<FeedbackView user={self.user_id} feedback={self.feedback_id} bekeken_op={self.bekeken_op}>'
+

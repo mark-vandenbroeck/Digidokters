@@ -18,6 +18,9 @@ MAX_SCREENSHOT_GROOTTE = 5 * 1024 * 1024  # 5 MB
 @login_required
 def lijst():
     """Toont overzicht van alle feedbacks, gesorteerd op aanmaaktijdstip (aflopend)."""
+    from utils.feedback_tracker import markeer_feedback_bekeken
+    markeer_feedback_bekeken(current_user.id, feedback_id=None)
+
     org_id = get_huidige_organisatie_id()
     status_filter = request.args.get('status', 'alle').strip().lower()
     type_filter = request.args.get('type', 'alle').strip().lower()
@@ -151,6 +154,9 @@ def nieuw():
         db.session.add(fb)
         db.session.commit()
 
+        from utils.feedback_tracker import markeer_feedback_bekeken
+        markeer_feedback_bekeken(current_user.id, feedback_id=fb.id)
+
         flash(f'Feedback "{fb.onderwerp}" succesvol ingediend. Bedankt voor je bijdrage!', 'success')
         return redirect(url_for('feedback.detail', id=fb.id))
 
@@ -171,6 +177,10 @@ def detail(id):
     # Multi-tenant check voor niet-platformbeheerders
     if current_user.rol != 'platformbeheerder' and fb.organisatie_id != org_id:
         abort(404)
+
+    # Registreer dat de huidige gebruiker dit specifieke item bekeken heeft
+    from utils.feedback_tracker import markeer_feedback_bekeken
+    markeer_feedback_bekeken(current_user.id, feedback_id=fb.id)
 
     mijn_stem = fb.gebruiker_stem(current_user.id)
     nu_str = datetime.now().strftime('%d-%m-%Y om %H:%M')
@@ -330,3 +340,15 @@ def status(id):
         flash(f'Feedback "{fb.onderwerp}" is succesvol afgesloten. Conversaties en stemmen zijn vergrendeld.', 'warning')
 
     return redirect(url_for('feedback.detail', id=fb.id))
+
+
+@feedback_bp.route('/melding-wegklikken', methods=['POST'])
+@login_required
+def melding_wegklikken():
+    """Markeert een notificatie-banner als gelezen wanneer de gebruiker op sluiten (kruisje) klikt."""
+    code = request.form.get('melding_code', '').strip()
+    item_id = request.form.get('item_id', type=int)
+    from utils.feedback_tracker import markeer_melding_gelezen
+    markeer_melding_gelezen(current_user.id, code, item_id)
+    return redirect(request.referrer or url_for('feedback.lijst'))
+

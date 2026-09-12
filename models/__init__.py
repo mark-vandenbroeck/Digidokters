@@ -14,7 +14,7 @@ from .audit import AuditLog
 from .herkomst import Herkomst
 from .evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
 from .email_template import EmailTemplate
-from .feedback import FeedbackItem, FeedbackVote, FeedbackComment
+from .feedback import FeedbackItem, FeedbackVote, FeedbackComment, FeedbackView
 from .question_category import QuestionCategory
 from .question_classification import QuestionClassification
 
@@ -23,7 +23,7 @@ __all__ = [
     'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem',
     'Folder', 'Document', 'AppFolder', 'AppDocument', 'AuditLog', 'Herkomst',
     'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation',
-    'EmailTemplate', 'FeedbackItem', 'FeedbackVote', 'FeedbackComment',
+    'EmailTemplate', 'FeedbackItem', 'FeedbackVote', 'FeedbackComment', 'FeedbackView',
     'QuestionCategory', 'QuestionClassification'
 ]
 

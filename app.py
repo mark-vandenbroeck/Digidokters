@@ -80,6 +80,19 @@ def create_app(config_class=Config):
         except Exception:
             return ''
 
+    @app.context_processor
+    def inject_feedback_meldingen():
+        if not current_user.is_authenticated:
+            return {'feedback_meldingen': []}
+        try:
+            from utils.feedback_tracker import get_feedback_meldingen
+            org_id = session.get('organisatie_id')
+            meldingen = get_feedback_meldingen(current_user, org_id)
+            return {'feedback_meldingen': meldingen}
+        except Exception:
+            return {'feedback_meldingen': []}
+
+
 
     # Controleer de organisatie-context voor authenticated requests
     from flask import session, redirect, url_for, request, flash, g

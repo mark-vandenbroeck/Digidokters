@@ -147,6 +147,11 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
     *   *Lezers:* Hebben enkel leesrechten (kunnen de items en reacties raadplegen, maar kunnen niets toevoegen, stemmen of reageren).
 *   **Afsluiten door Beheerders:** Beheerders kunnen een item met één klik **afsluiten** (waarna er niet meer op gestemd of gereageerd kan worden) of heropenen.
 *   **Overzichtslijst:** Standaard chronologisch gesorteerd (nieuwste items bovenaan). Afgesloten items worden herkenbaar grijs getoond (*greyed out*). Snelfilters voor Alle / Open / Afgesloten, type-selectie en realtime zoekfilter.
+*   **Automatisch bijhouden van weergaven (`FeedbackView`):** Het platform registreert per gebruiker het exacte tijdstip waarop de overzichtslijst (`/feedback/`) of een specifieke detailpagina (`/feedback/<id>`) voor het laatst is bekeken.
+*   **Klikbare Notificatie-banners bovenaan elke pagina:**
+    *   *Nieuwe reactie op eigen feedback:* Zodra een collega reageert op een door de gebruiker ingediend item, verschijnt direct bovenaan elke pagina een klikbare melding (`💬 Nieuwe reactie op uw feedback...`) met directe link naar het gesprek.
+    *   *Nieuwe feedback door een collega:* Zodra een collega binnen de organisatie (of platform-breed voor platformbeheerders) een nieuw voorstel of foutje indient dat de gebruiker nog niet heeft gezien, verschijnt er een klikbare melding met een knop om het direct te bekijken.
+    *   *Permanente weergave & Wegklikken:* De notificatie verdwijnt niet automatisch na enkele seconden, maar blijft permanent zichtbaar tot het betreffende item wordt geopend, of totdat de gebruiker op het sluitkruisje (`×`) klikt om de melding als gelezen te markeren.
 
 ### 13. AI-Vraaganalyse & Monitoring (Gemini AI)
 *   **Automatische Real-time Classificatie:** Consultatievragen worden bij het opslaan op de achtergrond (asynchroon via daemon threads) geanalyseerd door Google Gemini AI (`gemini-2.5-flash`) en ingedeeld in 10 gestandaardiseerde hoofdcategorieën.

@@ -350,6 +350,35 @@
         </div>
         {% endif %}
 
+        <!-- Feedback notificatie banners -->
+        {% if feedback_meldingen %}
+        <div class="dd-feedback-meldingen-container px-3 pt-2">
+            {% for melding in feedback_meldingen %}
+            <div class="alert alert-{{ melding.type }} alert-dismissible fade show shadow-sm d-flex align-items-center gap-2 mb-2 dd-feedback-alert" role="alert">
+                <i class="bi bi-{{ melding.icon }} fs-5 flex-shrink-0 text-{{ melding.btn_type }}"></i>
+                <div class="flex-grow-1 text-truncate">
+                    <a href="{{ melding.url }}" class="alert-link text-decoration-none d-inline-block text-truncate align-middle" style="max-width: 100%;">
+                        <strong class="me-1">{{ melding.titel }}:</strong>
+                        <span>{{ melding.tekst }}</span>
+                    </a>
+                </div>
+                <a href="{{ melding.url }}" class="btn btn-sm btn-{{ melding.btn_type }} ms-2 text-nowrap d-none d-sm-inline-flex align-items-center gap-1">
+                    <span>Bekijken</span>
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+                <form action="{{ url_for('feedback.melding_wegklikken') }}" method="POST" class="d-inline m-0 p-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="melding_code" value="{{ melding.code }}">
+                    {% if melding.item_id %}
+                    <input type="hidden" name="item_id" value="{{ melding.item_id }}">
+                    {% endif %}
+                    <button type="submit" class="btn-close position-relative p-2 ms-1" aria-label="Sluiten" title="Markeer als gelezen"></button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <div class="dd-content">
             {% block content %}{% endblock %}
         </div>
@@ -427,9 +456,9 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Auto-dismiss flash messages after 5s
+// Auto-dismiss flash messages after 5s (exclusief permanente notificatiebanners)
 setTimeout(() => {
-    document.querySelectorAll('.alert.fade.show').forEach(el => {
+    document.querySelectorAll('.dd-flash-container .alert.fade.show:not(.dd-feedback-alert)').forEach(el => {
         const bsAlert = bootstrap.Alert.getOrCreateInstance(el);
         bsAlert.close();
     });

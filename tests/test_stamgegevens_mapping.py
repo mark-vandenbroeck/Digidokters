@@ -258,3 +258,104 @@ class TestStamgegevensMapping(BaseTestCase):
         self.assertIn("Volwassenen (18-64)", csv_text)
         self.assertNotIn("Oude Laptop 2010", csv_text)
 
+    def test_statistieken_sortering_volgens_stamgegevens_volgorde(self):
+        """Test dat statistiekenpagina entries toont in de volgorde van stamgegevens."""
+        from models.digidokter import Digidokter
+        from models.herkomst import Herkomst
+        from models.agenda import AgendaItem
+        from models.location import Location
+        from models.activity_type import ActivityType
+
+        # Digidokters: DD1 (volgorde 2, 5 bezoeken), DD2 (volgorde 1, 1 bezoek)
+        dd1 = Digidokter(naam="Zoe", volgorde=2, organisatie_id=self.org.id)
+        dd2 = Digidokter(naam="Albert", volgorde=1, organisatie_id=self.org.id)
+        db.session.add_all([dd1, dd2])
+
+        # Toestellen: T1 (volgorde 2, 5 bezoeken), T2 (volgorde 1, 1 bezoek)
+        t1 = Device(naam="Tablet", volgorde=2, actief=True, organisatie_id=self.org.id)
+        t2 = Device(naam="Smartphone", volgorde=1, actief=True, organisatie_id=self.org.id)
+        db.session.add_all([t1, t2])
+
+        # Leeftijden: L1 (volgorde 2, 5 bezoeken), L2 (volgorde 1, 1 bezoek)
+        l1 = AgeCategory(naam="Senior", volgorde=2, actief=True, organisatie_id=self.org.id)
+        l2 = AgeCategory(naam="Jeugd", volgorde=1, actief=True, organisatie_id=self.org.id)
+        db.session.add_all([l1, l2])
+
+        # Herkomst: H1 (volgorde 2, 5 bezoeken), H2 (volgorde 1, 1 bezoek)
+        h1 = Herkomst(naam="Website", volgorde=2, actief=True, organisatie_id=self.org.id)
+        h2 = Herkomst(naam="Mond-aan-mond", volgorde=1, actief=True, organisatie_id=self.org.id)
+        db.session.add_all([h1, h2])
+
+        # Locaties & Types
+        loc1 = Location(naam="Zaal Zuid", volgorde=2, actief=True, organisatie_id=self.org.id)
+        loc2 = Location(naam="Zaal Noord", volgorde=1, actief=True, organisatie_id=self.org.id)
+        tp1 = ActivityType(naam="Workshop", volgorde=2, actief=True, organisatie_id=self.org.id)
+        tp2 = ActivityType(naam="Inloop", volgorde=1, actief=True, organisatie_id=self.org.id)
+        db.session.add_all([loc1, loc2, tp1, tp2])
+        db.session.commit()
+
+        # Registraties: meer bezoeken voor volgorde 2
+        for i in range(5):
+            r = Registration(
+                registratienummer=f"2026-99{i}",
+                datum=date(2026, 6, 1),
+                client=f"Client {i}",
+                digidokter_id=dd1.id,
+                toestel_id=t1.id,
+                leeftijdscategorie_id=l1.id,
+                herkomst_id=h1.id,
+                onderwerp="Test",
+                organisatie_id=self.org.id,
+                aangemaakt_door_id=self.admin_user.id
+            )
+            db.session.add(r)
+
+        # 1 bezoek voor volgorde 1
+        r_single = Registration(
+            registratienummer="2026-9999",
+            datum=date(2026, 6, 2),
+            client="Client Single",
+            digidokter_id=dd2.id,
+            toestel_id=t2.id,
+            leeftijdscategorie_id=l2.id,
+            herkomst_id=h2.id,
+            onderwerp="Test Single",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        db.session.add(r_single)
+
+        # Agenda items
+        ag1 = AgendaItem(
+            datum=date(2026, 6, 1),
+            uur_van="10:00",
+            uur_tot="12:00",
+            locatie_id=loc1.id,
+            type_id=tp1.id,
+            organisatie_id=self.org.id
+        )
+        ag2 = AgendaItem(
+            datum=date(2026, 6, 2),
+            uur_van="14:00",
+            uur_tot="16:00",
+            locatie_id=loc2.id,
+            type_id=tp2.id,
+            organisatie_id=self.org.id
+        )
+        db.session.add_all([ag1, ag2])
+        db.session.commit()
+
+        # Request stats pagina
+        res = self.client.get('/statistieken?jaar=2026')
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode('utf-8')
+
+        # Volgorde 1 moet vóór volgorde 2 staan in de HTML, ondanks dat volgorde 2 5x meer bezoeken heeft
+        self.assertLess(html.index("Albert"), html.index("Zoe"))
+        self.assertLess(html.index("Smartphone"), html.index("Tablet"))
+        self.assertLess(html.index("Jeugd"), html.index("Senior"))
+        self.assertLess(html.index("Mond-aan-mond"), html.index("Website"))
+        self.assertLess(html.index("Zaal Noord"), html.index("Zaal Zuid"))
+        self.assertLess(html.index("Inloop"), html.index("Workshop"))
+
+

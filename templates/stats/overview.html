@@ -408,7 +408,6 @@
                     <div class="card-header">Sessies per locatie</div>
                     <div class="card-body">
                         {% if locatie_bezetting %}
-                        {% set max_loc_sessions = locatie_bezetting[0][1] if locatie_bezetting else 1 %}
                         {% for loc, aantal in locatie_bezetting %}
                         <div class="dd-progress-row">
                             <div class="dd-progress-label">{{ loc }}</div>
@@ -429,7 +428,6 @@
                     <div class="card-header">Sessies per activiteitstype</div>
                     <div class="card-body">
                         {% if type_bezetting %}
-                        {% set max_type_sessions = type_bezetting[0][1] if type_bezetting else 1 %}
                         {% for tp, aantal in type_bezetting %}
                         <div class="dd-progress-row">
                             <div class="dd-progress-label">{{ tp }}</div>

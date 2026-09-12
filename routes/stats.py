@@ -87,68 +87,77 @@ def overzicht():
     per_maand = [(MAAND_NAMEN[int(r.maand)], r.aantal) for r in per_maand_data]
 
     # Per digidokter
-    per_digidokter = (
+    per_digidokter_raw = (
         jaar_filter(
             db.session.query(
                 Digidokter.naam,
-                func.count(Registration.id).label('aantal')
+                func.count(Registration.id).label('aantal'),
+                Digidokter.volgorde
             ).join(Digidokter, Registration.digidokter_id == Digidokter.id)
         )
-        .group_by(Digidokter.naam)
-        .order_by(func.count(Registration.id).desc())
+        .group_by(Digidokter.naam, Digidokter.volgorde)
+        .order_by(Digidokter.volgorde.asc(), Digidokter.naam.asc())
         .all()
     )
+    per_digidokter = [(r[0], r[1]) for r in per_digidokter_raw]
 
     # Per leeftijdscategorie
     from sqlalchemy.orm import aliased
     MappedAgeCategory = aliased(AgeCategory)
     eff_leeftijd_naam = func.coalesce(MappedAgeCategory.naam, AgeCategory.naam)
-    per_leeftijd = (
+    eff_leeftijd_volgorde = func.min(func.coalesce(MappedAgeCategory.volgorde, AgeCategory.volgorde))
+    per_leeftijd_raw = (
         jaar_filter(
             db.session.query(
                 eff_leeftijd_naam,
-                func.count(Registration.id).label('aantal')
+                func.count(Registration.id).label('aantal'),
+                eff_leeftijd_volgorde.label('volgorde')
             ).join(AgeCategory, Registration.leeftijdscategorie_id == AgeCategory.id)
              .outerjoin(MappedAgeCategory, AgeCategory.mapped_to_id == MappedAgeCategory.id)
         )
         .group_by(eff_leeftijd_naam)
-        .order_by(func.count(Registration.id).desc())
+        .order_by(eff_leeftijd_volgorde.asc(), eff_leeftijd_naam.asc())
         .all()
     )
+    per_leeftijd = [(r[0], r[1]) for r in per_leeftijd_raw]
 
     # Per toestel
     MappedDevice = aliased(Device)
     eff_toestel_naam = func.coalesce(MappedDevice.naam, Device.naam)
-    per_toestel = (
+    eff_toestel_volgorde = func.min(func.coalesce(MappedDevice.volgorde, Device.volgorde))
+    per_toestel_raw = (
         jaar_filter(
             db.session.query(
                 eff_toestel_naam,
-                func.count(Registration.id).label('aantal')
+                func.count(Registration.id).label('aantal'),
+                eff_toestel_volgorde.label('volgorde')
             ).join(Device, Registration.toestel_id == Device.id)
              .outerjoin(MappedDevice, Device.mapped_to_id == MappedDevice.id)
         )
         .group_by(eff_toestel_naam)
-        .order_by(func.count(Registration.id).desc())
+        .order_by(eff_toestel_volgorde.asc(), eff_toestel_naam.asc())
         .all()
     )
+    per_toestel = [(r[0], r[1]) for r in per_toestel_raw]
 
     # Per herkomst
     from models.herkomst import Herkomst
+    eff_herkomst_naam = func.coalesce(Herkomst.naam, 'Niet gespecificeerd')
+    eff_herkomst_volgorde = func.min(func.coalesce(Herkomst.volgorde, 999999))
     per_herkomst_raw = (
         jaar_filter(
             db.session.query(
-                Herkomst.naam,
-                func.count(Registration.id).label('aantal')
+                eff_herkomst_naam,
+                func.count(Registration.id).label('aantal'),
+                eff_herkomst_volgorde.label('volgorde')
             ).outerjoin(Herkomst, Registration.herkomst_id == Herkomst.id)
         )
-        .group_by(Herkomst.naam)
+        .group_by(eff_herkomst_naam)
+        .order_by(eff_herkomst_volgorde.asc(), eff_herkomst_naam.asc())
         .all()
     )
-    per_herkomst = []
-    for r in per_herkomst_raw:
-        naam = r.naam if r.naam else 'Niet gespecificeerd'
-        per_herkomst.append((naam, r.aantal))
-    per_herkomst = sorted(per_herkomst, key=lambda x: x[1], reverse=True)
+    per_herkomst = [(r[0], r[1]) for r in per_herkomst_raw]
+
 
     # Nieuwe vs terugkerende klanten
     nieuwe_klanten = jaar_filter(
@@ -310,9 +319,19 @@ def overzicht():
         })
     vrijwilligers_inzet = sorted(vrijwilligers_inzet, key=lambda x: x['uren'], reverse=True)
 
-    # Sorteer locaties en types op aantal sessies desc
-    locatie_bezetting = sorted(sessions_per_location.items(), key=lambda x: x[1], reverse=True)
-    type_bezetting = sorted(sessions_per_type.items(), key=lambda x: x[1], reverse=True)
+    # Sorteer locaties en types op stamgegevens volgorde
+    locatie_order = {
+        loc.naam: loc.volgorde 
+        for loc in Location.query.filter_by(organisatie_id=org_id).all()
+    }
+    type_order = {
+        t.naam: t.volgorde 
+        for t in ActivityType.query.filter_by(organisatie_id=org_id).all()
+    }
+    locatie_bezetting = sorted(sessions_per_location.items(), key=lambda x: (locatie_order.get(x[0], 999999), x[0]))
+    type_bezetting = sorted(sessions_per_type.items(), key=lambda x: (type_order.get(x[0], 999999), x[0]))
+    max_loc_sessions = max([s[1] for s in locatie_bezetting], default=1)
+    max_type_sessions = max([s[1] for s in type_bezetting], default=1)
 
     # Maandelijkse uren trend
     maand_labels = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
@@ -501,6 +520,8 @@ def overzicht():
         vrijwilligers_inzet=vrijwilligers_inzet,
         locatie_bezetting=locatie_bezetting,
         type_bezetting=type_bezetting,
+        max_loc_sessions=max_loc_sessions,
+        max_type_sessions=max_type_sessions,
         maand_labels=maand_labels,
         vrijwilligersuren_per_maand=vrijwilligersuren_per_maand,
         sessions_ratio=sessions_ratio,

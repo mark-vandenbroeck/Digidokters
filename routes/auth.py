@@ -123,9 +123,10 @@ def wachtwoord_wijzigen():
         wachtwoord_gewijzigd = False
         if huidig or nieuw or bevestig or current_user.moet_wachtwoord_wijzigen:
             wachtwoord_gewijzigd = True
-            if not check_password_hash(current_user.wachtwoord_hash, huidig):
-                flash('Huidig wachtwoord is onjuist.', 'danger')
-                return render_template('auth/change_password.html', form_data=request.form)
+            if not current_user.moet_wachtwoord_wijzigen:
+                if not check_password_hash(current_user.wachtwoord_hash, huidig):
+                    flash('Huidig wachtwoord is onjuist.', 'danger')
+                    return render_template('auth/change_password.html', form_data=request.form)
 
         # Controleer of e-mail al door iemand anders gebruikt wordt
         if email and User.query.filter(User.email == email, User.id != current_user.id).first():
@@ -134,6 +135,10 @@ def wachtwoord_wijzigen():
 
         # Wachtwoord valideren (alleen als er effectief een nieuw wachtwoord is opgegeven)
         if wachtwoord_gewijzigd:
+            if current_user.moet_wachtwoord_wijzigen and not nieuw:
+                flash('Nieuw wachtwoord is verplicht.', 'danger')
+                return render_template('auth/change_password.html', form_data=request.form)
+
             if nieuw != bevestig:
                 flash('De nieuwe wachtwoorden komen niet overeen.', 'danger')
                 return render_template('auth/change_password.html', form_data=request.form)
@@ -149,6 +154,14 @@ def wachtwoord_wijzigen():
 
         current_user.email = email
         db.session.commit()
+
+        if not session.get('organisatie_id') and current_user.rol != 'platformbeheerder':
+            active_memberships = [
+                uo for uo in current_user.user_organisaties 
+                if uo.actief and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon'
+            ]
+            if len(active_memberships) == 1:
+                session['organisatie_id'] = active_memberships[0].organisatie_id
 
         if wachtwoord_gewijzigd:
             flash('Wachtwoord succesvol gewijzigd.', 'success')

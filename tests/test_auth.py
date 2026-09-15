@@ -151,3 +151,30 @@ class TestAuth(BaseTestCase):
         self.assertIn('dd-nav-chevron', html)
         self.assertIn('sidebar_collapse_', html)
 
+    def test_moet_wachtwoord_wijzigen_login_en_wijzig_flow(self):
+        from extensions import db
+        # Zet gebruiker op moet_wachtwoord_wijzigen = True
+        self.medewerker_user.moet_wachtwoord_wijzigen = True
+        db.session.commit()
+
+        # Inloggen met huidig wachtwoord
+        res = self.client.post('/login', data={
+            'email': 'tim@test.com',
+            'wachtwoord': 'password123'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        # Wachtwoord wijzigen zonder huidig_wachtwoord mee te sturen
+        res_change = self.client.post('/wachtwoord', data={
+            'nieuw_wachtwoord': 'NieuwPass123!',
+            'bevestig_wachtwoord': 'NieuwPass123!',
+            'email': 'tim@test.com'
+        }, follow_redirects=True)
+        self.assertEqual(res_change.status_code, 200)
+        self.assertIn("Wachtwoord succesvol gewijzigd", res_change.get_data(as_text=True))
+
+        # Controleer dat moet_wachtwoord_wijzigen nu False is
+        db.session.refresh(self.medewerker_user)
+        self.assertFalse(self.medewerker_user.moet_wachtwoord_wijzigen)
+
+

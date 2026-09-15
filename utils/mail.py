@@ -149,11 +149,12 @@ def stuur_fout_email(error_code, error_message, exception=None):
         org_id = session.get('organisatie_id', 'Geen')
         
         trace_str = ""
-        if exception:
+        if exception and exception.__traceback__:
             trace_str = f"\n\nStack Trace:\n{''.join(traceback.format_exception(type(exception), exception, exception.__traceback__))}"
-        elif error_code == 500:
-            # Fallback om actieve traceback te pakken als die er is
-            trace_str = f"\n\nStack Trace:\n{traceback.format_exc()}"
+        else:
+            current_tb = traceback.format_exc()
+            if "NoneType: None" not in current_tb and "None" not in current_tb.strip():
+                trace_str = f"\n\nStack Trace:\n{current_tb}"
             
         mail_body = f"""Beste platformbeheerder,
 

@@ -229,7 +229,22 @@ def create_app(config_class=Config):
     @app.errorhandler(500)
     def internal_error(e):
         db.session.rollback()
-        app.logger.error(f"Internal Server Error: {e}")
+        real_ex = getattr(e, 'original_exception', e)
+        app.logger.error(f"Internal Server Error: {real_ex}", exc_info=True)
+        try:
+            from utils.mail import stuur_fout_email
+            stuur_fout_email(500, str(real_ex), exception=real_ex)
+        except Exception as mail_err:
+            app.logger.error(f"Kon foutmail niet versturen: {mail_err}")
+        return render_template('errors/500.html'), 500
+
+    @app.errorhandler(Exception)
+    def unhandled_exception(e):
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            return e
+        db.session.rollback()
+        app.logger.error(f"Unhandled Exception: {e}", exc_info=True)
         try:
             from utils.mail import stuur_fout_email
             stuur_fout_email(500, str(e), exception=e)

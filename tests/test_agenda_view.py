@@ -45,3 +45,22 @@ class TestAgendaView(BaseTestCase):
         html = response.get_data(as_text=True)
         self.assertIn('15/10/2026', html)
         self.assertIn('donderdag', html)
+
+    def test_agenda_nieuw_form_validation_error_renders_without_jinja_error(self):
+        self.login("AdminMark", "password123")
+        with self.client.session_transaction() as sess:
+            sess['organisatie_id'] = self.org.id
+
+        # POST met ontbrekende vereiste velden maar met digidokter_ids geselecteerd
+        response = self.client.post('/agenda/nieuw', data={
+            'datum': '',  # ontbrekende datum triggert validatiefout
+            'uur_van': '10:00',
+            'uur_tot': '12:00',
+            'digidokter_ids': [str(self.digidokter.id)]
+        }, follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('Datum is verplicht.', html)
+        self.assertIn(f'id="dd_{self.digidokter.id}"', html)
+

@@ -74,9 +74,13 @@
                     <div class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
                         {% set checked_ids = [] %}
                         {% if form_data %}
-                            {% set dummy = checked_ids.extend(request.form.getlist('digidokter_ids', type=int)) %}
+                            {% for did in request.form.getlist('digidokter_ids') %}
+                                {% set _ = checked_ids.append(did|int) %}
+                            {% endfor %}
                         {% elif item %}
-                            {% set dummy = checked_ids.extend(item.digidokters|map(attribute='id')) %}
+                            {% for dd in item.digidokters %}
+                                {% set _ = checked_ids.append(dd.id) %}
+                            {% endfor %}
                         {% endif %}
                         
                         {% for dd in digidokters %}

@@ -39,14 +39,15 @@
                     <div class="form-text">Dit e-mailadres wordt gebruikt om in te loggen — moet uniek zijn.</div>
                 </div>
 
+                {% set geselecteerde_rol = form_data.rol if form_data and form_data.rol is defined else (user.rol if user and user.rol == 'platformbeheerder' else (membership.rol if membership and membership.rol else (user.rol if user else 'medewerker'))) %}
                 <div class="mb-3">
                     <label for="rol" class="form-label">Rol <span class="text-danger">*</span></label>
                     <select class="form-select" id="rol" name="rol" required>
-                        <option value="lezer" {% if (form_data.rol if form_data else (user.rol if user else (membership.rol if membership else ''))) == 'lezer' %}selected{% endif %}>Lezer (alleen-lezen)</option>
-                        <option value="medewerker" {% if (form_data.rol if form_data else (user.rol if user else (membership.rol if membership else ''))) == 'medewerker' %}selected{% endif %}>Medewerker</option>
-                        <option value="beheerder" {% if (form_data.rol if form_data else (user.rol if user else (membership.rol if membership else ''))) == 'beheerder' %}selected{% endif %}>Beheerder</option>
+                        <option value="lezer" {% if geselecteerde_rol == 'lezer' %}selected{% endif %}>Lezer (alleen-lezen)</option>
+                        <option value="medewerker" {% if geselecteerde_rol == 'medewerker' %}selected{% endif %}>Medewerker</option>
+                        <option value="beheerder" {% if geselecteerde_rol == 'beheerder' %}selected{% endif %}>Beheerder</option>
                         {% if current_user.rol == 'platformbeheerder' %}
-                        <option value="platformbeheerder" {% if (form_data.rol if form_data else (user.rol if user else '')) == 'platformbeheerder' %}selected{% endif %}>Platformbeheerder</option>
+                        <option value="platformbeheerder" {% if geselecteerde_rol == 'platformbeheerder' %}selected{% endif %}>Platformbeheerder</option>
                         {% endif %}
                     </select>
                 </div>
@@ -60,6 +61,7 @@
                         {% endif %}
                     </label>
                     <input type="password" class="form-control" id="wachtwoord" name="wachtwoord"
+                           autocomplete="new-password"
                            placeholder="{% if actie == 'Nieuw' %}Tijdelijk wachtwoord{% else %}••••••••{% endif %}"
                            {% if actie == 'Nieuw' %}required{% endif %}>
                     {% if actie == 'Nieuw' %}

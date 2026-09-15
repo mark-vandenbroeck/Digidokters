@@ -8,6 +8,7 @@ class Location(db.Model):
     naam = db.Column(db.String(150), nullable=False)
     actief = db.Column(db.Boolean, default=True, nullable=False)
     volgorde = db.Column(db.Integer, default=0, nullable=False)
+    gebruikt_voor_consultaties = db.Column(db.Boolean, default=False, nullable=False)
     organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False)
 
     __table_args__ = (

@@ -48,6 +48,7 @@ def _haal_registraties(
             'Onderwerp': reg.onderwerp,
             'Leeftijdscategorie': reg.leeftijdscategorie.effectieve_naam if reg.leeftijdscategorie else '',
             'Toestel': reg.toestel.effectieve_naam if reg.toestel else '',
+            'Locatie': reg.locatie.naam if reg.locatie else '',
         })
     return rijen
 
@@ -60,7 +61,7 @@ def exporteer_csv(
     rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
     df = pd.DataFrame(rijen) if rijen else pd.DataFrame(
         columns=['Registratienummer', 'Datum', 'Bezoeker', 'Digidokter',
-                 'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel']
+                 'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel', 'Locatie']
     )
     output = io.StringIO()
     df.to_csv(output, index=False, encoding='utf-8-sig')
@@ -75,7 +76,7 @@ def exporteer_xlsx(
     rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
     df = pd.DataFrame(rijen) if rijen else pd.DataFrame(
         columns=['Registratienummer', 'Datum', 'Bezoeker', 'Digidokter',
-                 'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel']
+                 'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel', 'Locatie']
     )
 
     output = io.BytesIO()

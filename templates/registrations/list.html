@@ -140,6 +140,9 @@
                         <td class="text-nowrap">{{ r.datum.strftime('%d/%m/%Y') }}</td>
                         <td>
                             <div class="fw-medium">{{ r.client }}</div>
+                            {% if r.locatie %}
+                            <div class="text-muted small" style="font-size: 0.75rem;"><i class="bi bi-geo-alt me-1 text-primary"></i>{{ r.locatie.naam }}</div>
+                            {% endif %}
                             <div class="text-muted small d-md-none">{{ r.digidokter.naam if r.digidokter }}</div>
                         </td>
                         <td class="d-none d-md-table-cell">{{ r.digidokter.naam if r.digidokter else '–' }}</td>

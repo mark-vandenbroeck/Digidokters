@@ -422,6 +422,18 @@ def create_app(config_class=Config):
             except Exception:
                 db.session.rollback()
 
+            try:
+                db.session.execute(db.text("ALTER TABLE locations ADD COLUMN gebruikt_voor_consultaties BOOLEAN DEFAULT FALSE NOT NULL"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+            try:
+                db.session.execute(db.text("ALTER TABLE registrations ADD COLUMN locatie_id INTEGER REFERENCES locations(id)"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
             from models.organisatie import UserOrganisatie
             from models.digidokter import Digidokter
             from models.user import User

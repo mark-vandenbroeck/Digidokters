@@ -158,6 +158,47 @@ def overzicht():
     )
     per_herkomst = [(r[0], r[1]) for r in per_herkomst_raw]
 
+    # Per consultatielocatie
+    from models.location import Location
+    org_consultatie_locs = (
+        Location.query
+        .filter_by(organisatie_id=org_id, gebruikt_voor_consultaties=True)
+        .order_by(Location.volgorde.asc(), Location.naam.asc())
+        .all()
+    )
+    heeft_consultatie_locaties = len(org_consultatie_locs) > 0
+
+    loc_counts_raw = (
+        jaar_filter(
+            db.session.query(
+                Registration.locatie_id,
+                func.count(Registration.id).label('aantal')
+            )
+        )
+        .group_by(Registration.locatie_id)
+        .all()
+    )
+    loc_counts = {r[0]: r[1] for r in loc_counts_raw}
+
+    per_locatie = []
+    seen_loc_ids = set()
+
+    for loc in org_consultatie_locs:
+        per_locatie.append((loc.naam, loc_counts.get(loc.id, 0)))
+        seen_loc_ids.add(loc.id)
+
+    # Eventuele overige locaties uit historische registraties
+    overige_loc_ids = [lid for lid in loc_counts if lid is not None and lid not in seen_loc_ids]
+    if overige_loc_ids:
+        overige_locs = Location.query.filter(Location.id.in_(overige_loc_ids)).order_by(Location.volgorde.asc(), Location.naam.asc()).all()
+        for loc in overige_locs:
+            per_locatie.append((loc.naam, loc_counts.get(loc.id, 0)))
+            seen_loc_ids.add(loc.id)
+
+    # Registraties zonder gekoppelde locatie
+    zonder_locatie_aantal = loc_counts.get(None, 0)
+    if zonder_locatie_aantal > 0:
+        per_locatie.append(('Niet gespecificeerd', zonder_locatie_aantal))
 
     # Nieuwe vs terugkerende klanten
     nieuwe_klanten = jaar_filter(
@@ -502,6 +543,8 @@ def overzicht():
         per_leeftijd=per_leeftijd,
         per_toestel=per_toestel,
         per_herkomst=per_herkomst,
+        per_locatie=per_locatie,
+        heeft_consultatie_locaties=heeft_consultatie_locaties,
         per_geslacht=per_geslacht,
         nieuwe_klanten=nieuwe_klanten,
         terugkerende_klanten=totaal_jaar - nieuwe_klanten,

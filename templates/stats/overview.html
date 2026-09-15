@@ -264,6 +264,61 @@
                 </div>
             </div>
 
+            <!-- Verdeling over locaties -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Verdeling over locaties</span>
+                        {% if per_locatie %}
+                        <span class="badge bg-light text-dark border fw-normal">{{ per_locatie|length }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-0">
+                        {% if per_locatie and (heeft_consultatie_locaties or per_locatie|length > 1 or (per_locatie|length == 1 and per_locatie[0][0] != 'Niet gespecificeerd')) %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-3">Locatie</th>
+                                        <th style="width: 35%;">Aandeel</th>
+                                        <th class="pe-3 text-end">Consultaties</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for loc, aantal in per_locatie %}
+                                    {% set pct = (aantal / totaal_jaar * 100)|round(1) if totaal_jaar > 0 else 0 %}
+                                    <tr>
+                                        <td class="ps-3 fw-medium">
+                                            {% if loc == 'Niet gespecificeerd' %}
+                                            <span class="text-muted"><i class="bi bi-question-circle me-1"></i>{{ loc }}</span>
+                                            {% else %}
+                                            <i class="bi bi-geo-alt me-1 text-primary"></i>{{ loc }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="progress flex-grow-1" style="height: 6px;">
+                                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ pct }}%"></div>
+                                                </div>
+                                                <span class="text-muted small text-nowrap" style="font-size: 0.75rem;">{{ pct }}%</span>
+                                            </div>
+                                        </td>
+                                        <td class="pe-3 text-end fw-semibold">{{ aantal }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4 px-3">
+                            <p class="text-muted mb-1">Geen consultatielocaties geconfigureerd voor deze organisatie.</p>
+                            <small class="text-muted">U kunt locaties aanduiden als "Gebruikt voor consultaties" via Beheer &gt; Locaties.</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
             <!-- Tijdlijn per week (jaar-op-jaar) of per jaar (bij 'alle') -->
             {% if jaar != 'alle' %}
             <div class="col-12">

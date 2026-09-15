@@ -10,6 +10,7 @@ from models.device import Device
 from models.activity_type import ActivityType
 from models.location import Location
 from models.herkomst import Herkomst
+from models.registration import Registration
 from utils.decorators import admin_required, platform_admin_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/beheer')
@@ -358,12 +359,21 @@ def _beheer_lijst(model, template, naam_veld='naam'):
             .all()
         )
     elif model.__name__ == 'Location':
-        usage_counts = dict(
+        agenda_counts = dict(
             db.session.query(AgendaItem.locatie_id, db.func.count(AgendaItem.id))
             .filter_by(organisatie_id=org_id)
             .group_by(AgendaItem.locatie_id)
             .all()
         )
+        reg_counts = dict(
+            db.session.query(Registration.locatie_id, db.func.count(Registration.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Registration.locatie_id)
+            .all()
+        )
+        usage_counts = {}
+        for lid in set(list(agenda_counts.keys()) + list(reg_counts.keys())):
+            usage_counts[lid] = agenda_counts.get(lid, 0) + reg_counts.get(lid, 0)
 
     return render_template(template, items=items, usage_counts=usage_counts)
 
@@ -990,6 +1000,7 @@ def backup():
             'digidokter_naam': r.digidokter.naam if r.digidokter else '',
             'leeftijdscategorie_naam': r.leeftijdscategorie.naam if r.leeftijdscategorie else '',
             'toestel_naam': r.toestel.naam if r.toestel else '',
+            'locatie_naam': r.locatie.naam if r.locatie else None,
             'aangemaakt_door_naam': r.aangemaakt_door_user.naam if r.aangemaakt_door_user else '',
             'aangemaakt_op': r.aangemaakt_op.isoformat() if r.aangemaakt_op else None,
             'gewijzigd_op': r.gewijzigd_op.isoformat() if r.gewijzigd_op else None
@@ -1008,7 +1019,8 @@ def backup():
         locations_data.append({
             'naam': l.naam,
             'actief': l.actief,
-            'volgorde': l.volgorde
+            'volgorde': l.volgorde,
+            'gebruikt_voor_consultaties': getattr(l, 'gebruikt_voor_consultaties', False)
         })
 
     agenda_items_data = []
@@ -1313,6 +1325,7 @@ def restore():
                             naam=l_data['naam'],
                             actief=l_data['actief'],
                             volgorde=l_data['volgorde'],
+                            gebruikt_voor_consultaties=l_data.get('gebruikt_voor_consultaties', False),
                             organisatie_id=org_id
                         )
                         db.session.add(l)
@@ -1512,9 +1525,26 @@ def activiteitstype_volgorde(item_id, richting):
 @login_required
 @admin_required
 def locaties():
-    from utils.tenant import filter_op_organisatie
+    from utils.tenant import filter_op_organisatie, get_huidige_organisatie_id
+    from models.agenda import AgendaItem
+    org_id = get_huidige_organisatie_id()
     items = filter_op_organisatie(Location.query, Location).order_by(Location.volgorde, Location.naam).all()
-    return render_template('admin/locaties.html', items=items)
+    agenda_counts = dict(
+        db.session.query(AgendaItem.locatie_id, db.func.count(AgendaItem.id))
+        .filter_by(organisatie_id=org_id)
+        .group_by(AgendaItem.locatie_id)
+        .all()
+    )
+    reg_counts = dict(
+        db.session.query(Registration.locatie_id, db.func.count(Registration.id))
+        .filter_by(organisatie_id=org_id)
+        .group_by(Registration.locatie_id)
+        .all()
+    )
+    usage_counts = {}
+    for lid in set(list(agenda_counts.keys()) + list(reg_counts.keys())):
+        usage_counts[lid] = agenda_counts.get(lid, 0) + reg_counts.get(lid, 0)
+    return render_template('admin/locaties.html', items=items, usage_counts=usage_counts)
 
 
 @admin_bp.route('/locaties/nieuw', methods=['GET', 'POST'])
@@ -1526,6 +1556,7 @@ def locatie_nieuw():
     
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
+        gebruikt_voor_consultaties = request.form.get('gebruikt_voor_consultaties') == 'on'
         if not naam:
             flash('Naam is verplicht.', 'danger')
             return render_template('admin/item_form.html', titel='Locatie', actie='Toevoegen', item=None, terug_url=url_for('admin.locaties'))
@@ -1536,7 +1567,7 @@ def locatie_nieuw():
             return render_template('admin/item_form.html', titel='Locatie', actie='Toevoegen', item=None, form_data=request.form, terug_url=url_for('admin.locaties'))
             
         max_volgorde = db.session.query(db.func.max(Location.volgorde)).filter_by(organisatie_id=org_id).scalar() or 0
-        item = Location(naam=naam, actief=True, volgorde=max_volgorde + 1)
+        item = Location(naam=naam, actief=True, volgorde=max_volgorde + 1, gebruikt_voor_consultaties=gebruikt_voor_consultaties)
         set_organisatie_id_op_model(item)
         db.session.add(item)
         db.session.commit()
@@ -1561,6 +1592,7 @@ def locatie_wijzigen(item_id):
     if request.method == 'POST':
         item.naam = request.form.get('naam', item.naam).strip()
         item.actief = request.form.get('actief') == 'on'
+        item.gebruikt_voor_consultaties = request.form.get('gebruikt_voor_consultaties') == 'on'
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.locaties'))
@@ -1589,8 +1621,14 @@ def locatie_verwijderen(item_id):
         abort(403)
 
     agenda_count = AgendaItem.query.filter_by(locatie_id=item.id).count()
-    if agenda_count > 0:
-        flash(f'Locatie "{item.naam}" kan niet worden verwijderd omdat er nog {agenda_count} agenda-activiteit(en) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+    reg_count = Registration.query.filter_by(locatie_id=item.id).count()
+    if agenda_count > 0 or reg_count > 0:
+        redenen = []
+        if reg_count > 0:
+            redenen.append(f'{reg_count} consultatie-registratie(s)')
+        if agenda_count > 0:
+            redenen.append(f'{agenda_count} agenda-activiteit(en)')
+        flash(f'Locatie "{item.naam}" kan niet worden verwijderd omdat er nog {" en ".join(redenen)} aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
         return redirect(url_for('admin.locaties'))
 
     naam = item.naam

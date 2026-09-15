@@ -8,6 +8,7 @@ from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
 from models.herkomst import Herkomst
+from models.location import Location
 from sqlalchemy.orm import joinedload
 from utils.decorators import writer_required
 
@@ -24,6 +25,7 @@ def _keuzelijsten():
         'leeftijdscategorieën': filter_op_organisatie(AgeCategory.query.filter_by(actief=True), AgeCategory).order_by(AgeCategory.volgorde, AgeCategory.naam).all(),
         'toestellen': filter_op_organisatie(Device.query.filter_by(actief=True), Device).order_by(Device.volgorde, Device.naam).all(),
         'herkomsten': filter_op_organisatie(Herkomst.query.filter_by(actief=True), Herkomst).order_by(Herkomst.volgorde, Herkomst.naam).all(),
+        'consultatie_locaties': filter_op_organisatie(Location.query.filter_by(actief=True, gebruikt_voor_consultaties=True), Location).order_by(Location.volgorde, Location.naam).all(),
     }
 
 
@@ -54,7 +56,8 @@ def lijst():
             joinedload(Registration.digidokter),
             joinedload(Registration.leeftijdscategorie).joinedload(AgeCategory.mapped_to),
             joinedload(Registration.toestel).joinedload(Device.mapped_to),
-            joinedload(Registration.herkomst)
+            joinedload(Registration.herkomst),
+            joinedload(Registration.locatie)
         )
     )
 
@@ -240,6 +243,21 @@ def nieuw():
             if not dev or dev.organisatie_id != org_id:
                 fouten.append('Ongeldig toestel geselecteerd.')
 
+        consultatie_locaties = keuzes['consultatie_locaties']
+        locatie_id = None
+        if len(consultatie_locaties) > 1:
+            locatie_id = request.form.get('locatie_id', 0, type=int) or None
+            if not locatie_id:
+                fouten.append('Locatie is verplicht.')
+            else:
+                loc = db.session.get(Location, locatie_id)
+                if not loc or loc.organisatie_id != org_id:
+                    fouten.append('Ongeldige locatie geselecteerd.')
+        elif len(consultatie_locaties) == 1:
+            locatie_id = consultatie_locaties[0].id
+        else:
+            locatie_id = None
+
         if fouten:
             for f in fouten:
                 flash(f, 'danger')
@@ -257,6 +275,7 @@ def nieuw():
             onderwerp=onderwerp,
             leeftijdscategorie_id=leeftijdscategorie_id,
             toestel_id=toestel_id,
+            locatie_id=locatie_id,
             aangemaakt_door_id=current_user.id,
         )
         set_organisatie_id_op_model(reg)
@@ -356,6 +375,20 @@ def wijzigen(reg_id):
             if not dev or dev.organisatie_id != org_id:
                 fouten.append('Ongeldig toestel geselecteerd.')
 
+        consultatie_locaties = keuzes['consultatie_locaties']
+        locatie_id = reg.locatie_id
+        if len(consultatie_locaties) > 1:
+            locatie_id = request.form.get('locatie_id', 0, type=int) or None
+            if not locatie_id:
+                fouten.append('Locatie is verplicht.')
+            else:
+                loc = db.session.get(Location, locatie_id)
+                if not loc or loc.organisatie_id != org_id:
+                    fouten.append('Ongeldige locatie geselecteerd.')
+        elif len(consultatie_locaties) == 1:
+            if not reg.locatie_id:
+                locatie_id = consultatie_locaties[0].id
+
         if fouten:
             for f in fouten:
                 flash(f, 'danger')
@@ -371,6 +404,7 @@ def wijzigen(reg_id):
         reg.onderwerp = onderwerp
         reg.leeftijdscategorie_id = leeftijdscategorie_id
         reg.toestel_id = toestel_id
+        reg.locatie_id = locatie_id
         db.session.commit()
 
         # Indien onderwerp gewijzigd of nog niet geclassificeerd, heranalyseer asynchroon

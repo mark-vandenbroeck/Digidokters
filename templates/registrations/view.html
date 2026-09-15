@@ -68,6 +68,11 @@
                     {% endif %}
                 </dd>
 
+                {% if reg.locatie %}
+                <dt class="col-sm-4 text-muted fw-normal small">Locatie</dt>
+                <dd class="col-sm-8"><i class="bi bi-geo-alt me-1 text-primary"></i>{{ reg.locatie.naam }}</dd>
+                {% endif %}
+
                 <dt class="col-sm-4 text-muted fw-normal small">Onderwerp</dt>
                 <dd class="col-sm-8">{{ reg.onderwerp }}</dd>
 

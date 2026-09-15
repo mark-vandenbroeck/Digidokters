@@ -223,3 +223,28 @@ class TestUserDeleteAndSorting(BaseTestCase):
         refreshed_folder = db.session.get(Folder, folder_id)
         self.assertEqual(refreshed_folder.aangemaakt_door_id, self.admin_user.id)
 
+    def test_gebruiker_wijzigen_form_renders_organisatie_rol_en_autocomplete(self):
+        self.login_admin()
+
+        # Maak gebruiker aan met globale rol 'medewerker', maar organisatie-rol 'beheerder'
+        u = User(
+            naam="Geert",
+            email="geert@test.com",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="medewerker",
+            actief=True
+        )
+        db.session.add(u)
+        db.session.commit()
+
+        uo = UserOrganisatie(user_id=u.id, organisatie_id=self.org.id, rol="beheerder", actief=True)
+        db.session.add(uo)
+        db.session.commit()
+
+        # GET op wijzigen pagina: controleer dat beheerder geselecteerd is en autocomplete aanwezig is
+        res = self.client.get(f'/beheer/gebruikers/{u.id}/wijzig')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertIn('<option value="beheerder" selected>Beheerder</option>', html)
+        self.assertIn('autocomplete="new-password"', html)
+

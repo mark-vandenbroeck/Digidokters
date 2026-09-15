@@ -70,6 +70,19 @@
                 </script>
                 {% endif %}
 
+                {% if titel == 'Locatie' %}
+                <div class="form-check mb-3 p-3 bg-light rounded border">
+                    <input class="form-check-input" type="checkbox" id="gebruikt_voor_consultaties" name="gebruikt_voor_consultaties" 
+                           {% if (form_data and form_data.get('gebruikt_voor_consultaties') == 'on') or (not form_data and item and item.gebruikt_voor_consultaties) %}checked{% endif %}>
+                    <label class="form-check-label fw-semibold text-dark" for="gebruikt_voor_consultaties">
+                        <i class="bi bi-geo-alt text-primary me-1"></i>Gebruikt voor consultaties
+                    </label>
+                    <div class="form-text text-muted mt-1 small">
+                        Duid aan of deze locatie gekozen kan worden bij het invoeren van consultatie-registraties.
+                    </div>
+                </div>
+                {% endif %}
+
                 {% if titel == 'Activiteitstype' %}
                 <div class="form-check mb-3 p-3 bg-light rounded border">
                     <input class="form-check-input" type="checkbox" id="heeft_evaluatie" name="heeft_evaluatie" 

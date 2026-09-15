@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entity-Relationship Diagram (ERD) - Digidokters</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',
+            securityLevel: 'loose',
+            themeVariables: {
+                fontFamily: 'Outfit, sans-serif',
+                primaryColor: '#EFF6FF',
+                primaryBorderColor: '#2563EB',
+                primaryTextColor: '#0F172A',
+                lineColor: '#64748B',
+                secondaryColor: '#ECFDF5',
+                tertiaryColor: '#F5F3FF'
+            }
+        });
+    </script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #1e40af;
+            --primary-hover: #1d4ed8;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 100%;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        .title-section h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-section p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-action {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        }
+
+        .btn-action:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: white;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+
+        .btn-secondary:hover {
+            background-color: #f1f5f9;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+
+        .stat-val {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.2;
+        }
+
+        .stat-lbl {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .card-title {
+            margin-top: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+
+        .diagram-container {
+            width: 100%;
+            overflow-x: auto;
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+
+        .domain-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+        }
+
+        .domain-item {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .domain-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+        }
+
+        .domain-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .table-badge {
+            font-family: 'JetBrains Mono', monospace;
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin: 2px;
+            display: inline-block;
+        }
+
+        @media print {
+            body {
+                background-color: white;
+                color: black;
+                padding: 0;
+            }
+            .btn-group { display: none; }
+            .card { box-shadow: none; border: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div class="title-section">
+            <h1>Entity-Relationship Diagram (ERD)</h1>
+            <p>Digidokters Multi-Tenant Platform — Relationeel Gegevensmodel</p>
+        </div>
+        <div class="btn-group">
+            <a href="Entity_Relationship_Diagram_Digidokters.pdf" class="btn-action" target="_blank">
+                <i class="bi bi-file-earmark-pdf-fill"></i> Download Volledig PDF Rapport
+            </a>
+            <button class="btn-action btn-secondary" onclick="window.print()">
+                <i class="bi bi-printer"></i> Afdrukken
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Overzicht -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#EFF6FF; color:#1D4ED8;"><i class="bi bi-table"></i></div>
+            <div>
+                <div class="stat-val">28 Tabellen</div>
+                <div class="stat-lbl">Entiteiten in Datamodel</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#ECFDF5; color:#047857;"><i class="bi bi-diagram-3-fill"></i></div>
+            <div>
+                <div class="stat-val">33 Relaties</div>
+                <div class="stat-lbl">Foreign Keys & Integriteit</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#F5F3FF; color:#6D28D9;"><i class="bi bi-building-lock"></i></div>
+            <div>
+                <div class="stat-val">Multi-Tenant</div>
+                <div class="stat-lbl">Isolatie via Organisatie_ID</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#FFFBEB; color:#B45309;"><i class="bi bi-robot"></i></div>
+            <div>
+                <div class="stat-val">Gemini AI</div>
+                <div class="stat-lbl">Geïntegreerde NLP Classificatie</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ERD Kaart -->
+    <div class="card">
+        <div class="card-title">
+            <i class="bi bi-diagram-3 text-primary"></i> Visueel Datamodel (Mermaid Entity-Relationship Diagram)
+        </div>
+        <div class="diagram-container">
+            <div class="mermaid">
+erDiagram
+    %% DOMEIN 1: MULTI-TENANCY & AUTH
+    organisaties ||--o{ user_organisaties : "heeft leden"
+    users ||--o{ user_organisaties : "is lid van"
+    organisaties ||--o{ audit_logs : "bevat mutaties"
+
+    %% DOMEIN 2: STAMGEGEVENS
+    organisaties ||--o{ digidokters : "beheert"
+    users ||--o| digidokters : "is gekoppeld aan (opt)"
+    organisaties ||--o{ devices : "beheert"
+    devices ||--o| devices : "mapped_to_id (historische consolidatie)"
+    organisaties ||--o{ age_categories : "beheert"
+    age_categories ||--o| age_categories : "mapped_to_id (historische consolidatie)"
+    organisaties ||--o{ herkomst : "beheert"
+    organisaties ||--o{ locations : "beheert"
+    organisaties ||--o{ activity_types : "beheert"
+
+    %% DOMEIN 3: REGISTRATIES
+    organisaties ||--o{ registrations : "bevat consultaties"
+    digidokters ||--o{ registrations : "verzorgt"
+    devices ||--o{ registrations : "behandelt"
+    age_categories ||--o{ registrations : "betreft"
+    herkomst ||--o{ registrations : "komt via (opt)"
+    users ||--o{ registrations : "voert in"
+
+    %% DOMEIN 4: AI CLASSIFICATIE
+    registrations ||--o| question_classifications : "heeft AI analyse (1:1)"
+    question_categories ||--o{ question_classifications : "categoriseert"
+    users ||--o{ question_classifications : "corrigeert handmatig (opt)"
+
+    %% DOMEIN 5: AGENDA & EVALUATIES
+    organisaties ||--o{ agenda_items : "plant sessies"
+    locations ||--o{ agenda_items : "vindt plaats in"
+    activity_types ||--o{ agenda_items : "is van type"
+    agenda_items ||--|{ agenda_digidokters : "bevat"
+    digidokters ||--|{ agenda_digidokters : "is ingepland via"
+    
+    organisaties ||--o{ evaluatie_formulieren : "beheert"
+    activity_types ||--o{ evaluatie_formulieren : "gebruikt formulier"
+    evaluatie_formulieren ||--o{ evaluatie_vragen : "bevat vragen"
+    agenda_items ||--o{ evaluatie_uitnodigingen : "triggert token-mail"
+    digidokters ||--o{ evaluatie_uitnodigingen : "ontvangt uitnodiging"
+    agenda_items ||--o{ evaluatie_reacties : "ontvangt respons"
+    evaluatie_formulieren ||--o{ evaluatie_reacties : "is ingevuld met"
+
+    %% DOMEIN 6: DOCUMENTEN
+    organisaties ||--o{ mappen : "beheert"
+    mappen ||--o{ mappen : "parent_id (boomstructuur)"
+    mappen ||--o{ documenten : "bevat bestanden"
+    app_mappen ||--o{ app_mappen : "parent_id (boomstructuur)"
+    app_mappen ||--o{ app_documenten : "bevat platformbestanden"
+
+    %% DOMEIN 7: FEEDBACK
+    organisaties ||--o{ feedback_items : "dient in"
+    users ||--o{ feedback_items : "auteur"
+    feedback_items ||--o{ feedback_reacties : "heeft commentaren"
+    feedback_items ||--o{ feedback_stemmen : "heeft votes"
+    feedback_items ||--o{ feedback_views : "gelezen-status per gebruiker"
+
+    %% ENTITY ATTRIBUTEN DEFINITIES
+    organisaties {
+        int id PK
+        string naam "unique"
+        string slug "unique, index"
+        boolean actief
+        datetime aangemaakt_op
+    }
+
+    users {
+        int id PK
+        string naam
+        string email "unique, index"
+        string wachtwoord_hash
+        string rol "platformbeheerder/beheerder/invoerder/lezer"
+        boolean actief
+        boolean moet_wachtwoord_wijzigen
+        string reset_code "6-cijferige OTP"
+    }
+
+    registrations {
+        int id PK
+        int organisatie_id FK
+        string registratienummer "JJJJ-XXXX"
+        date datum "index"
+        string client
+        int digidokter_id FK
+        int toestel_id FK
+        int leeftijdscategorie_id FK
+        int herkomst_id FK
+        string geslacht
+        text onderwerp "invoer voor AI"
+        int aangemaakt_door_id FK
+    }
+
+    devices {
+        int id PK
+        int organisatie_id FK
+        string naam
+        int volgorde
+        boolean actief
+        int mapped_to_id FK "self-ref consolidatie"
+    }
+
+    age_categories {
+        int id PK
+        int organisatie_id FK
+        string naam
+        int volgorde
+        boolean actief
+        int mapped_to_id FK "self-ref consolidatie"
+    }
+
+    question_classifications {
+        int id PK
+        int registration_id FK "1:1 unique"
+        int category_id FK
+        float zekerheid "score"
+        text toelichting
+        string model_naam
+        boolean is_handmatig_aangepast
+    }
+
+    agenda_items {
+        int id PK
+        int organisatie_id FK
+        date datum
+        string uur_van
+        string uur_tot
+        int type_id FK
+        int locatie_id FK
+        string reeks_id "UUID herhaling"
+    }
+            </div>
+        </div>
+    </div>
+
+    <!-- 8 Domeinen Kaart -->
+    <div class="card">
+        <div class="card-title">
+            <i class="bi bi-layers text-primary"></i> Architecturale Domeinen & Tabellenoverzicht
+        </div>
+        <div class="domain-grid">
+            <div class="domain-item" style="border-left: 4px solid #1D4ED8;">
+                <div class="domain-header">
+                    <span>1. Multi-Tenancy & Autorisatie</span>
+                    <span class="domain-badge" style="background:#EFF6FF; color:#1D4ED8;">4 Tabellen</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Gebruikersaccounts, tenant-isolatie en audit logging.</p>
+                <div>
+                    <span class="table-badge">organisaties</span>
+                    <span class="table-badge">users</span>
+                    <span class="table-badge">user_organisaties</span>
+                    <span class="table-badge">audit_logs</span>
+                </div>
+            </div>
+
+            <div class="domain-item" style="border-left: 4px solid #047857;">
+                <div class="domain-header">
+                    <span>2. Stamgegevens (Master Data)</span>
+                    <span class="domain-badge" style="background:#ECFDF5; color:#047857;">6 Tabellen</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Configureerbare stamtabellen met volgorde en historische mapping.</p>
+                <div>
+                    <span class="table-badge">digidokters</span>
+                    <span class="table-badge">devices</span>
+                    <span class="table-badge">age_categories</span>
+                    <span class="table-badge">herkomst</span>
+                    <span class="table-badge">locations</span>
+                    <span class="table-badge">activity_types</span>
+                </div>
+            </div>
+
+            <div class="domain-item" style="border-left: 4px solid #6D28D9;">
+                <div class="domain-header">
+                    <span>3. Consultaties & Registraties</span>
+                    <span class="domain-badge" style="background:#F5F3FF; color:#6D28D9;">1 Tabel</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Centrale bezoekenadministratie en demografische parameters.</p>
+                <div>
+                    <span class="table-badge">registrations</span>
+                </div>
+            </div>
+
+            <div class="domain-item" style="border-left: 4px solid #4338CA;">
+                <div class="domain-header">
+                    <span>4. AI-Vragenanalyse</span>
+                    <span class="domain-badge" style="background:#EEF2FF; color:#4338CA;">2 Tabellen</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Gemini AI categorisatie, zekerheidsscores en beheer-overrides.</p>
+                <div>
+                    <span class="table-badge">question_categories</span>
+                    <span class="table-badge">question_classifications</span>
+                </div>
+            </div>
+
+            <div class="domain-item" style="border-left: 4px solid #B45309;">
+                <div class="domain-header">
+                    <span>5. Agenda & Planning</span>
+                    <span class="domain-badge" style="background:#FFFBEB; color:#B45309;">2 Tabellen</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Sessiebeheer, herhalende reeksen en N:M vrijwilligerskoppeling.</p>
+                <div>
+                    <span class="table-badge">agenda_items</span>
+                    <span class="table-badge">agenda_digidokters</span>
+                </div>
+            </div>
+
+            <div class="domain-item" style="border-left: 4px solid #C2410C;">
+                <div class="domain-header">
+                    <span>6. Evaluaties & Tevredenheid</span>
+                    <span class="domain-badge" style="background:#FFF7ED; color:#C2410C;">4 Tabellen</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Formulieren, token-uitnodigingen en ingevulde evaluaties.</p>
+                <div>
+                    <span class="table-badge">evaluatie_formulieren</span>
+                    <span class="table-badge">evaluatie_vragen</span>
+                    <span class="table-badge">evaluatie_uitnodigingen</span>
+                    <span class="table-badge">evaluatie_reacties</span>
+                </div>
+            </div>
+
+            <div class="domain-item" style="border-left: 4px solid #0E7490;">
+                <div class="domain-header">
+                    <span>7. Documentenbeheer</span>
+                    <span class="domain-badge" style="background:#ECFEFF; color:#0E7490;">4 Tabellen</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Organisatie- én platformdocumenten (blob + full-text search).</p>
+                <div>
+                    <span class="table-badge">mappen</span>
+                    <span class="table-badge">documenten</span>
+                    <span class="table-badge">app_mappen</span>
+                    <span class="table-badge">app_documenten</span>
+                </div>
+            </div>
+
+            <div class="domain-item" style="border-left: 4px solid #BE123C;">
+                <div class="domain-header">
+                    <span>8. Feedback & Communicatie</span>
+                    <span class="domain-badge" style="background:#FFF1F2; color:#BE123C;">5 Tabellen</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Bugs, wensen, upvotes, gelezen-status en e-mailsjablonen.</p>
+                <div>
+                    <span class="table-badge">feedback_items</span>
+                    <span class="table-badge">feedback_reacties</span>
+                    <span class="table-badge">feedback_stemmen</span>
+                    <span class="table-badge">feedback_views</span>
+                    <span class="table-badge">email_templates</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

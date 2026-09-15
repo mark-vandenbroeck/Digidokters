@@ -85,6 +85,24 @@
                         </select>
                     </div>
 
+                    <!-- Locatie (enkel indien meer dan één consultatielocatie) -->
+                    {% if consultatie_locaties and consultatie_locaties|length > 1 %}
+                    <div class="col-12 col-sm-6">
+                        <label for="locatie_id" class="form-label">Locatie <span class="text-danger">*</span></label>
+                        <select class="form-select" id="locatie_id" name="locatie_id" required>
+                            <option value="">— Kies een locatie —</option>
+                            {% for loc in consultatie_locaties %}
+                            <option value="{{ loc.id }}" {{ 'selected' if loc.id == reg.locatie_id }}>
+                                {{ loc.naam }}
+                            </option>
+                            {% endfor %}
+                            {% if reg.locatie and reg.locatie not in consultatie_locaties %}
+                            <option value="{{ reg.locatie.id }}" selected>{{ reg.locatie.naam }} (historisch)</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    {% endif %}
+
                     <div class="col-12">
                         <label for="onderwerp" class="form-label">Onderwerp <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="onderwerp" name="onderwerp"

@@ -103,10 +103,11 @@ def seed_organisatie_defaults(org_id):
         
         if active_locs:
             for i, loc in enumerate(active_locs):
-                db.session.add(Location(naam=loc.naam, actief=True, volgorde=i, organisatie_id=org_id))
+                db.session.add(Location(naam=loc.naam, actief=True, volgorde=i, gebruikt_voor_consultaties=getattr(loc, 'gebruikt_voor_consultaties', False), organisatie_id=org_id))
         else:
             for i, name in enumerate(['Bib Londerzeel', 'Buurttafel', 'Brouwerij De Palm']):
-                db.session.add(Location(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+                gebruikt = (i == 0)
+                db.session.add(Location(naam=name, actief=True, volgorde=i, gebruikt_voor_consultaties=gebruikt, organisatie_id=org_id))
 
     # Herkomsten
     if not Herkomst.query.filter_by(organisatie_id=org_id).first():

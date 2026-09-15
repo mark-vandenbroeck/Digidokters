@@ -17,6 +17,8 @@ class Registration(db.Model):
     onderwerp = db.Column(db.Text, nullable=False)
     leeftijdscategorie_id = db.Column(db.Integer, db.ForeignKey('age_categories.id'), nullable=False, index=True)
     toestel_id = db.Column(db.Integer, db.ForeignKey('devices.id'), nullable=False, index=True)
+    locatie_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True, index=True)
+    locatie = db.relationship('Location', backref=db.backref('registraties', lazy=True))
     aangemaakt_door_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     aangemaakt_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     gewijzigd_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),

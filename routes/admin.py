@@ -10,6 +10,8 @@ from models.device import Device
 from models.activity_type import ActivityType
 from models.location import Location
 from models.herkomst import Herkomst
+from models.gender_identity import GenderIdentity
+from models.functie import Functie, user_functies
 from models.registration import Registration
 from utils.decorators import admin_required, platform_admin_required
 
@@ -63,7 +65,8 @@ def gebruikers():
         memberships=memberships,
         digidokter_counts=digidokter_counts,
         sort_by=sort_by,
-        direction=direction
+        direction=direction,
+        org_id=org_id
     )
 
 
@@ -75,20 +78,24 @@ def gebruiker_nieuw():
     from models.organisatie import UserOrganisatie
     org_id = get_huidige_organisatie_id()
 
+    beschikbare_functies = Functie.query.filter_by(organisatie_id=org_id, actief=True).order_by(Functie.volgorde).all()
+
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
         email_raw = request.form.get('email', '').strip().lower()
         email = email_raw if email_raw and email_raw not in ('none', 'null', 'undefined', 'n/a', '') else None
+        telefoonnummer = request.form.get('telefoonnummer', '').strip() or None
         rol = request.form.get('rol', 'medewerker')
         tijdelijk_ww = request.form.get('wachtwoord', '').strip()
+        functie_ids = [int(x) for x in request.form.getlist('functie_ids') if x.isdigit()]
 
         if rol == 'platformbeheerder' and current_user.rol != 'platformbeheerder':
             flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
-            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
+            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies)
 
         if not naam or not email or not tijdelijk_ww:
             flash('Naam, e-mailadres en wachtwoord zijn verplicht.', 'danger')
-            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
+            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies)
 
         # Check of gebruiker al bestaat globally op e-mailadres
         user = User.query.filter(db.func.lower(User.email) == email).first()
@@ -96,7 +103,7 @@ def gebruiker_nieuw():
             uo_existing = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first()
             if uo_existing:
                 flash('Er bestaat al een gebruiker met dit e-mailadres in deze organisatie.', 'danger')
-                return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form)
+                return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies)
             
             uo = UserOrganisatie(
                 user_id=user.id,
@@ -105,7 +112,16 @@ def gebruiker_nieuw():
                 actief=request.form.get('actief') == 'on' if 'actief' in request.form else True
             )
             db.session.add(uo)
+            if telefoonnummer and not user.telefoonnummer:
+                user.telefoonnummer = telefoonnummer
             
+            # Geselecteerde functies koppelen
+            if functie_ids:
+                gekozen = Functie.query.filter(Functie.organisatie_id == org_id, Functie.id.in_(functie_ids)).all()
+                for fn in gekozen:
+                    if fn not in user.functies:
+                        user.functies.append(fn)
+
             # Voeg ook toe als Digidokter
             existing_dd = Digidokter.query.filter_by(organisatie_id=org_id, naam=user.naam).first()
             if not existing_dd:
@@ -120,6 +136,7 @@ def gebruiker_nieuw():
         user = User(
             naam=naam,
             email=email,
+            telefoonnummer=telefoonnummer,
             wachtwoord_hash=generate_password_hash(tijdelijk_ww),
             rol=rol,
             actief=True,
@@ -127,6 +144,12 @@ def gebruiker_nieuw():
         )
         db.session.add(user)
         db.session.flush()
+
+        # Geselecteerde functies koppelen
+        if functie_ids:
+            gekozen = Functie.query.filter(Functie.organisatie_id == org_id, Functie.id.in_(functie_ids)).all()
+            for fn in gekozen:
+                user.functies.append(fn)
 
         uo = UserOrganisatie(
             user_id=user.id,
@@ -157,7 +180,7 @@ def gebruiker_nieuw():
             
         return redirect(url_for('admin.gebruikers'))
 
-    return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None)
+    return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, beschikbare_functies=beschikbare_functies)
 
 
 @admin_bp.route('/gebruikers/<int:user_id>/wijzig', methods=['GET', 'POST'])
@@ -170,36 +193,46 @@ def gebruiker_wijzigen(user_id):
     
     user = db.get_or_404(User, user_id)
     membership = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first_or_404()
+    beschikbare_functies = Functie.query.filter_by(organisatie_id=org_id).order_by(Functie.volgorde).all()
 
     if request.method == 'POST':
         rol = request.form.get('rol', membership.rol)
         if rol == 'platformbeheerder' and current_user.rol != 'platformbeheerder':
             flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
-            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies)
 
         naam_in = request.form.get('naam', user.naam).strip()
         email_raw = request.form.get('email', '').strip().lower()
         email_in = email_raw if email_raw and email_raw not in ('none', 'null', 'undefined', 'n/a', '') else None
+        telefoonnummer_in = request.form.get('telefoonnummer', '').strip() or None
+        functie_ids = [int(x) for x in request.form.getlist('functie_ids') if x.isdigit()]
 
         # Controleer unieke naam
         if naam_in != user.naam:
             bestaande_naam = User.query.filter(db.func.lower(User.naam) == naam_in.lower(), User.id != user.id).first()
             if bestaande_naam:
                 flash(f'Gebruikersnaam {naam_in} is al in gebruik.', 'danger')
-                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
+                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies)
 
         # Controleer unieke email
         if email_in and email_in != user.email:
             bestaande_email = User.query.filter(db.func.lower(User.email) == email_in, User.id != user.id).first()
             if bestaande_email:
                 flash(f'Het e-mailadres {email_in} is al in gebruik door {bestaande_email.naam}.', 'danger')
-                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
+                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies)
 
         user.naam = naam_in
         user.email = email_in
+        user.telefoonnummer = telefoonnummer_in
         user.rol = rol
         membership.rol = 'beheerder' if rol == 'platformbeheerder' else rol
         
+        # Functies bijwerken voor deze organisatie
+        user.functies = [f for f in user.functies if f.organisatie_id != org_id]
+        if functie_ids:
+            gekozen = Functie.query.filter(Functie.organisatie_id == org_id, Functie.id.in_(functie_ids)).all()
+            user.functies.extend(gekozen)
+
         if user.id != 1:
             membership.actief = request.form.get('actief') == 'on'
             
@@ -217,9 +250,9 @@ def gebruiker_wijzigen(user_id):
         except Exception as e:
             db.session.rollback()
             flash(f'Fout bij opslaan van gebruiker: {str(e)}', 'danger')
-            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form)
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies)
 
-    return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership)
+    return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, beschikbare_functies=beschikbare_functies)
 
 
 @admin_bp.route('/gebruikers/<int:user_id>/toggle')
@@ -840,6 +873,195 @@ def herkomst_verwijderen(item_id):
 @admin_required
 def herkomst_volgorde(item_id, richting):
     return _beheer_volgorde(Herkomst, item_id, richting, 'admin.herkomsten')
+
+
+# ─── Genderidentiteiten ──────────────────────────────────────────────────────
+
+@admin_bp.route('/genderidentiteiten')
+@login_required
+@admin_required
+def genderidentiteiten():
+    return _beheer_lijst(GenderIdentity, 'admin/genderidentiteiten.html')
+
+
+@admin_bp.route('/genderidentiteiten/nieuw', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def genderidentiteit_nieuw():
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        if not naam:
+            flash('Omschrijving / naam is verplicht.', 'danger')
+            return render_template('admin/item_form.html', titel='Genderidentiteit', actie='Nieuw',
+                                   item=None, terug_url=url_for('admin.genderidentiteiten'))
+        max_volgorde = db.session.query(db.func.max(GenderIdentity.volgorde)).filter(GenderIdentity.organisatie_id == org_id).scalar() or 0
+        db.session.add(GenderIdentity(naam=naam, volgorde=max_volgorde + 1, organisatie_id=org_id,
+                                     actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
+        db.session.commit()
+        flash(f'Genderidentiteit {naam} toegevoegd.', 'success')
+        return redirect(url_for('admin.genderidentiteiten'))
+    return render_template('admin/item_form.html', titel='Genderidentiteit', actie='Nieuw',
+                           item=None, terug_url=url_for('admin.genderidentiteiten'))
+
+
+@admin_bp.route('/genderidentiteiten/<int:item_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def genderidentiteit_wijzigen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(GenderIdentity, item_id)
+    
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+        
+    if request.method == 'POST':
+        item.naam = request.form.get('naam', item.naam).strip()
+        item.actief = request.form.get('actief') == 'on'
+        db.session.commit()
+        flash(f'Genderidentiteit {item.naam} bijgewerkt.', 'success')
+        return redirect(url_for('admin.genderidentiteiten'))
+    return render_template('admin/item_form.html', titel='Genderidentiteit', actie='Wijzigen',
+                           item=item, terug_url=url_for('admin.genderidentiteiten'))
+
+
+@admin_bp.route('/genderidentiteiten/<int:item_id>/toggle')
+@login_required
+@admin_required
+def genderidentiteit_toggle(item_id):
+    return _beheer_toggle(GenderIdentity, item_id, 'admin.genderidentiteiten')
+
+
+@admin_bp.route('/genderidentiteiten/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def genderidentiteit_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(GenderIdentity, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    count = (
+        Registration.query
+        .filter(Registration.organisatie_id == org_id)
+        .filter(db.func.lower(Registration.geslacht) == item.naam.lower())
+        .count()
+    )
+    if count > 0:
+        flash(f'Genderidentiteit "{item.naam}" kan niet worden verwijderd omdat er nog {count} registratie(s) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.genderidentiteiten'))
+
+    naam = item.naam
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Genderidentiteit "{naam}" is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.genderidentiteiten'))
+
+
+@admin_bp.route('/genderidentiteiten/<int:item_id>/volgorde/<richting>')
+@login_required
+@admin_required
+def genderidentiteit_volgorde(item_id, richting):
+    return _beheer_volgorde(GenderIdentity, item_id, richting, 'admin.genderidentiteiten')
+
+
+# ─── Functies ────────────────────────────────────────────────────────────────
+
+@admin_bp.route('/functies')
+@login_required
+@admin_required
+def functies():
+    return _beheer_lijst(Functie, 'admin/functies.html')
+
+
+@admin_bp.route('/functies/nieuw', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def functie_nieuw():
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        if not naam:
+            flash('Functienaam is verplicht.', 'danger')
+            return render_template('admin/item_form.html', titel='Functie', actie='Nieuw',
+                                   item=None, terug_url=url_for('admin.functies'))
+        max_volgorde = db.session.query(db.func.max(Functie.volgorde)).filter(Functie.organisatie_id == org_id).scalar() or 0
+        db.session.add(Functie(naam=naam, volgorde=max_volgorde + 1, organisatie_id=org_id,
+                               actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
+        db.session.commit()
+        flash(f'Functie {naam} toegevoegd.', 'success')
+        return redirect(url_for('admin.functies'))
+    return render_template('admin/item_form.html', titel='Functie', actie='Nieuw',
+                           item=None, terug_url=url_for('admin.functies'))
+
+
+@admin_bp.route('/functies/<int:item_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def functie_wijzigen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Functie, item_id)
+    
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+        
+    if request.method == 'POST':
+        item.naam = request.form.get('naam', item.naam).strip()
+        item.actief = request.form.get('actief') == 'on'
+        db.session.commit()
+        flash(f'Functie {item.naam} bijgewerkt.', 'success')
+        return redirect(url_for('admin.functies'))
+    return render_template('admin/item_form.html', titel='Functie', actie='Wijzigen',
+                           item=item, terug_url=url_for('admin.functies'))
+
+
+@admin_bp.route('/functies/<int:item_id>/toggle')
+@login_required
+@admin_required
+def functie_toggle(item_id):
+    return _beheer_toggle(Functie, item_id, 'admin.functies')
+
+
+@admin_bp.route('/functies/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def functie_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Functie, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    count = db.session.query(user_functies).filter_by(functie_id=item.id).count()
+    if count > 0:
+        flash(f'Functie "{item.naam}" kan niet worden verwijderd omdat deze nog is toegekend aan {count} gebruiker(s). U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.functies'))
+
+    naam = item.naam
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Functie "{naam}" is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.functies'))
+
+
+@admin_bp.route('/functies/<int:item_id>/volgorde/<richting>')
+@login_required
+@admin_required
+def functie_volgorde(item_id, richting):
+    return _beheer_volgorde(Functie, item_id, richting, 'admin.functies')
 
 
 @admin_bp.route('/backup')

@@ -9,6 +9,8 @@ from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
 from models.herkomst import Herkomst
+from models.gender_identity import GenderIdentity
+from models.functie import Functie, user_functies
 from models.registration import Registration
 from models.activity_type import ActivityType
 from models.location import Location
@@ -30,11 +32,13 @@ def maak_backup(org_id: int) -> dict:
         {
             'naam': m.user.naam,
             'email': m.user.email,
+            'telefoonnummer': getattr(m.user, 'telefoonnummer', None),
             'wachtwoord_hash': m.user.wachtwoord_hash,
             'rol': m.user.rol,
             'actief': m.user.actief,
             'membership_rol': m.rol,
-            'membership_actief': m.actief
+            'membership_actief': m.actief,
+            'functies': [f.naam for f in m.user.get_functies_voor_organisatie(org_id)]
         }
         for m in memberships if m.user
     ]
@@ -87,6 +91,20 @@ def maak_backup(org_id: int) -> dict:
     herkomsten_data = [
         {'naam': h.naam, 'actief': h.actief, 'volgorde': h.volgorde}
         for h in herkomsten
+    ]
+
+    # 5b. Genderidentiteiten
+    gender_identities = GenderIdentity.query.filter_by(organisatie_id=org_id).order_by(GenderIdentity.volgorde).all()
+    gender_identities_data = [
+        {'naam': g.naam, 'actief': g.actief, 'volgorde': g.volgorde}
+        for g in gender_identities
+    ]
+
+    # 5c. Functies
+    functies = Functie.query.filter_by(organisatie_id=org_id).order_by(Functie.volgorde).all()
+    functies_data = [
+        {'naam': fn.naam, 'actief': fn.actief, 'volgorde': fn.volgorde}
+        for fn in functies
     ]
 
     # 6. Registrations (eager load foreign key relations)
@@ -182,6 +200,8 @@ def maak_backup(org_id: int) -> dict:
         'age_categories': age_cats_data,
         'devices': devices_data,
         'herkomsten': herkomsten_data,
+        'gender_identities': gender_identities_data,
+        'functies': functies_data,
         'activity_types': activity_types_data,
         'locations': locations_data,
         'agenda_items': agenda_items_data,
@@ -209,6 +229,8 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
             AgeCategory.query.filter_by(organisatie_id=org_id).delete()
             Device.query.filter_by(organisatie_id=org_id).delete()
             Herkomst.query.filter_by(organisatie_id=org_id).delete()
+            GenderIdentity.query.filter_by(organisatie_id=org_id).delete()
+            Functie.query.filter_by(organisatie_id=org_id).delete()
             ActivityType.query.filter_by(organisatie_id=org_id).delete()
             Location.query.filter_by(organisatie_id=org_id).delete()
 
@@ -301,6 +323,44 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                     db.session.flush()
                     herkomsten_map[name] = h.id
 
+            # 5b. Herstel genderidentiteiten
+            if 'gender_identities' in data:
+                for g_data in data.get('gender_identities', []):
+                    g = GenderIdentity(
+                        naam=g_data['naam'],
+                        actief=g_data.get('actief', True),
+                        volgorde=g_data.get('volgorde', 0),
+                        organisatie_id=org_id
+                    )
+                    db.session.add(g)
+                db.session.flush()
+            else:
+                # Fallback defaults
+                for idx, name in enumerate(['Man', 'Vrouw']):
+                    db.session.add(GenderIdentity(naam=name, actief=True, volgorde=idx, organisatie_id=org_id))
+                db.session.flush()
+
+            # 5c. Herstel functies
+            functies_map = {}
+            if 'functies' in data:
+                for fn_data in data.get('functies', []):
+                    fn = Functie(
+                        naam=fn_data['naam'],
+                        actief=fn_data.get('actief', True),
+                        volgorde=fn_data.get('volgorde', 0),
+                        organisatie_id=org_id
+                    )
+                    db.session.add(fn)
+                    db.session.flush()
+                    functies_map[fn.naam] = fn
+            else:
+                # Fallback defaults
+                for idx, name in enumerate(['Digidokter', 'Digihelper', 'Lesgever']):
+                    fn = Functie(naam=name, actief=True, volgorde=idx, organisatie_id=org_id)
+                    db.session.add(fn)
+                    db.session.flush()
+                    functies_map[name] = fn
+
             # 6. Herstel gebruikers & lidmaatschappen
             users_map = {}
             for u_data in data.get('users', []):
@@ -309,6 +369,7 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                     u = User(
                         naam=u_data['naam'],
                         email=u_data.get('email'),
+                        telefoonnummer=u_data.get('telefoonnummer'),
                         wachtwoord_hash=u_data['wachtwoord_hash'],
                         rol=u_data.get('rol', 'medewerker'),
                         actief=u_data.get('actief', True),
@@ -316,6 +377,15 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                     )
                     db.session.add(u)
                     db.session.flush()
+                elif u_data.get('telefoonnummer') and not u.telefoonnummer:
+                    u.telefoonnummer = u_data.get('telefoonnummer')
+
+                # Herstel gekoppelde functies
+                if 'functies' in u_data and isinstance(u_data['functies'], list):
+                    for fn_naam in u_data['functies']:
+                        fn_obj = functies_map.get(fn_naam)
+                        if fn_obj and fn_obj not in u.functies:
+                            u.functies.append(fn_obj)
 
                 users_map[u.naam] = u.id
 

@@ -26,20 +26,22 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 
 ### Belangrijkste tabellen en datamodel:
 1.  **Organisaties (`organisaties`):** Beheert de verschillende tenants (bijv. Londerzeel).
-2.  **Gebruikers (`users`):** Beheert beheerders en medewerkers. Gekoppeld aan organisaties via `user_organisaties`. Tevens voorzien van wachtwoord-resetkolommen (`reset_code`, `reset_code_verloopt_op`).
-3.  **Digidokters (`digidokters`):** Vrijwilligers binnen een specifieke organisatie.
-4.  **Registraties (`registrations`):** Registratie van een bezoekerssessie met foreign keys naar digidokter, leeftijdscategorie, toestel en herkomst.
-5.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
-6.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
-7.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering en geïndexeerde tekstinhoud (`tekst_inhoud`).
-8.  **Herkomst (`herkomst`):** Standaard keuzelijst met herkomstbronnen (bijv. website, mond-tot-mond) per organisatie.
-9.  **Evaluatieformulieren & Vragen (`evaluatie_formulieren`, `evaluatie_vragen`):** Configureerbare evaluatievragenlijsten gekoppeld aan specifieke activiteitstypes (zoals Digicafé).
-10. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
-11. **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
-12. **Feedback & Conversatie (`feedback_items`, `feedback_votes`, `feedback_comments`):** Beheer van gebruikersfeedback ("Voorstel" of "Foutje?"), stemmen met duimpjes (+1/-1), screenshot-opslag, conversatiereacties en beheerderstatus (open/afgesloten).
-13. **Vraagcategorieën (`question_categories`):** Centrale lijst van 10 gestandaardiseerde hoofdcategorieën met AI-richtlijnen en actieve status.
-14. **Vraagclassificaties (`question_classifications`):** 1-op-1 gekoppeld aan registraties met AI-categorietoewijzing, betrouwbaarheidsscore (zekerheid %), toelichting en handmatige override-auditering.
-15. **App Mappen & App Documenten (`app_mappen`, `app_documenten`):** Centrale, platformbrede documentenopslag gedeeld door alle organisaties (zonder `organisatie_id`).
+2.  **Gebruikers (`users`):** Beheert beheerders en medewerkers. Gekoppeld aan organisaties via `user_organisaties`. Tevens voorzien van contactgegevens (`telefoonnummer`, `email`) en wachtwoord-resetkolommen (`reset_code`, `reset_code_verloopt_op`).
+3.  **Functies & Gebruiker-Functies (`functies`, `user_functies`):** Beheert vrijwilligersfuncties (bijv. Digidokter, Digihelper, Lesgever) per organisatie en de toekenning (veel-op-veel) aan gebruikers.
+4.  **Genderidentiteiten (`gender_identities`):** Beheert de dynamische lijst van geslachten/genderidentiteiten (standaard 'Man', 'Vrouw') per organisatie.
+5.  **Digidokters (`digidokters`):** Vrijwilligers binnen een specifieke organisatie (gekoppeld aan registraties en agenda).
+6.  **Registraties (`registrations`):** Registratie van een bezoekerssessie met foreign keys naar digidokter, leeftijdscategorie, toestel, herkomst en geslacht.
+7.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
+8.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
+9.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering en geïndexeerde tekstinhoud (`tekst_inhoud`).
+10. **Herkomst (`herkomst`):** Standaard keuzelijst met herkomstbronnen (bijv. website, mond-tot-mond) per organisatie.
+11. **Evaluatieformulieren & Vragen (`evaluatie_formulieren`, `evaluatie_vragen`):** Configureerbare evaluatievragenlijsten gekoppeld aan specifieke activiteitstypes (zoals Digicafé).
+12. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
+13. **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
+14. **Feedback & Conversatie (`feedback_items`, `feedback_votes`, `feedback_comments`):** Beheer van gebruikersfeedback ("Voorstel" of "Foutje?"), stemmen met duimpjes (+1/-1), screenshot-opslag, conversatiereacties en beheerderstatus (open/afgesloten).
+15. **Vraagcategorieën (`question_categories`):** Centrale lijst van 10 gestandaardiseerde hoofdcategorieën met AI-richtlijnen en actieve status.
+16. **Vraagclassificaties (`question_classifications`):** 1-op-1 gekoppeld aan registraties met AI-categorietoewijzing, betrouwbaarheidsscore (zekerheid %), toelichting en handmatige override-auditering.
+17. **App Mappen & App Documenten (`app_mappen`, `app_documenten`):** Centrale, platformbrede documentenopslag gedeeld door alle organisaties (zonder `organisatie_id`).
 
 ---
 
@@ -48,6 +50,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 ### 1. Bezoekenregistratie
 *   Medewerkers en beheerders kunnen snel binnenlopende bezoekers registreren.
 *   Bij het openen van het formulier wordt de ingelogde gebruiker automatisch geselecteerd als Digidokter.
+*   **Dynamische Genderidentiteit:** Het geslacht van de bezoeker wordt gekozen uit de geconfigureerde genderidentiteiten van de organisatie (standaard 'Man' en 'Vrouw', uitbreidbaar via stamgegevens).
 *   **Consultatielocaties:** Indien er binnen de organisatie meerdere locaties zijn gemarkeerd als *"Gebruikt voor consultaties"*, kan de specifieke locatie direct worden geselecteerd. Bij exact één consultatielocatie wordt deze automatisch zonder extra dropdown toegekend.
 *   **Realtime Asynchrone AI-classificatie:** Zodra een consultatie wordt opgeslagen of bewerkt, wordt de vraag op de achtergrond binnen 1-2 seconden geanalyseerd via Google Gemini AI en toegekend aan de passende categorie.
 *   Vrijwilligers (digidokters) met de rol `medewerker` hebben ook de mogelijkheid om registraties te wissen bij foutieve invoer.
@@ -97,14 +100,15 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 *   Subtiele weergave van record-IDs in alle data-weergaven ter vereenvoudiging van auditing.
 
 ### 8. Stamgegevensbeheer & Veilig Wissen
-*   **Volledig beheer van keuzelijsten:** Beheerders en platformbeheerders kunnen binnen hun organisatie locaties, activiteitstypes, leeftijdscategorieën, toestellen en herkomstbronnen aanmaken, bewerken, activeren/deactiveren en handmatig van volgorde veranderen.
+*   **Volledig beheer van keuzelijsten:** Beheerders en platformbeheerders kunnen binnen hun organisatie locaties, activiteitstypes, leeftijdscategorieën, toestellen, herkomstbronnen, **genderidentiteiten** en **functies** aanmaken, bewerken, activeren/deactiveren en handmatig van volgorde veranderen.
 *   **Locaties voor Consultaties:** Locaties kunnen worden aangeduid met de optie *"Gebruikt voor consultaties"*. Enkel locaties met deze vlag verschijnen bij de registratie van consultaties en in het consultatielocatiefilter.
 *   **Mapping van gedeactiveerde entries:** Gedeactiveerde leeftijdscategorieën en toesteltypes kunnen in het beheer worden gekoppeld (gemapt) naar een actieve categorie. Historische consultaties blijven intact in de database, maar worden in overzichten, filters, detailweergaven, statistieken en exports automatisch getoond en geaggregeerd onder de gemapte actieve categorie.
 *   **Geavanceerde filters in het consultatieoverzicht:** De overzichtspagina van registraties bevat kolommen en filters op zoekterm, digidokter, locatie, toesteltype, geslacht, leeftijdscategorie en datum (van-tot). De dropdowns tonen enkel actieve opties; filteren op een optie matcht automatisch ook historische registraties met een gekoppelde inactieve entry.
 *   **Referentiecontroles bij wissen:** Stamgegevens kunnen uitsluitend permanent gewist worden als er **geen enkele andere data naar verwijst**:
     *   *Locaties:* Mag niet gewist worden zolang er nog gekoppelde agenda-activiteiten of geregistreerde consultaties zijn.
     *   *Activiteitstypes:* Mag niet gewist worden zolang er gekoppelde agenda-activiteiten of ingevulde evaluaties zijn.
-    *   *Leeftijdscategorieën, Toestellen & Herkomst:* Mogen niet gewist worden zolang er nog geregistreerde consultaties aan gekoppeld zijn.
+    *   *Leeftijdscategorieën, Toestellen, Herkomst & Genderidentiteiten:* Mogen niet gewist worden zolang er nog geregistreerde consultaties aan gekoppeld zijn.
+    *   *Functies:* Mogen niet gewist worden zolang ze nog toegekend zijn aan één of meerdere gebruikers.
 *   **Duidelijke gebruikersfeedback:** Indien een item nog in gebruik is, wordt de verwijderknop automatisch gedeactiveerd met een tooltip die het aantal gekoppelde records vermeldt. Indien ongebruikt, kan het item met één klik en bevestiging definitief worden verwijderd.
 
 ### 9. CSV Import-script (`scripts/import_agenda.py`)
@@ -132,8 +136,9 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
     *   *Fabrieksherstel:* Met één klik kan elk sjabloon worden hersteld naar de standaardinstellingen.
 *   **Multi-tenant Organisatiebeheer:** Platformbeheerders kunnen nieuwe organisaties toevoegen, bewerken, en gebruikers koppelen aan organisaties met specifieke rollen.
 *   **Centrale Sjabloon-organisatie (`Sjabloon`):** Een speciale beschermde tenant met slug `sjabloon` dient als referentie-blauwdruk voor het hele platform.
-    *   Wanneer een platformbeheerder een nieuwe gemeente of organisatie aanmaakt, worden alle actieve stamgegevens (leeftijdscategorieën, toestellen, activiteitstypes, evaluatieformulieren & vragen, locaties, herkomsten) automatisch gekopieerd uit deze Sjabloon-organisatie.
+    *   Wanneer een platformbeheerder een nieuwe gemeente of organisatie aanmaakt, worden alle actieve stamgegevens (leeftijdscategorieën, toestellen, activiteitstypes, evaluatieformulieren & vragen, locaties, herkomsten, genderidentiteiten en functies) automatisch gekopieerd uit deze Sjabloon-organisatie.
     *   Aanpassingen die de beheerder in de stamgegevens van de Sjabloon-organisatie maakt, gelden direct als de nieuwe standaard voor alle toekomstige organisaties.
+    *   **Strikte Beperking:** In de organisatie "Sjabloon" kunnen uitsluitend stamgegevens worden beheerd. Transacties zoals registraties, agenda-items, feedback, documenten en evaluaties zijn geblokkeerd om vervuiling van het standaardsjabloon te voorkomen.
 *   **Organisaties Wissen met Cascading Cleanup:** Mogelijkheid om overbodige organisaties permanent te wissen (`/platform/organisaties/<id>/verwijderen`).
     *   **Veiligheid:** De hoofdorganisatie (ID 1) en de template-organisatie (`Sjabloon`) zijn permanent beschermd tegen wissen.
     *   **Volledige Cleanup:** Alle bijbehorende data (registraties, agenda-items, evaluaties, documenten, mappen, stamgegevens en gebruikerskoppelingen) wordt automatisch en geordend verwijderd.
@@ -162,6 +167,7 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
 *   **Betrouwbaarheid & Motivatie:** Ieder resultaat bevat een zekerheidsscore (0–100%) en een motivatie/toelichting van het model.
 *   **Beheer van Vraagcategorieën (`/platform/vraagcategorieen`):** Centrale lijst van categorieën met AI-richtlijnen en definities. Alleen toegankelijk voor platformbeheerders.
 *   **Monitoring & Handmatige Correcties (`/platform/vraagclassificaties`):** Overzichtstabel met filters op onzekere AI-scores (< 80%), organisatie en categorie. Platformbeheerders kunnen classificaties handmatig overriden of met één klik opnieuw laten analyseren door de AI.
+*   **Asynchrone Batch-analyse:** De knop "Batch-analyse starten" draait volledig asynchroon in de achtergrond met realtime statusindicatie (`/api/vraagclassificaties/batch-status`), waardoor de app direct bruikbaar blijft zonder time-outs of vastlopende webpagina's.
 *   **Batch- & CLI-seeding:** Ondersteunt batchverwerking van historische consultaties via `flask seed-vragenanalyse` of de batchknop in de webinterface.
 
 ### 14. App Documentatie (Centraal & Gemeenschappelijk)
@@ -174,6 +180,14 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
 *   **Inklapbare Rubrieken:** Alle rubrieken in de linker zijbalk zijn inklapbaar met geanimeerde indicators. De actieve inklapstatus wordt automatisch per gebruiker/browser bewaard in `localStorage`.
 *   **Consequente 'Bezoeker'-terminologie:** Overal in formulieren, exports en statistieken is overgeschakeld op de gastvrije en AVG-conforme term "Bezoeker" (i.p.v. "Klant" of "Cliënt").
 *   **Digidokter-voorselectie:** Bij een nieuw bezoek wordt de ingelogde gebruiker automatisch als actieve Digidokter ingesteld om herhaald klikwerk te vermijden.
+
+### 16. Vrijwilligersfuncties & Zelfbediening Gebruikersprofiel
+*   **Functies Stamgegevens (`/beheer/functies`):** Beheer van vrijwilligersfuncties per organisatie (standaard 'Digidokter', 'Digihelper' en 'Lesgever'). Functies kunnen worden toegevoegd, gewijzigd, geactiveerd/gedeactiveerd en gerangschikt.
+*   **Toekennen aan Gebruikers:** Beheerders kunnen in het gebruikersbeheer (`/beheer/gebruikers`) één of meerdere functies toekennen aan een medewerker of beheerder, en een contacttelefoonnummer registreren.
+*   **Zelfbediening via Linkeronderhoek (`/wachtwoord`):** Gebruikers kunnen door op hun naam linksonder te klikken zelf:
+    *   Hun e-mailadres en contacttelefoonnummer aanpassen.
+    *   De functies die ze binnen de huidige organisatie opnemen direct selecteren of aanpassen via handige selectievakjes.
+    *   Optioneel hun wachtwoord wijzigen.
 
 ---
 

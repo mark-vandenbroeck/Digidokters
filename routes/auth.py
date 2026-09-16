@@ -108,16 +108,28 @@ _EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 @login_required
 @limiter.limit("10 per minute")
 def wachtwoord_wijzigen():
+    from utils.tenant import get_huidige_organisatie_id
+    from models.functie import Functie
+    org_id = get_huidige_organisatie_id()
+    beschikbare_functies = (
+        Functie.query.filter_by(organisatie_id=org_id, actief=True).order_by(Functie.volgorde, Functie.naam).all()
+        if org_id else []
+    )
+    toegekende_functie_ids = [f.id for f in current_user.get_functies_voor_organisatie(org_id)] if org_id else []
+
     if request.method == 'POST':
         huidig = request.form.get('huidig_wachtwoord', '')
         nieuw = request.form.get('nieuw_wachtwoord', '')
         bevestig = request.form.get('bevestig_wachtwoord', '')
         email = request.form.get('email', '').strip().lower()
 
+        telefoonnummer = request.form.get('telefoonnummer', '').strip() or None
+        functie_ids = [int(x) for x in request.form.getlist('functie_ids') if x.isdigit()]
+
         # E-mail valideren als ingevuld
         if email and not _EMAIL_REGEX.match(email):
             flash('Ongeldig e-mailadres.', 'danger')
-            return render_template('auth/change_password.html', form_data=request.form)
+            return render_template('auth/change_password.html', form_data=request.form, beschikbare_functies=beschikbare_functies, toegekende_functie_ids=toegekende_functie_ids)
 
         # Wachtwoordwijziging is optioneel indien de gebruiker het niet MOET wijzigen
         wachtwoord_gewijzigd = False
@@ -126,33 +138,41 @@ def wachtwoord_wijzigen():
             if not current_user.moet_wachtwoord_wijzigen:
                 if not check_password_hash(current_user.wachtwoord_hash, huidig):
                     flash('Huidig wachtwoord is onjuist.', 'danger')
-                    return render_template('auth/change_password.html', form_data=request.form)
+                    return render_template('auth/change_password.html', form_data=request.form, beschikbare_functies=beschikbare_functies, toegekende_functie_ids=toegekende_functie_ids)
 
         # Controleer of e-mail al door iemand anders gebruikt wordt
         if email and User.query.filter(User.email == email, User.id != current_user.id).first():
             flash('Dit e-mailadres is al in gebruik door een andere gebruiker.', 'danger')
-            return render_template('auth/change_password.html', form_data=request.form)
+            return render_template('auth/change_password.html', form_data=request.form, beschikbare_functies=beschikbare_functies, toegekende_functie_ids=toegekende_functie_ids)
 
         # Wachtwoord valideren (alleen als er effectief een nieuw wachtwoord is opgegeven)
         if wachtwoord_gewijzigd:
             if current_user.moet_wachtwoord_wijzigen and not nieuw:
                 flash('Nieuw wachtwoord is verplicht.', 'danger')
-                return render_template('auth/change_password.html', form_data=request.form)
+                return render_template('auth/change_password.html', form_data=request.form, beschikbare_functies=beschikbare_functies, toegekende_functie_ids=toegekende_functie_ids)
 
             if nieuw != bevestig:
                 flash('De nieuwe wachtwoorden komen niet overeen.', 'danger')
-                return render_template('auth/change_password.html', form_data=request.form)
+                return render_template('auth/change_password.html', form_data=request.form, beschikbare_functies=beschikbare_functies, toegekende_functie_ids=toegekende_functie_ids)
 
             fouten = _valideer_wachtwoord(nieuw)
             if fouten:
                 for f in fouten:
                     flash(f, 'danger')
-                return render_template('auth/change_password.html', form_data=request.form)
+                return render_template('auth/change_password.html', form_data=request.form, beschikbare_functies=beschikbare_functies, toegekende_functie_ids=toegekende_functie_ids)
 
             current_user.wachtwoord_hash = generate_password_hash(nieuw)
             current_user.moet_wachtwoord_wijzigen = False
 
         current_user.email = email
+        current_user.telefoonnummer = telefoonnummer
+
+        if org_id:
+            current_user.functies = [f for f in current_user.functies if f.organisatie_id != org_id]
+            if functie_ids:
+                gekozen = Functie.query.filter(Functie.organisatie_id == org_id, Functie.id.in_(functie_ids)).all()
+                current_user.functies.extend(gekozen)
+
         db.session.commit()
 
         if not session.get('organisatie_id') and current_user.rol != 'platformbeheerder':
@@ -169,7 +189,7 @@ def wachtwoord_wijzigen():
             flash('Gegevens succesvol bijgewerkt.', 'success')
         return redirect(url_for('reg.lijst'))
 
-    return render_template('auth/change_password.html')
+    return render_template('auth/change_password.html', beschikbare_functies=beschikbare_functies, toegekende_functie_ids=toegekende_functie_ids)
 
 
 @auth_bp.route('/select-organisatie', methods=['GET', 'POST'])
@@ -203,6 +223,8 @@ def select_org():
             next_page = request.args.get('next')
             if _is_veilige_redirect(next_page):
                 return redirect(next_page)
+            if membership.organisatie.slug == 'sjabloon':
+                return redirect(url_for('admin.leeftijdscategorieën'))
             return redirect(url_for('reg.lijst'))
         else:
             flash('Ongeldige organisatie selectie.', 'danger')
@@ -214,11 +236,13 @@ def select_org():
 @login_required
 def switch_organisatie():
     org_id = request.form.get('organisatie_id', type=int)
+    target_org = None
     if current_user.rol == 'platformbeheerder':
         from models.organisatie import Organisatie
         org = Organisatie.query.filter_by(id=org_id, actief=True).first()
         if org:
             session['organisatie_id'] = org_id
+            target_org = org
             flash(f'Gewisseld naar organisatie: {org.naam}', 'success')
         else:
             flash('Ongeldige organisatie.', 'danger')
@@ -230,10 +254,13 @@ def switch_organisatie():
         membership = next((uo for uo in active_memberships if uo.organisatie_id == org_id), None)
         if membership:
             session['organisatie_id'] = org_id
+            target_org = membership.organisatie
             flash(f'Gewisseld naar organisatie: {membership.organisatie.naam}', 'success')
         else:
             flash('U heeft geen toegang tot deze organisatie.', 'danger')
         
+    if target_org and target_org.slug == 'sjabloon':
+        return redirect(url_for('admin.leeftijdscategorieën'))
     return redirect(url_for('reg.lijst'))
 
 

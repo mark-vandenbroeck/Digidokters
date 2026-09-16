@@ -8,9 +8,11 @@ from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
 from models.herkomst import Herkomst
+from models.gender_identity import GenderIdentity
 from models.location import Location
 from utils.decorators import writer_required
 from utils.helpers import safe_int, safe_date, safe_str
+from utils.tenant import filter_op_organisatie
 
 reg_bp = Blueprint('reg', __name__)
 
@@ -25,6 +27,7 @@ def _keuzelijsten():
         'leeftijdscategorieën': filter_op_organisatie(AgeCategory.query.filter_by(actief=True), AgeCategory).order_by(AgeCategory.volgorde, AgeCategory.naam).all(),
         'toestellen': filter_op_organisatie(Device.query.filter_by(actief=True), Device).order_by(Device.volgorde, Device.naam).all(),
         'herkomsten': filter_op_organisatie(Herkomst.query.filter_by(actief=True), Herkomst).order_by(Herkomst.volgorde, Herkomst.naam).all(),
+        'genderidentiteiten': filter_op_organisatie(GenderIdentity.query.filter_by(actief=True), GenderIdentity).order_by(GenderIdentity.volgorde, GenderIdentity.naam).all(),
         'consultatie_locaties': filter_op_organisatie(Location.query.filter_by(actief=True, gebruikt_voor_consultaties=True), Location).order_by(Location.volgorde, Location.naam).all(),
     }
 
@@ -82,16 +85,16 @@ def lijst():
     if filter_leeftijd:
         mapped_leeftijd_ids = [c.id for c in AgeCategory.query.filter_by(mapped_to_id=filter_leeftijd).all()]
         query = query.filter(Registration.leeftijdscategorie_id.in_([filter_leeftijd] + mapped_leeftijd_ids))
-    if filter_geslacht in ('man', 'vrouw'):
-        query = query.filter(Registration.geslacht == filter_geslacht)
-    elif filter_geslacht in ('onbekend', 'geen'):
+    if filter_geslacht in ('onbekend', 'geen'):
         query = query.filter(
             db.or_(
                 Registration.geslacht.is_(None),
                 Registration.geslacht == '',
-                Registration.geslacht == 'onbekend'
+                Registration.geslacht.ilike('onbekend')
             )
         )
+    elif filter_geslacht:
+        query = query.filter(Registration.geslacht.ilike(filter_geslacht))
     if filter_datum_van:
         try:
             query = query.filter(Registration.datum >= date.fromisoformat(filter_datum_van))
@@ -165,6 +168,7 @@ def lijst():
         consultatie_locaties=keuzes['consultatie_locaties'],
         toestellen=keuzes['toestellen'],
         leeftijdscategorieën=keuzes['leeftijdscategorieën'],
+        genderidentiteiten=keuzes['genderidentiteiten'],
         sort_by=sort_by,
         direction=direction,
     )
@@ -228,8 +232,12 @@ def nieuw():
             if not dd or dd.organisatie_id != org_id:
                 fouten.append('Ongeldige digidokter geselecteerd.')
                 
-        if geslacht and geslacht not in ('man', 'vrouw'):
-            fouten.append('Ongeldig geslacht geselecteerd.')
+        if geslacht:
+            geldige_genders = {g.naam.lower(): g.naam for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
+            if geslacht.lower() in geldige_genders:
+                geslacht = geldige_genders[geslacht.lower()]
+            elif geslacht.lower() not in ('man', 'vrouw'):
+                fouten.append('Ongeldige genderidentiteit geselecteerd.')
 
         if herkomst_id:
             h = db.session.get(Herkomst, herkomst_id)
@@ -367,8 +375,12 @@ def wijzigen(reg_id):
             if not dd or dd.organisatie_id != org_id:
                 fouten.append('Ongeldige digidokter geselecteerd.')
                 
-        if geslacht and geslacht not in ('man', 'vrouw'):
-            fouten.append('Ongeldig geslacht geselecteerd.')
+        if geslacht:
+            geldige_genders = {g.naam.lower(): g.naam for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
+            if geslacht.lower() in geldige_genders:
+                geslacht = geldige_genders[geslacht.lower()]
+            elif geslacht.lower() not in ('man', 'vrouw'):
+                fouten.append('Ongeldige genderidentiteit geselecteerd.')
 
         if herkomst_id:
             h = db.session.get(Herkomst, herkomst_id)

@@ -296,3 +296,51 @@ class TestPlatformOrganizationDelete(BaseTestCase):
         resp = self.client.post('/switch-organisatie', data={'organisatie_id': sjabloon.id}, follow_redirects=True)
         self.assertIn('U heeft geen toegang tot deze organisatie.', resp.get_data(as_text=True))
 
+    def test_sjabloon_only_allows_stamgegevens_and_blocks_transactions(self):
+        sjabloon = Organisatie.query.filter_by(slug='sjabloon').first()
+        if not sjabloon:
+            sjabloon = Organisatie(naam="Sjabloon", slug="sjabloon", actief=True)
+            db.session.add(sjabloon)
+            db.session.commit()
+
+        # Login as platform admin and switch to Sjabloon
+        self.login("superplatform@test.be", "password123")
+        resp_switch = self.client.post('/switch-organisatie', data={'organisatie_id': sjabloon.id}, follow_redirects=True)
+        self.assertEqual(resp_switch.status_code, 200)
+        # Should land on stamgegevens overview (e.g. leeftijdscategorieën)
+        self.assertIn('Leeftijdscategorieën', resp_switch.get_data(as_text=True))
+        self.assertIn('Sjabloon-organisatie:', resp_switch.get_data(as_text=True))
+
+        # 1. Stamgegevens are allowed
+        res_age = self.client.get('/beheer/leeftijdscategorieën')
+        self.assertEqual(res_age.status_code, 200)
+
+        res_dev = self.client.get('/beheer/toestellen')
+        self.assertEqual(res_dev.status_code, 200)
+
+        res_act = self.client.get('/beheer/activiteitstypes')
+        self.assertEqual(res_act.status_code, 200)
+
+        res_loc = self.client.get('/beheer/locaties')
+        self.assertEqual(res_loc.status_code, 200)
+
+        res_gen = self.client.get('/beheer/genderidentiteiten')
+        self.assertEqual(res_gen.status_code, 200)
+
+        res_fn = self.client.get('/beheer/functies')
+        self.assertEqual(res_fn.status_code, 200)
+
+        # 2. Transaction routes are blocked and redirect with warning
+        res_reg = self.client.get('/registraties', follow_redirects=True)
+        self.assertEqual(res_reg.status_code, 200)
+        self.assertIn('kunnen enkel stamgegevens worden beheerd', res_reg.get_data(as_text=True))
+
+        res_agenda = self.client.get('/agenda', follow_redirects=True)
+        self.assertEqual(res_agenda.status_code, 200)
+        self.assertIn('kunnen enkel stamgegevens worden beheerd', res_agenda.get_data(as_text=True))
+
+        res_stats = self.client.get('/statistieken', follow_redirects=True)
+        self.assertEqual(res_stats.status_code, 200)
+        self.assertIn('kunnen enkel stamgegevens worden beheerd', res_stats.get_data(as_text=True))
+
+

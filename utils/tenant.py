@@ -122,6 +122,34 @@ def seed_organisatie_defaults(org_id):
             for i, name in enumerate(['Mond-tot-mond', 'Website', 'Sociale media', 'Flyer/Affiche', 'Gemeenteblad', 'Andere']):
                 db.session.add(Herkomst(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
 
+    # Genderidentiteit (Man, Vrouw)
+    from models.gender_identity import GenderIdentity
+    if not GenderIdentity.query.filter_by(organisatie_id=org_id).first():
+        active_genders = []
+        if source_org_id:
+            active_genders = GenderIdentity.query.filter_by(organisatie_id=source_org_id, actief=True).order_by(GenderIdentity.volgorde).all()
+        
+        if active_genders:
+            for i, g in enumerate(active_genders):
+                db.session.add(GenderIdentity(naam=g.naam, actief=True, volgorde=i, organisatie_id=org_id))
+        else:
+            for i, name in enumerate(['Man', 'Vrouw']):
+                db.session.add(GenderIdentity(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+
+    # Functies (Digidokter, Digihelper, Lesgever)
+    from models.functie import Functie
+    if not Functie.query.filter_by(organisatie_id=org_id).first():
+        active_functies = []
+        if source_org_id:
+            active_functies = Functie.query.filter_by(organisatie_id=source_org_id, actief=True).order_by(Functie.volgorde).all()
+        
+        if active_functies:
+            for i, fn in enumerate(active_functies):
+                db.session.add(Functie(naam=fn.naam, actief=True, volgorde=i, organisatie_id=org_id))
+        else:
+            for i, name in enumerate(['Digidokter', 'Digihelper', 'Lesgever']):
+                db.session.add(Functie(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
+
     db.session.commit()
 
     # Evaluatieformulieren seeden voor activiteitstypes met evaluatieplicht

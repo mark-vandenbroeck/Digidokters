@@ -81,18 +81,21 @@ def create_app(config_class=Config):
             return ''
 
     @app.context_processor
-    def inject_feedback_meldingen():
+    def inject_global_template_vars():
+        res = {'feedback_meldingen': [], 'huidige_organisatie': None, 'is_sjabloon_org': False}
         if not current_user.is_authenticated:
-            return {'feedback_meldingen': []}
+            return res
         try:
             from utils.feedback_tracker import get_feedback_meldingen
+            from utils.tenant import get_huidige_organisatie
             org_id = session.get('organisatie_id')
-            meldingen = get_feedback_meldingen(current_user, org_id)
-            return {'feedback_meldingen': meldingen}
+            res['feedback_meldingen'] = get_feedback_meldingen(current_user, org_id)
+            huidige_org = get_huidige_organisatie()
+            res['huidige_organisatie'] = huidige_org
+            res['is_sjabloon_org'] = bool(huidige_org and huidige_org.slug == 'sjabloon')
+            return res
         except Exception:
-            return {'feedback_meldingen': []}
-
-
+            return res
 
     # Controleer de organisatie-context voor authenticated requests
     from flask import session, redirect, url_for, request, flash, g
@@ -129,6 +132,35 @@ def create_app(config_class=Config):
                     session.pop('organisatie_id', None)
                     flash('De geselecteerde organisatie is niet langer actief.', 'warning')
                     return redirect(url_for('auth.select_org'))
+
+                # Beperkingen voor organisatie 'Sjabloon'
+                if org.slug == 'sjabloon':
+                    allowed_sjabloon_prefixes = (
+                        'static', 'service_worker', 'ping', 'auth.', 'platform.', 'app_docs.', 'feedback.'
+                    )
+                    allowed_sjabloon_endpoints = (
+                        'admin.leeftijdscategorieën', 'admin.leeftijdscategorie_nieuw', 'admin.leeftijdscategorie_wijzigen',
+                        'admin.leeftijdscategorie_toggle', 'admin.leeftijdscategorie_volgorde', 'admin.leeftijdscategorie_verwijderen',
+                        'admin.toestellen', 'admin.toestel_nieuw', 'admin.toestel_wijzigen', 'admin.toestel_toggle',
+                        'admin.toestel_volgorde', 'admin.toestel_verwijderen',
+                        'admin.activiteitstypes', 'admin.activiteitstype_nieuw', 'admin.activiteitstype_wijzigen',
+                        'admin.activiteitstype_toggle', 'admin.activiteitstype_volgorde', 'admin.activiteitstype_verwijderen',
+                        'admin.locaties', 'admin.locatie_nieuw', 'admin.locatie_wijzigen', 'admin.locatie_toggle',
+                        'admin.locatie_volgorde', 'admin.locatie_verwijderen',
+                        'admin.herkomsten', 'admin.herkomst_nieuw', 'admin.herkomst_wijzigen', 'admin.herkomst_toggle',
+                        'admin.herkomst_volgorde', 'admin.herkomst_verwijderen',
+                        'admin.genderidentiteiten', 'admin.genderidentiteit_nieuw', 'admin.genderidentiteit_wijzigen',
+                        'admin.genderidentiteit_toggle', 'admin.genderidentiteit_volgorde', 'admin.genderidentiteit_verwijderen',
+                        'admin.functies', 'admin.functie_nieuw', 'admin.functie_wijzigen',
+                        'admin.functie_toggle', 'admin.functie_volgorde', 'admin.functie_verwijderen',
+                        'eval.overzicht', 'eval.formulier_bewerken', 'eval.vraag_toevoegen', 'eval.vraag_bewerken',
+                        'eval.vraag_verwijderen', 'eval.vraag_volgorde'
+                    )
+                    if request.endpoint:
+                        is_allowed = any(request.endpoint.startswith(p) for p in allowed_sjabloon_prefixes) or (request.endpoint in allowed_sjabloon_endpoints)
+                        if not is_allowed:
+                            flash('In de organisatie "Sjabloon" kunnen enkel stamgegevens worden beheerd. Registraties, agenda-items en transacties zijn hier uitgeschakeld.', 'warning')
+                            return redirect(url_for('admin.leeftijdscategorieën'))
             else:
                 org_id = session.get('organisatie_id')
                 if not org_id:
@@ -361,13 +393,23 @@ def create_app(config_class=Config):
             db.session.commit()
             print("✓ Herkomsten geïnitialiseerd voor standaard organisatie")
 
-        # 10. Seed Vraagcategorieën (AI)
+        # 10. Seed Genderidentiteit (Man, Vrouw) voor alle organisaties indien ontbrekend
+        from models.gender_identity import GenderIdentity
+        alle_orgs = Organisatie.query.all()
+        for org in alle_orgs:
+            if not GenderIdentity.query.filter_by(organisatie_id=org.id).first():
+                for i, name in enumerate(['Man', 'Vrouw']):
+                    db.session.add(GenderIdentity(naam=name, actief=True, volgorde=i, organisatie_id=org.id))
+        db.session.commit()
+        print("✓ Genderidentiteiten geïnitialiseerd")
+
+        # 11. Seed Vraagcategorieën (AI)
         from utils.ai_classifier import seed_standaard_categorieen
         n_cats = seed_standaard_categorieen()
         if n_cats > 0:
             print(f"✓ {n_cats} nieuwe vraagcategorieën geïnitialiseerd")
 
-        # 11. Seed standaard mappen voor App Documentatie
+        # 12. Seed standaard mappen voor App Documentatie
         from models.app_document import AppFolder
         if AppFolder.query.count() == 0:
             admin_user = User.query.filter_by(rol='platformbeheerder').first() or User.query.first()
@@ -428,9 +470,32 @@ def create_app(config_class=Config):
         verwerkt, fouten = seed_retroactieve_classificaties(batch_size=25, progress_callback=progress)
         print(f"✓ Voltooid: {verwerkt} consultaties geclassificeerd, {fouten} mislukt.")
 
-    # Synchroniseer bestaande gebruikers als Digidokter op de achtergrond bij het opstarten
+    # Synchroniseer tabellen en bestaande gebruikers als Digidokter bij het opstarten
     with app.app_context():
         try:
+            db.create_all()
+
+            from models.gender_identity import GenderIdentity
+            from models.functie import Functie
+            from models.organisatie import Organisatie
+            for org in Organisatie.query.all():
+                if not GenderIdentity.query.filter_by(organisatie_id=org.id).first():
+                    for i, name in enumerate(['Man', 'Vrouw']):
+                        db.session.add(GenderIdentity(naam=name, actief=True, volgorde=i, organisatie_id=org.id))
+                if not Functie.query.filter_by(organisatie_id=org.id).first():
+                    for i, name in enumerate(['Digidokter', 'Digihelper', 'Lesgever']):
+                        db.session.add(Functie(naam=name, actief=True, volgorde=i, organisatie_id=org.id))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        try:
+            try:
+                db.session.execute(db.text("ALTER TABLE users ADD COLUMN telefoonnummer VARCHAR(30)"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
             try:
                 db.session.execute(db.text("ALTER TABLE digidokters ADD COLUMN user_id INTEGER REFERENCES users(id)"))
                 db.session.commit()

@@ -39,9 +39,17 @@
                     <div class="form-text">Dit e-mailadres wordt gebruikt om in te loggen — moet uniek zijn.</div>
                 </div>
 
+                <div class="mb-3">
+                    <label for="telefoonnummer" class="form-label">Telefoonnummer</label>
+                    <input type="tel" class="form-control" id="telefoonnummer" name="telefoonnummer"
+                           placeholder="bijv. +32 470 12 34 56"
+                           value="{{ form_data.telefoonnummer if form_data and form_data.telefoonnummer is defined else (user.telefoonnummer if user and user.telefoonnummer else '') }}">
+                    <div class="form-text">Optioneel. Contactnummer voor interne communicatie of permanentie.</div>
+                </div>
+
                 {% set geselecteerde_rol = form_data.rol if form_data and form_data.rol is defined else (user.rol if user and user.rol == 'platformbeheerder' else (membership.rol if membership and membership.rol else (user.rol if user else 'medewerker'))) %}
                 <div class="mb-3">
-                    <label for="rol" class="form-label">Rol <span class="text-danger">*</span></label>
+                    <label for="rol" class="form-label">Toegangsrechten / Rol <span class="text-danger">*</span></label>
                     <select class="form-select" id="rol" name="rol" required>
                         <option value="lezer" {% if geselecteerde_rol == 'lezer' %}selected{% endif %}>Lezer (alleen-lezen)</option>
                         <option value="medewerker" {% if geselecteerde_rol == 'medewerker' %}selected{% endif %}>Medewerker</option>
@@ -50,6 +58,29 @@
                         <option value="platformbeheerder" {% if geselecteerde_rol == 'platformbeheerder' %}selected{% endif %}>Platformbeheerder</option>
                         {% endif %}
                     </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label d-block mb-1">Toegewezen functies</label>
+                    <div class="form-text mb-2">Vink de functies aan die deze gebruiker binnen deze organisatie opneemt.</div>
+                    {% set user_fn_ids = (user.functies | map(attribute='id') | list) if user else [] %}
+                    {% if beschikbare_functies %}
+                    <div class="card bg-light border-0 p-3">
+                        <div class="d-flex flex-wrap gap-3">
+                            {% for fn in beschikbare_functies %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="functie_ids" value="{{ fn.id }}" id="fn_{{ fn.id }}"
+                                       {% if fn.id in user_fn_ids %}checked{% endif %}>
+                                <label class="form-check-label fw-medium" for="fn_{{ fn.id }}">
+                                    <i class="bi bi-person-badge text-primary me-1"></i>{{ fn.naam }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0">Er zijn nog geen functies gedefinieerd in deze organisatie.</p>
+                    {% endif %}
                 </div>
 
                 <div class="mb-4">

@@ -17,6 +17,8 @@ from .email_template import EmailTemplate
 from .feedback import FeedbackItem, FeedbackVote, FeedbackComment, FeedbackView
 from .question_category import QuestionCategory
 from .question_classification import QuestionClassification
+from .gender_identity import GenderIdentity
+from .functie import Functie, user_functies
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
@@ -24,7 +26,7 @@ __all__ = [
     'Folder', 'Document', 'AppFolder', 'AppDocument', 'AuditLog', 'Herkomst',
     'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation',
     'EmailTemplate', 'FeedbackItem', 'FeedbackVote', 'FeedbackComment', 'FeedbackView',
-    'QuestionCategory', 'QuestionClassification'
+    'QuestionCategory', 'QuestionClassification', 'GenderIdentity', 'Functie', 'user_functies'
 ]
 
 

@@ -36,7 +36,9 @@
                     <tr>
                         <th class="ps-3">{{ sort_link('naam', 'Naam') }}</th>
                         <th>{{ sort_link('email', 'E-mailadres') }}</th>
-                        <th>{{ sort_link('rol', 'Rol') }}</th>
+                        <th>Telefoon</th>
+                        <th>Functie(s)</th>
+                        <th>{{ sort_link('rol', 'Rechten') }}</th>
                         <th>{{ sort_link('status', 'Status') }}</th>
                         <th>{{ sort_link('laatste_login', 'Laatste login') }}</th>
                         <th class="pe-3 text-end">Acties</th>
@@ -55,6 +57,29 @@
                             {{ u.email }}
                             {% else %}
                             <span class="text-muted fst-italic">Niet ingevuld</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.telefoonnummer %}
+                            <a href="tel:{{ u.telefoonnummer }}" class="text-decoration-none text-body">
+                                <i class="bi bi-telephone me-1 text-muted"></i>{{ u.telefoonnummer }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted fst-italic">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set user_fns = u.get_functies_voor_organisatie(org_id) if org_id else [] %}
+                            {% if user_fns %}
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for fn in user_fns %}
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                        {{ fn.naam }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted fst-italic">—</span>
                             {% endif %}
                         </td>
                         <td>

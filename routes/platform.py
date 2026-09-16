@@ -10,6 +10,9 @@ from models.agenda import AgendaItem
 from models.email_template import EmailTemplate, ensure_default_email_templates
 from models.question_category import QuestionCategory
 from models.question_classification import QuestionClassification
+from models.herkomst import Herkomst
+from models.gender_identity import GenderIdentity
+from models.functie import Functie
 from utils.ai_classifier import seed_standaard_categorieen
 from sqlalchemy import func, extract
 from utils.decorators import platform_admin_required
@@ -248,6 +251,7 @@ def organisatie_verwijderen(org_id):
     from models.device import Device
     from models.age_category import AgeCategory
     from models.herkomst import Herkomst
+    from models.gender_identity import GenderIdentity
     from models.document import Document, Folder
     from models.evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
     from models.audit import AuditLog
@@ -290,6 +294,8 @@ def organisatie_verwijderen(org_id):
     Device.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
     AgeCategory.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
     Herkomst.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    GenderIdentity.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    Functie.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
 
     # 6. Audit Logs
     AuditLog.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)

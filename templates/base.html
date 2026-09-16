@@ -141,6 +141,7 @@
             </div>
             {% endif %}
 
+            {% if not is_sjabloon_org %}
             <!-- Registraties -->
             <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-registraties" role="button" aria-expanded="true" aria-controls="nav-registraties">
                 <span>Registraties</span>
@@ -187,14 +188,16 @@
                 </a>
             </div>
             {% endif %}
+            {% endif %}
 
             {% if current_user.is_beheerder() and session.get('organisatie_id') %}
             <!-- Beheer -->
             <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-beheer" role="button" aria-expanded="true" aria-controls="nav-beheer">
-                <span>Beheer</span>
+                <span>{% if is_sjabloon_org %}Stamgegevens Sjabloon{% else %}Beheer{% endif %}</span>
                 <i class="bi bi-chevron-down dd-nav-chevron"></i>
             </div>
             <div class="collapse show" id="nav-beheer">
+                {% if not is_sjabloon_org %}
                 <a href="{{ url_for('admin.gebruikers') }}"
                    class="dd-nav-link {% if request.endpoint and 'gebruiker' in request.endpoint %}active{% endif %}">
                     <i class="bi bi-people"></i>
@@ -205,6 +208,7 @@
                     <i class="bi bi-person-badge"></i>
                     <span>Digidokters</span>
                 </a>
+                {% endif %}
                 <a href="{{ url_for('admin.activiteitstypes') }}"
                    class="dd-nav-link {% if request.endpoint and 'activiteitstype' in request.endpoint %}active{% endif %}">
                     <i class="bi bi-tags"></i>
@@ -235,6 +239,17 @@
                     <i class="bi bi-compass"></i>
                     <span>Herkomst</span>
                 </a>
+                <a href="{{ url_for('admin.genderidentiteiten') }}"
+                   class="dd-nav-link {% if request.endpoint and 'gender' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-gender-ambiguous"></i>
+                    <span>Genderidentiteit</span>
+                </a>
+                <a href="{{ url_for('admin.functies') }}"
+                   class="dd-nav-link {% if request.endpoint and 'functie' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-person-badge"></i>
+                    <span>Functies</span>
+                </a>
+                {% if not is_sjabloon_org %}
                 <a href="{{ url_for('admin.backup') }}"
                    class="dd-nav-link {% if request.endpoint == 'admin.backup' %}active{% endif %}">
                     <i class="bi bi-download"></i>
@@ -252,9 +267,11 @@
                     <span>Audit Logs</span>
                 </a>
                 {% endif %}
+                {% endif %}
             </div>
             {% endif %}
 
+            {% if not is_sjabloon_org %}
             <!-- Data -->
             <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-data" role="button" aria-expanded="true" aria-controls="nav-data">
                 <span>Data</span>
@@ -279,6 +296,7 @@
                     <span>Statistieken</span>
                 </a>
             </div>
+            {% endif %}
 
             <!-- Algemeen -->
             <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-algemeen" role="button" aria-expanded="true" aria-controls="nav-algemeen">
@@ -347,6 +365,21 @@
             <i class="bi bi-shield-exclamation fs-5"></i>
             <span>Gelieve uw tijdelijk wachtwoord te wijzigen.</span>
             <a href="{{ url_for('auth.wachtwoord_wijzigen') }}" class="btn btn-sm btn-warning ms-auto">Wijzig nu</a>
+        </div>
+        {% endif %}
+
+        <!-- Sjabloon-organisatie status banner -->
+        {% if is_sjabloon_org %}
+        <div class="alert alert-warning d-flex align-items-center justify-content-between gap-2 mx-3 mt-2 mb-0 shadow-sm border-warning">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-file-earmark-code fs-5 text-warning-emphasis"></i>
+                <div>
+                    <strong>Sjabloon-organisatie:</strong> U beheert hier de standaard stamgegevens voor nieuwe gemeenten. Registraties, agenda-items en transacties zijn hier uitgeschakeld.
+                </div>
+            </div>
+            {% if current_user.rol == 'platformbeheerder' %}
+            <a href="{{ url_for('platform.dashboard') }}" class="btn btn-sm btn-outline-dark text-nowrap ms-2">Platformbeheer</a>
+            {% endif %}
         </div>
         {% endif %}
 

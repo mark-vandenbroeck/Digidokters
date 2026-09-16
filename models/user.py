@@ -11,6 +11,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     naam = db.Column(db.String(100), unique=True, nullable=False, index=True)
     email = db.Column(db.String(150), unique=True, nullable=True, index=True)
+    telefoonnummer = db.Column(db.String(30), nullable=True)
     wachtwoord_hash = db.Column(db.String(256), nullable=False)
     rol = db.Column(db.String(20), nullable=False, default=ROLE_MEDEWERKER)
     actief = db.Column(db.Boolean, default=True, nullable=False)
@@ -27,6 +28,11 @@ class User(UserMixin, db.Model):
     registraties = db.relationship('Registration', backref='aangemaakt_door_user', lazy=True,
                                    foreign_keys='Registration.aangemaakt_door_id')
     user_organisaties = db.relationship('UserOrganisatie', back_populates='user', cascade='all, delete-orphan')
+    functies = db.relationship('Functie', secondary='user_functies', backref=db.backref('users', lazy='dynamic'))
+
+    def get_functies_voor_organisatie(self, org_id):
+        """Haal de toegekende functies van deze gebruiker op binnen een specifieke organisatie."""
+        return [f for f in self.functies if f.organisatie_id == org_id]
 
 
     def is_beheerder(self):

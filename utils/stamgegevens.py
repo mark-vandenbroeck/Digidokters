@@ -31,6 +31,20 @@ def get_usage_counts(model: Type[db.Model], org_id: int) -> dict[int, int]:
             .group_by(Registration.herkomst_id)
             .all()
         )
+    if name == 'GenderIdentity':
+        # Haal alle genderidentiteiten op voor deze organisatie
+        from models.gender_identity import GenderIdentity
+        genders = GenderIdentity.query.filter_by(organisatie_id=org_id).all()
+        usage = {}
+        for g in genders:
+            cnt = (
+                Registration.query
+                .filter(Registration.organisatie_id == org_id)
+                .filter(db.func.lower(Registration.geslacht) == g.naam.lower())
+                .count()
+            )
+            usage[g.id] = cnt
+        return usage
     if name == 'Digidokter':
         return dict(
             db.session.query(Registration.digidokter_id, db.func.count(Registration.id))
@@ -55,6 +69,13 @@ def get_usage_counts(model: Type[db.Model], org_id: int) -> dict[int, int]:
         for lid in set(list(agenda_counts.keys()) + list(reg_counts.keys())):
             usage[lid] = agenda_counts.get(lid, 0) + reg_counts.get(lid, 0)
         return usage
+    if name == 'Functie':
+        from models.functie import user_functies
+        return dict(
+            db.session.query(user_functies.c.functie_id, db.func.count(user_functies.c.user_id))
+            .group_by(user_functies.c.functie_id)
+            .all()
+        )
     return {}
 
 

@@ -115,7 +115,29 @@ class BaseTestCase(unittest.TestCase):
             actief=True,
             organisatie_id=self.org.id
         )
-        db.session.add_all([self.digidokter, self.age_category, self.device, self.herkomst])
+        from models.gender_identity import GenderIdentity
+        self.gender_man = GenderIdentity(
+            naam="Man",
+            actief=True,
+            volgorde=0,
+            organisatie_id=self.org.id
+        )
+        self.gender_vrouw = GenderIdentity(
+            naam="Vrouw",
+            actief=True,
+            volgorde=1,
+            organisatie_id=self.org.id
+        )
+        from models.functie import Functie
+        self.functie_digidokter = Functie(naam="Digidokter", actief=True, volgorde=0, organisatie_id=self.org.id)
+        self.functie_digihelper = Functie(naam="Digihelper", actief=True, volgorde=1, organisatie_id=self.org.id)
+        self.functie_lesgever = Functie(naam="Lesgever", actief=True, volgorde=2, organisatie_id=self.org.id)
+
+        db.session.add_all([
+            self.digidokter, self.age_category, self.device, self.herkomst,
+            self.gender_man, self.gender_vrouw,
+            self.functie_digidokter, self.functie_digihelper, self.functie_lesgever
+        ])
         db.session.commit()
 
     def login(self, identifier, password):

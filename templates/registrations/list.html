@@ -91,8 +91,14 @@
                     <label class="form-label mb-1 small fw-medium">Geslacht</label>
                     <select class="form-select form-select-sm" name="geslacht">
                         <option value="">Alle</option>
-                        <option value="man" {{ 'selected' if filter_geslacht == 'man' }}>Man</option>
-                        <option value="vrouw" {{ 'selected' if filter_geslacht == 'vrouw' }}>Vrouw</option>
+                        {% if genderidentiteiten %}
+                            {% for g in genderidentiteiten if g.actief %}
+                            <option value="{{ g.naam }}" {{ 'selected' if filter_geslacht and filter_geslacht|lower == g.naam|lower }}>{{ g.naam }}</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="man" {{ 'selected' if filter_geslacht == 'man' }}>Man</option>
+                            <option value="vrouw" {{ 'selected' if filter_geslacht == 'vrouw' }}>Vrouw</option>
+                        {% endif %}
                         <option value="onbekend" {{ 'selected' if filter_geslacht == 'onbekend' }}>Niet gespecificeerd</option>
                     </select>
                 </div>

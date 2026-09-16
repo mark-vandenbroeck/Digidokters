@@ -80,8 +80,9 @@
                         <label for="geslacht" class="form-label">Geslacht</label>
                         <select class="form-select" id="geslacht" name="geslacht">
                             <option value="" {{ 'selected' if not reg.geslacht }}>Niet gespecificeerd</option>
-                            <option value="man" {{ 'selected' if reg.geslacht == 'man' }}>Man</option>
-                            <option value="vrouw" {{ 'selected' if reg.geslacht == 'vrouw' }}>Vrouw</option>
+                            {% for g in genderidentiteiten %}
+                            <option value="{{ g.naam }}" {{ 'selected' if reg.geslacht and (reg.geslacht|lower == g.naam|lower) }}>{{ g.naam }}</option>
+                            {% endfor %}
                         </select>
                     </div>
 

@@ -218,3 +218,69 @@ class TestRegistrations(BaseTestCase):
         self.assertIn(self.digidokter.naam, html)
         self.assertNotIn("Inactieve Dokter", html)
 
+    def test_view_registration_shows_classification(self):
+        """Test dat op de detailpagina van een registratie de vraagclassificatie, categorie, zekerheid en motivatie getoond worden."""
+        from models.question_category import QuestionCategory
+        from models.question_classification import QuestionClassification
+
+        # 1. Registratie zonder classificatie
+        reg_unclassified = Registration(
+            registratienummer="2026-0201",
+            datum=date.today(),
+            client="Klant Ongeclassificeerd",
+            digidokter_id=self.digidokter.id,
+            toestel_id=self.device.id,
+            leeftijdscategorie_id=self.age_category.id,
+            onderwerp="Vraag over router configuratie",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        db.session.add(reg_unclassified)
+        db.session.commit()
+
+        res = self.client.get(f"/registraties/{reg_unclassified.id}")
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Vraagclassificatie", html)
+        self.assertIn("Nog niet geclassificeerd", html)
+
+        # 2. Registratie met classificatie
+        cat = QuestionCategory(naam="Netwerk & Internet", omschrijving="Vragen over wifi, routers, netwerk", actief=True)
+        db.session.add(cat)
+        db.session.commit()
+
+        reg_classified = Registration(
+            registratienummer="2026-0202",
+            datum=date.today(),
+            client="Klant Geclassificeerd",
+            digidokter_id=self.digidokter.id,
+            toestel_id=self.device.id,
+            leeftijdscategorie_id=self.age_category.id,
+            onderwerp="Wifi valt steeds weg op laptop",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        db.session.add(reg_classified)
+        db.session.commit()
+
+        classification = QuestionClassification(
+            registration_id=reg_classified.id,
+            category_id=cat.id,
+            zekerheid=0.93,
+            toelichting="De vraag betreft wifi-connectiviteit en netwerkproblemen.",
+            model_naam="gemini-2.5-flash",
+            is_handmatig_aangepast=False
+        )
+        db.session.add(classification)
+        db.session.commit()
+
+        res2 = self.client.get(f"/registraties/{reg_classified.id}")
+        self.assertEqual(res2.status_code, 200)
+        html2 = res2.data.decode("utf-8")
+        self.assertIn("Vraagclassificatie", html2)
+        self.assertIn("Netwerk &amp; Internet", html2)
+        self.assertIn("93% zekerheid", html2)
+        self.assertIn("De vraag betreft wifi-connectiviteit en netwerkproblemen.", html2)
+        self.assertIn("Motivatie:", html2)
+
+

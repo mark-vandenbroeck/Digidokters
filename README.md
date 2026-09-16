@@ -48,6 +48,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 ### 1. Bezoekenregistratie
 *   Medewerkers en beheerders kunnen snel binnenlopende bezoekers registreren.
 *   Bij het openen van het formulier wordt de ingelogde gebruiker automatisch geselecteerd als Digidokter.
+*   **Consultatielocaties:** Indien er binnen de organisatie meerdere locaties zijn gemarkeerd als *"Gebruikt voor consultaties"*, kan de specifieke locatie direct worden geselecteerd. Bij exact één consultatielocatie wordt deze automatisch zonder extra dropdown toegekend.
 *   **Realtime Asynchrone AI-classificatie:** Zodra een consultatie wordt opgeslagen of bewerkt, wordt de vraag op de achtergrond binnen 1-2 seconden geanalyseerd via Google Gemini AI en toegekend aan de passende categorie.
 *   Vrijwilligers (digidokters) met de rol `medewerker` hebben ook de mogelijkheid om registraties te wissen bij foutieve invoer.
 
@@ -59,7 +60,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 
 ### 3. Statistieken & Dashboard
 Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
-*   **Bezoekers & Consultaties:** Tijdlijn per week (jaar-op-jaar), maandelijkse verdelingen, nieuwe vs. terugkerende bezoekers, meest populaire leeftijdscategorieën, toestellen, geslachtsverdeling en drukste dagen.
+*   **Bezoekers & Consultaties:** Tijdlijn per week (jaar-op-jaar), maandelijkse verdelingen, verdeling over locaties, nieuwe vs. terugkerende bezoekers, meest populaire leeftijdscategorieën, toestellen, geslachtsverdeling en drukste dagen.
 *   **Vrijwilligers & Agenda:** Totaal aantal gepresteerde uren per digidokter, sessies per locatie en activiteitstype, urentrend per maand en de **Druktest ratio** (gemiddeld aantal bezoeken per aanwezige vrijwilliger per sessie, uitsluitend berekend voor activiteiten in het verleden).
 *   **Vragen & AI-Analyse:** AI-gestuurde analyse van consultaties met realtime KPI's (dekkingsgraad, populairste categorie, gemiddelde zekerheid), categorie-staafdiagram, top-5 maandelijkse evolutiegrafiek en kruistabellen per apparaat en leeftijdscategorie.
 *   **Filter 'Alle jaren' & Tab-behoud:** Ondersteunt filteren per specifiek jaar én over 'Alle jaren' heen, waarbij het geopende tabblad altijd actief blijft bij filterwijzigingen.
@@ -97,10 +98,11 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 
 ### 8. Stamgegevensbeheer & Veilig Wissen
 *   **Volledig beheer van keuzelijsten:** Beheerders en platformbeheerders kunnen binnen hun organisatie locaties, activiteitstypes, leeftijdscategorieën, toestellen en herkomstbronnen aanmaken, bewerken, activeren/deactiveren en handmatig van volgorde veranderen.
+*   **Locaties voor Consultaties:** Locaties kunnen worden aangeduid met de optie *"Gebruikt voor consultaties"*. Enkel locaties met deze vlag verschijnen bij de registratie van consultaties en in het consultatielocatiefilter.
 *   **Mapping van gedeactiveerde entries:** Gedeactiveerde leeftijdscategorieën en toesteltypes kunnen in het beheer worden gekoppeld (gemapt) naar een actieve categorie. Historische consultaties blijven intact in de database, maar worden in overzichten, filters, detailweergaven, statistieken en exports automatisch getoond en geaggregeerd onder de gemapte actieve categorie.
-*   **Geavanceerde filters in het consultatieoverzicht:** De overzichtspagina van registraties bevat filters op zoekterm, digidokter, toesteltype, geslacht, leeftijdscategorie en datum (van-tot). De dropdowns tonen enkel actieve opties; filteren op een optie matcht automatisch ook historische registraties met een gekoppelde inactieve entry.
+*   **Geavanceerde filters in het consultatieoverzicht:** De overzichtspagina van registraties bevat kolommen en filters op zoekterm, digidokter, locatie, toesteltype, geslacht, leeftijdscategorie en datum (van-tot). De dropdowns tonen enkel actieve opties; filteren op een optie matcht automatisch ook historische registraties met een gekoppelde inactieve entry.
 *   **Referentiecontroles bij wissen:** Stamgegevens kunnen uitsluitend permanent gewist worden als er **geen enkele andere data naar verwijst**:
-    *   *Locaties:* Mag niet gewist worden zolang er nog gekoppelde agenda-activiteiten zijn.
+    *   *Locaties:* Mag niet gewist worden zolang er nog gekoppelde agenda-activiteiten of geregistreerde consultaties zijn.
     *   *Activiteitstypes:* Mag niet gewist worden zolang er gekoppelde agenda-activiteiten of ingevulde evaluaties zijn.
     *   *Leeftijdscategorieën, Toestellen & Herkomst:* Mogen niet gewist worden zolang er nog geregistreerde consultaties aan gekoppeld zijn.
 *   **Duidelijke gebruikersfeedback:** Indien een item nog in gebruik is, wordt de verwijderknop automatisch gedeactiveerd met een tooltip die het aantal gekoppelde records vermeldt. Indien ongebruikt, kan het item met één klik en bevestiging definitief worden verwijderd.

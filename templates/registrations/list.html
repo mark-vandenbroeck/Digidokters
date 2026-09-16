@@ -16,7 +16,7 @@
 
 {% macro sort_link(col_name, display_text) %}
     {% set target_dir = 'desc' if sort_by == col_name and direction == 'asc' else 'asc' %}
-    <a href="{{ url_for('reg.lijst', sort_by=col_name, direction=target_dir, zoek=zoek, digidokter=filter_digidokter, toestel=filter_toestel, leeftijd=filter_leeftijd, geslacht=filter_geslacht, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+    <a href="{{ url_for('reg.lijst', sort_by=col_name, direction=target_dir, zoek=zoek, digidokter=filter_digidokter, locatie=filter_locatie, toestel=filter_toestel, leeftijd=filter_leeftijd, geslacht=filter_geslacht, datum_van=filter_datum_van, datum_tot=filter_datum_tot) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
         {{ display_text }}
         {% if sort_by == col_name %}
             {% if direction == 'asc' %}
@@ -37,7 +37,7 @@
             <input type="hidden" name="sort_by" value="{{ sort_by }}">
             <input type="hidden" name="direction" value="{{ direction }}">
             
-            <!-- Rij 1: Zoeken, Digidokter, Toesteltype, Geslacht -->
+            <!-- Rij 1: Zoeken, Digidokter, Locatie, Toesteltype -->
             <div class="row g-2 align-items-end mb-2">
                 <div class="col-12 col-sm-6 col-lg-3">
                     <label class="form-label mb-1 small fw-medium">Zoeken</label>
@@ -57,6 +57,15 @@
                     </select>
                 </div>
                 <div class="col-6 col-sm-6 col-lg-3">
+                    <label class="form-label mb-1 small fw-medium">Locatie</label>
+                    <select class="form-select form-select-sm" name="locatie">
+                        <option value="0">Alle locaties</option>
+                        {% for loc in consultatie_locaties if loc.actief %}
+                        <option value="{{ loc.id }}" {{ 'selected' if loc.id == filter_locatie }}>{{ loc.naam }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-sm-6 col-lg-3">
                     <label class="form-label mb-1 small fw-medium">Toesteltype</label>
                     <select class="form-select form-select-sm" name="toestel">
                         <option value="0">Alle toestellen</option>
@@ -65,20 +74,11 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-6 col-sm-6 col-lg-3">
-                    <label class="form-label mb-1 small fw-medium">Geslacht</label>
-                    <select class="form-select form-select-sm" name="geslacht">
-                        <option value="">Alle</option>
-                        <option value="man" {{ 'selected' if filter_geslacht == 'man' }}>Man</option>
-                        <option value="vrouw" {{ 'selected' if filter_geslacht == 'vrouw' }}>Vrouw</option>
-                        <option value="onbekend" {{ 'selected' if filter_geslacht == 'onbekend' }}>Niet gespecificeerd</option>
-                    </select>
-                </div>
             </div>
 
-            <!-- Rij 2: Leeftijdscategorie, Datum van, Datum tot, Actieknoppen -->
+            <!-- Rij 2: Leeftijdscategorie, Geslacht, Datum van, Datum tot, Actieknoppen -->
             <div class="row g-2 align-items-end">
-                <div class="col-12 col-sm-6 col-lg-4">
+                <div class="col-12 col-sm-6 col-lg-3">
                     <label class="form-label mb-1 small fw-medium">Leeftijdscategorie</label>
                     <select class="form-select form-select-sm" name="leeftijd">
                         <option value="0">Alle leeftijdscategorieën</option>
@@ -87,21 +87,30 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-6 col-sm-3 col-lg-3">
+                <div class="col-6 col-sm-6 col-lg-2">
+                    <label class="form-label mb-1 small fw-medium">Geslacht</label>
+                    <select class="form-select form-select-sm" name="geslacht">
+                        <option value="">Alle</option>
+                        <option value="man" {{ 'selected' if filter_geslacht == 'man' }}>Man</option>
+                        <option value="vrouw" {{ 'selected' if filter_geslacht == 'vrouw' }}>Vrouw</option>
+                        <option value="onbekend" {{ 'selected' if filter_geslacht == 'onbekend' }}>Niet gespecificeerd</option>
+                    </select>
+                </div>
+                <div class="col-6 col-sm-3 col-lg-2">
                     <label class="form-label mb-1 small fw-medium">Datum van</label>
                     <input type="date" class="form-control form-control-sm"
                            name="datum_van" value="{{ filter_datum_van }}">
                 </div>
-                <div class="col-6 col-sm-3 col-lg-3">
+                <div class="col-6 col-sm-3 col-lg-2">
                     <label class="form-label mb-1 small fw-medium">Datum tot</label>
                     <input type="date" class="form-control form-control-sm"
                            name="datum_tot" value="{{ filter_datum_tot }}">
                 </div>
-                <div class="col-12 col-lg-2 d-flex gap-2">
+                <div class="col-12 col-lg-3 d-flex gap-2">
                     <button type="submit" class="btn btn-primary btn-sm flex-fill text-nowrap">
                         <i class="bi bi-funnel me-1"></i>Filteren
                     </button>
-                    {% if zoek or filter_digidokter or filter_toestel or filter_leeftijd or filter_geslacht or filter_datum_van or filter_datum_tot %}
+                    {% if zoek or filter_digidokter or filter_locatie or filter_toestel or filter_leeftijd or filter_geslacht or filter_datum_van or filter_datum_tot %}
                     <a href="{{ url_for('reg.lijst') }}" class="btn btn-outline-secondary btn-sm" title="Filters wissen">
                         <i class="bi bi-x-lg"></i>
                     </a>
@@ -123,6 +132,7 @@
                         <th class="ps-3">{{ sort_link('nummer', 'Nr.') }}</th>
                         <th>{{ sort_link('datum', 'Datum') }}</th>
                         <th>{{ sort_link('client', 'Bezoeker') }}</th>
+                        <th class="d-none d-md-table-cell">{{ sort_link('locatie', 'Locatie') }}</th>
                         <th class="d-none d-md-table-cell">{{ sort_link('digidokter', 'Digidokter') }}</th>
                         <th class="d-none d-lg-table-cell">{{ sort_link('leeftijd', 'Leeftijd') }}</th>
                         <th class="d-none d-lg-table-cell">{{ sort_link('toestel', 'Toestel') }}</th>
@@ -141,9 +151,16 @@
                         <td>
                             <div class="fw-medium">{{ r.client }}</div>
                             {% if r.locatie %}
-                            <div class="text-muted small" style="font-size: 0.75rem;"><i class="bi bi-geo-alt me-1 text-primary"></i>{{ r.locatie.naam }}</div>
+                            <div class="text-muted small d-md-none" style="font-size: 0.75rem;"><i class="bi bi-geo-alt me-1 text-primary"></i>{{ r.locatie.naam }}</div>
                             {% endif %}
                             <div class="text-muted small d-md-none">{{ r.digidokter.naam if r.digidokter }}</div>
+                        </td>
+                        <td class="d-none d-md-table-cell">
+                            {% if r.locatie %}
+                            <span class="text-dark">{{ r.locatie.naam }}</span>
+                            {% else %}
+                            <span class="text-muted">–</span>
+                            {% endif %}
                         </td>
                         <td class="d-none d-md-table-cell">{{ r.digidokter.naam if r.digidokter else '–' }}</td>
                         <td class="d-none d-lg-table-cell">{{ r.leeftijdscategorie.effectieve_naam if r.leeftijdscategorie else '–' }}</td>
@@ -190,7 +207,7 @@
                 <ul class="pagination pagination-sm mb-0">
                     {% if paginatie.has_prev %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.prev_num, zoek=zoek, digidokter=filter_digidokter, toestel=filter_toestel, leeftijd=filter_leeftijd, geslacht=filter_geslacht, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">
+                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.prev_num, zoek=zoek, digidokter=filter_digidokter, locatie=filter_locatie, toestel=filter_toestel, leeftijd=filter_leeftijd, geslacht=filter_geslacht, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     </li>
@@ -198,7 +215,7 @@
                     {% for p in paginatie.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
                         {% if p %}
                         <li class="page-item {{ 'active' if p == paginatie.page }}">
-                            <a class="page-link" href="{{ url_for('reg.lijst', pagina=p, zoek=zoek, digidokter=filter_digidokter, toestel=filter_toestel, leeftijd=filter_leeftijd, geslacht=filter_geslacht, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">{{ p }}</a>
+                            <a class="page-link" href="{{ url_for('reg.lijst', pagina=p, zoek=zoek, digidokter=filter_digidokter, locatie=filter_locatie, toestel=filter_toestel, leeftijd=filter_leeftijd, geslacht=filter_geslacht, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">{{ p }}</a>
                         </li>
                         {% else %}
                         <li class="page-item disabled"><span class="page-link">…</span></li>
@@ -206,7 +223,7 @@
                     {% endfor %}
                     {% if paginatie.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.next_num, zoek=zoek, digidokter=filter_digidokter, toestel=filter_toestel, leeftijd=filter_leeftijd, geslacht=filter_geslacht, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">
+                        <a class="page-link" href="{{ url_for('reg.lijst', pagina=paginatie.next_num, zoek=zoek, digidokter=filter_digidokter, locatie=filter_locatie, toestel=filter_toestel, leeftijd=filter_leeftijd, geslacht=filter_geslacht, datum_van=filter_datum_van, datum_tot=filter_datum_tot, sort_by=sort_by, direction=direction) }}">
                             <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>
@@ -224,7 +241,7 @@
         <div class="text-center py-5">
             <i class="bi bi-clipboard2-x fs-1 text-muted mb-3 d-block"></i>
             <p class="text-muted mb-2">Geen registraties gevonden.</p>
-            {% if zoek or filter_digidokter or filter_toestel or filter_leeftijd or filter_geslacht or filter_datum_van or filter_datum_tot %}
+            {% if zoek or filter_digidokter or filter_locatie or filter_toestel or filter_leeftijd or filter_geslacht or filter_datum_van or filter_datum_tot %}
             <a href="{{ url_for('reg.lijst') }}" class="btn btn-sm btn-outline-secondary">Filters wissen</a>
             {% else %}
             <a href="{{ url_for('reg.nieuw') }}" class="btn btn-sm btn-primary">Eerste bezoek registreren</a>

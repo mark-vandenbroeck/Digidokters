@@ -41,6 +41,7 @@ def lijst():
     pagina = request.args.get('pagina', 1, type=int)
     zoek = request.args.get('zoek', '').strip()
     filter_digidokter = request.args.get('digidokter', 0, type=int)
+    filter_locatie = request.args.get('locatie', 0, type=int)
     filter_toestel = request.args.get('toestel', type=int) or request.args.get('toesteltype', 0, type=int)
     filter_leeftijd = request.args.get('leeftijd', type=int) or request.args.get('leeftijdscategorie', 0, type=int)
     filter_geslacht = request.args.get('geslacht', '').strip().lower()
@@ -68,10 +69,13 @@ def lijst():
                 Registration.onderwerp.ilike(f'%{zoek}%'),
                 Registration.registratienummer.ilike(f'%{zoek}%'),
                 Registration.herkomst.has(Herkomst.naam.ilike(f'%{zoek}%')),
+                Registration.locatie.has(Location.naam.ilike(f'%{zoek}%')),
             )
         )
     if filter_digidokter:
         query = query.filter(Registration.digidokter_id == filter_digidokter)
+    if filter_locatie:
+        query = query.filter(Registration.locatie_id == filter_locatie)
     if filter_toestel:
         mapped_toestel_ids = [t.id for t in Device.query.filter_by(mapped_to_id=filter_toestel).all()]
         query = query.filter(Registration.toestel_id.in_([filter_toestel] + mapped_toestel_ids))
@@ -105,6 +109,10 @@ def lijst():
         query = query.order_by(order_col)
     elif sort_by == 'client':
         order_col = Registration.client.desc() if direction == 'desc' else Registration.client.asc()
+        query = query.order_by(order_col)
+    elif sort_by == 'locatie':
+        query = query.outerjoin(Location, Registration.locatie_id == Location.id)
+        order_col = Location.naam.desc() if direction == 'desc' else Location.naam.asc()
         query = query.order_by(order_col)
     elif sort_by == 'digidokter':
         query = query.outerjoin(Digidokter, Registration.digidokter_id == Digidokter.id)
@@ -147,12 +155,14 @@ def lijst():
         paginatie=paginatie,
         zoek=zoek,
         filter_digidokter=filter_digidokter,
+        filter_locatie=filter_locatie,
         filter_toestel=filter_toestel,
         filter_leeftijd=filter_leeftijd,
         filter_geslacht=filter_geslacht,
         filter_datum_van=filter_datum_van,
         filter_datum_tot=filter_datum_tot,
         digidokters=keuzes['digidokters'],
+        consultatie_locaties=keuzes['consultatie_locaties'],
         toestellen=keuzes['toestellen'],
         leeftijdscategorieën=keuzes['leeftijdscategorieën'],
         sort_by=sort_by,

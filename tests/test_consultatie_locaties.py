@@ -221,3 +221,60 @@ class ConsultatieLocatiesTestCase(BaseTestCase):
         self.assertIn(b'Verdeling over locaties', resp.data)
         self.assertIn(b'Locatie Alpha', resp.data)
         self.assertIn(b'Locatie Beta', resp.data)
+
+    def test_registraties_lijst_locatie_kolom_en_filter(self):
+        """Registratielijst toont de locatiekolom en ondersteunt filtering en sortering op locatie."""
+        loc_x = Location(naam='Locatie Xylophone', actief=True, volgorde=1, gebruikt_voor_consultaties=True, organisatie_id=self.org.id)
+        loc_y = Location(naam='Locatie Yellow', actief=True, volgorde=2, gebruikt_voor_consultaties=True, organisatie_id=self.org.id)
+        db.session.add_all([loc_x, loc_y])
+        db.session.commit()
+
+        r1 = Registration(
+            registratienummer='2026-0101',
+            datum=date(2026, 3, 1),
+            client='Karel X',
+            digidokter_id=self.digidokter.id,
+            nieuwe_klant=False,
+            onderwerp='Vraag X',
+            leeftijdscategorie_id=self.age_category.id,
+            toestel_id=self.device.id,
+            locatie_id=loc_x.id,
+            organisatie_id=self.org.id
+        )
+        r2 = Registration(
+            registratienummer='2026-0102',
+            datum=date(2026, 3, 2),
+            client='Petra Y',
+            digidokter_id=self.digidokter.id,
+            nieuwe_klant=False,
+            onderwerp='Vraag Y',
+            leeftijdscategorie_id=self.age_category.id,
+            toestel_id=self.device.id,
+            locatie_id=loc_y.id,
+            organisatie_id=self.org.id
+        )
+        db.session.add_all([r1, r2])
+        db.session.commit()
+
+        # 1. GET op lijst toont tabel header Locatie, dropdown filter en locaties van items
+        resp = self.client.get('/registraties')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn('Locatie', html)
+        self.assertIn('Locatie Xylophone', html)
+        self.assertIn('Locatie Yellow', html)
+        self.assertIn('<select class="form-select form-select-sm" name="locatie">', html)
+
+        # 2. Filteren op loc_x
+        resp_filter_x = self.client.get(f'/registraties?locatie={loc_x.id}')
+        self.assertEqual(resp_filter_x.status_code, 200)
+        html_x = resp_filter_x.get_data(as_text=True)
+        self.assertIn('Karel X', html_x)
+        self.assertNotIn('Petra Y', html_x)
+
+        # 3. Sorteren op locatie asc & desc
+        resp_sort = self.client.get('/registraties?sort_by=locatie&direction=asc')
+        self.assertEqual(resp_sort.status_code, 200)
+        resp_sort_desc = self.client.get('/registraties?sort_by=locatie&direction=desc')
+        self.assertEqual(resp_sort_desc.status_code, 200)
+

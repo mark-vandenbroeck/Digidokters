@@ -11,7 +11,21 @@
             Gemeenschappelijke categorieën voor automatische AI-classificatie en analyse over alle aangesloten organisaties
         </p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Status filter">
+            <a href="{{ url_for('platform.vraagcategorieen', status='alle') }}"
+               class="btn {% if status_filter == 'alle' or not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Alle
+            </a>
+            <a href="{{ url_for('platform.vraagcategorieen', status='actief') }}"
+               class="btn {% if status_filter == 'actief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-check-circle me-1"></i>Enkel actieve
+            </a>
+            <a href="{{ url_for('platform.vraagcategorieen', status='inactief') }}"
+               class="btn {% if status_filter == 'inactief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-eye-slash me-1"></i>Enkel gedeactiveerde
+            </a>
+        </div>
         <a href="{{ url_for('platform.vraagclassificaties') }}" class="btn btn-outline-primary">
             <i class="bi bi-stars me-1"></i>Bekijk AI-classificaties
         </a>
@@ -47,12 +61,12 @@
                     <tr class="{% if not cat.actief %}table-light opacity-75{% endif %}">
                         <td class="text-center">
                             <div class="btn-group-vertical btn-group-sm">
-                                <a href="{{ url_for('platform.vraagcategorie_volgorde', cat_id=cat.id, richting='omhoog') }}" 
+                                <a href="{{ url_for('platform.vraagcategorie_volgorde', cat_id=cat.id, richting='omhoog', status=status_filter) }}" 
                                    class="btn btn-sm btn-link p-0 text-secondary" title="Omhoog">
                                     <i class="bi bi-chevron-up"></i>
                                 </a>
                                 <span class="badge bg-light text-dark border">{{ cat.volgorde }}</span>
-                                <a href="{{ url_for('platform.vraagcategorie_volgorde', cat_id=cat.id, richting='omlaag') }}" 
+                                <a href="{{ url_for('platform.vraagcategorie_volgorde', cat_id=cat.id, richting='omlaag', status=status_filter) }}" 
                                    class="btn btn-sm btn-link p-0 text-secondary" title="Omlaag">
                                     <i class="bi bi-chevron-down"></i>
                                 </a>
@@ -66,13 +80,13 @@
                         </td>
                         <td class="text-center">
                             <a href="{{ url_for('platform.vraagclassificaties', categorie_id=cat.id) }}" 
-                               class="badge {% if count > 0 %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-light text-muted border{% endif %} text-decoration-none"
+                                class="badge {% if count > 0 %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-light text-muted border{% endif %} text-decoration-none"
                                title="Bekijk de {{ count }} gekoppelde vragen">
                                 <i class="bi bi-chat-left-text me-1"></i>{{ count }}
                             </a>
                         </td>
                         <td class="text-center">
-                            <form action="{{ url_for('platform.vraagcategorie_toggle', cat_id=cat.id) }}" method="POST" class="d-inline">
+                            <form action="{{ url_for('platform.vraagcategorie_toggle', cat_id=cat.id, status=status_filter) }}" method="POST" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm p-0 border-0 bg-transparent" title="Klik om status te wijzigen">
                                     {% if cat.actief %}
@@ -108,7 +122,11 @@
                     {% else %}
                     <tr>
                         <td colspan="6" class="text-center py-4 text-muted">
+                            {% if status_filter and status_filter != 'alle' %}
+                            Geen categorieën gevonden met status "{{ status_filter }}". <a href="{{ url_for('platform.vraagcategorieen', status='alle') }}" class="btn btn-link btn-sm p-0 ms-1">Toon alle</a>
+                            {% else %}
                             Geen categorieën gevonden.
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -118,3 +136,4 @@
     </div>
 </div>
 {% endblock %}
+

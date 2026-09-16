@@ -31,6 +31,9 @@ def gebruikers():
 
     sort_by = request.args.get('sort_by', 'naam').strip()
     direction = request.args.get('direction', 'asc').strip()
+    status_filter = request.args.get('status', 'alle').strip().lower()
+    if status_filter not in ('actief', 'inactief', 'alle'):
+        status_filter = 'alle'
 
     query = (
         UserOrganisatie.query
@@ -38,6 +41,11 @@ def gebruikers():
         .join(User, UserOrganisatie.user_id == User.id)
         .filter(UserOrganisatie.organisatie_id == org_id)
     )
+
+    if status_filter == 'actief':
+        query = query.filter(UserOrganisatie.actief == True)
+    elif status_filter == 'inactief':
+        query = query.filter(UserOrganisatie.actief == False)
 
     if sort_by == 'email':
         order_col = User.email.desc() if direction == 'desc' else User.email.asc()
@@ -66,6 +74,7 @@ def gebruikers():
         digidokter_counts=digidokter_counts,
         sort_by=sort_by,
         direction=direction,
+        status_filter=status_filter,
         org_id=org_id
     )
 
@@ -358,9 +367,19 @@ def _beheer_lijst(model, template, naam_veld='naam'):
     from utils.tenant import filter_op_organisatie, get_huidige_organisatie_id
     from utils.stamgegevens import get_usage_counts
     org_id = get_huidige_organisatie_id()
-    items = filter_op_organisatie(model.query, model).order_by(getattr(model, 'volgorde'), getattr(model, naam_veld)).all()
+    status_filter = request.args.get('status', 'alle').strip().lower()
+    if status_filter not in ('actief', 'inactief', 'alle'):
+        status_filter = 'alle'
+
+    query = filter_op_organisatie(model.query, model)
+    if status_filter == 'actief':
+        query = query.filter(model.actief == True)
+    elif status_filter == 'inactief':
+        query = query.filter(model.actief == False)
+
+    items = query.order_by(getattr(model, 'volgorde'), getattr(model, naam_veld)).all()
     usage_counts = get_usage_counts(model, org_id)
-    return render_template(template, items=items, usage_counts=usage_counts)
+    return render_template(template, items=items, usage_counts=usage_counts, status_filter=status_filter)
 
 
 def _beheer_toggle(model, item_id, redirect_endpoint):
@@ -368,8 +387,11 @@ def _beheer_toggle(model, item_id, redirect_endpoint):
     from utils.stamgegevens import toggle_stamgegeven_status
     org_id = get_huidige_organisatie_id()
     naam, actief = toggle_stamgegeven_status(model, item_id, org_id)
-    status = 'geactiveerd' if actief else 'gedeactiveerd'
-    flash(f'{naam} {status}.', 'info')
+    status_msg = 'geactiveerd' if actief else 'gedeactiveerd'
+    flash(f'{naam} {status_msg}.', 'info')
+    status_param = request.args.get('status')
+    if status_param and status_param in ('actief', 'inactief', 'alle'):
+        return redirect(url_for(redirect_endpoint, status=status_param))
     return redirect(url_for(redirect_endpoint))
 
 
@@ -379,6 +401,9 @@ def _beheer_volgorde(model, item_id, richting, redirect_endpoint):
     from utils.stamgegevens import wijzig_stamgegeven_volgorde
     org_id = get_huidige_organisatie_id()
     wijzig_stamgegeven_volgorde(model, item_id, richting, org_id)
+    status_param = request.args.get('status')
+    if status_param and status_param in ('actief', 'inactief', 'alle'):
+        return redirect(url_for(redirect_endpoint, status=status_param))
     return redirect(url_for(redirect_endpoint))
 
 
@@ -1129,7 +1154,17 @@ def activiteitstypes():
     from models.agenda import AgendaItem
     from models.evaluation import EvaluationForm, EvaluationResponse
     org_id = get_huidige_organisatie_id()
-    items = filter_op_organisatie(ActivityType.query, ActivityType).order_by(ActivityType.volgorde, ActivityType.naam).all()
+    status_filter = request.args.get('status', 'alle').strip().lower()
+    if status_filter not in ('actief', 'inactief', 'alle'):
+        status_filter = 'alle'
+
+    query = filter_op_organisatie(ActivityType.query, ActivityType)
+    if status_filter == 'actief':
+        query = query.filter(ActivityType.actief == True)
+    elif status_filter == 'inactief':
+        query = query.filter(ActivityType.actief == False)
+
+    items = query.order_by(ActivityType.volgorde, ActivityType.naam).all()
 
     agenda_counts = dict(
         db.session.query(AgendaItem.type_id, db.func.count(AgendaItem.id))
@@ -1144,7 +1179,7 @@ def activiteitstypes():
         .group_by(EvaluationForm.activity_type_id)
         .all()
     )
-    return render_template('admin/activiteitstypes.html', items=items, agenda_counts=agenda_counts, eval_counts=eval_counts)
+    return render_template('admin/activiteitstypes.html', items=items, agenda_counts=agenda_counts, eval_counts=eval_counts, status_filter=status_filter)
 
 
 @admin_bp.route('/activiteitstypes/nieuw', methods=['GET', 'POST'])
@@ -1263,7 +1298,17 @@ def locaties():
     from utils.tenant import filter_op_organisatie, get_huidige_organisatie_id
     from models.agenda import AgendaItem
     org_id = get_huidige_organisatie_id()
-    items = filter_op_organisatie(Location.query, Location).order_by(Location.volgorde, Location.naam).all()
+    status_filter = request.args.get('status', 'alle').strip().lower()
+    if status_filter not in ('actief', 'inactief', 'alle'):
+        status_filter = 'alle'
+
+    query = filter_op_organisatie(Location.query, Location)
+    if status_filter == 'actief':
+        query = query.filter(Location.actief == True)
+    elif status_filter == 'inactief':
+        query = query.filter(Location.actief == False)
+
+    items = query.order_by(Location.volgorde, Location.naam).all()
     agenda_counts = dict(
         db.session.query(AgendaItem.locatie_id, db.func.count(AgendaItem.id))
         .filter_by(organisatie_id=org_id)
@@ -1279,7 +1324,7 @@ def locaties():
     usage_counts = {}
     for lid in set(list(agenda_counts.keys()) + list(reg_counts.keys())):
         usage_counts[lid] = agenda_counts.get(lid, 0) + reg_counts.get(lid, 0)
-    return render_template('admin/locaties.html', items=items, usage_counts=usage_counts)
+    return render_template('admin/locaties.html', items=items, usage_counts=usage_counts, status_filter=status_filter)
 
 
 @admin_bp.route('/locaties/nieuw', methods=['GET', 'POST'])

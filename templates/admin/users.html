@@ -7,14 +7,30 @@
         <h1 class="dd-page-title mb-0"><i class="bi bi-people me-2 text-primary"></i>Gebruikersbeheer</h1>
         <p class="dd-page-subtitle mb-0">Beheer medewerkers en beheerders</p>
     </div>
-    <a href="{{ url_for('admin.gebruiker_nieuw') }}" class="btn btn-primary">
-        <i class="bi bi-person-plus me-1"></i>Nieuwe gebruiker
-    </a>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Status filter">
+            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='alle') }}"
+               class="btn {% if status_filter == 'alle' or not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Alle
+            </a>
+            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='actief') }}"
+               class="btn {% if status_filter == 'actief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-check-circle me-1"></i>Enkel actieve
+            </a>
+            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='inactief') }}"
+               class="btn {% if status_filter == 'inactief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-eye-slash me-1"></i>Enkel gedeactiveerde
+            </a>
+        </div>
+        <a href="{{ url_for('admin.gebruiker_nieuw') }}" class="btn btn-primary">
+            <i class="bi bi-person-plus me-1"></i>Nieuwe gebruiker
+        </a>
+    </div>
 </div>
 
 {% macro sort_link(col_name, display_text) %}
     {% set target_dir = 'desc' if sort_by == col_name and direction == 'asc' else 'asc' %}
-    <a href="{{ url_for('admin.gebruikers', sort_by=col_name, direction=target_dir) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+    <a href="{{ url_for('admin.gebruikers', sort_by=col_name, direction=target_dir, status=status_filter) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
         {{ display_text }}
         {% if sort_by == col_name %}
             {% if direction == 'asc' %}
@@ -30,6 +46,7 @@
 
 <div class="card">
     <div class="card-body p-0">
+        {% if memberships %}
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>
@@ -134,6 +151,18 @@
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-people fs-1 text-muted mb-3 d-block"></i>
+            {% if status_filter and status_filter != 'alle' %}
+            <p class="text-muted">Geen gebruikers gevonden met status "{{ status_filter }}".</p>
+            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='alle') }}" class="btn btn-sm btn-outline-secondary">Toon alle gebruikers</a>
+            {% else %}
+            <p class="text-muted">Geen gebruikers gedefinieerd.</p>
+            <a href="{{ url_for('admin.gebruiker_nieuw') }}" class="btn btn-sm btn-primary">Eerste toevoegen</a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

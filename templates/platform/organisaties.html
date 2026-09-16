@@ -7,13 +7,30 @@
         <h1 class="dd-page-title mb-0"><i class="bi bi-building me-2 text-primary"></i>Organisaties beheren</h1>
         <p class="dd-page-subtitle mb-0">Beheer alle organisaties op dit platform</p>
     </div>
-    <a href="{{ url_for('platform.organisatie_nieuw') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>Nieuwe organisatie
-    </a>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Status filter">
+            <a href="{{ url_for('platform.organisaties', status='alle') }}"
+               class="btn {% if status_filter == 'alle' or not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Alle
+            </a>
+            <a href="{{ url_for('platform.organisaties', status='actief') }}"
+               class="btn {% if status_filter == 'actief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-check-circle me-1"></i>Enkel actieve
+            </a>
+            <a href="{{ url_for('platform.organisaties', status='inactief') }}"
+               class="btn {% if status_filter == 'inactief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-eye-slash me-1"></i>Enkel gedeactiveerde
+            </a>
+        </div>
+        <a href="{{ url_for('platform.organisatie_nieuw') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Nieuwe organisatie
+        </a>
+    </div>
 </div>
 
 <div class="card">
     <div class="card-body p-0">
+        {% if organisaties %}
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>
@@ -70,6 +87,18 @@
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-building fs-1 text-muted mb-3 d-block"></i>
+            {% if status_filter and status_filter != 'alle' %}
+            <p class="text-muted">Geen organisaties gevonden met status "{{ status_filter }}".</p>
+            <a href="{{ url_for('platform.organisaties', status='alle') }}" class="btn btn-sm btn-outline-secondary">Toon alle organisaties</a>
+            {% else %}
+            <p class="text-muted">Geen organisaties gedefinieerd.</p>
+            <a href="{{ url_for('platform.organisatie_nieuw') }}" class="btn btn-sm btn-primary">Eerste toevoegen</a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 

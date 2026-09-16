@@ -155,8 +155,18 @@ def dashboard():
 @login_required
 @platform_admin_required
 def organisaties():
-    orgs = Organisatie.query.order_by(Organisatie.naam).all()
-    return render_template('platform/organisaties.html', organisaties=orgs)
+    status_filter = request.args.get('status', 'alle').strip().lower()
+    if status_filter not in ('actief', 'inactief', 'alle'):
+        status_filter = 'alle'
+
+    query = Organisatie.query
+    if status_filter == 'actief':
+        query = query.filter(Organisatie.actief == True)
+    elif status_filter == 'inactief':
+        query = query.filter(Organisatie.actief == False)
+
+    orgs = query.order_by(Organisatie.naam).all()
+    return render_template('platform/organisaties.html', organisaties=orgs, status_filter=status_filter)
 
 @platform_bp.route('/organisaties/nieuw', methods=['GET', 'POST'])
 @login_required
@@ -518,6 +528,10 @@ def emailsjablonen_herstellen(template_id):
 @platform_admin_required
 def vraagcategorieen():
     seed_standaard_categorieen()
+    status_filter = request.args.get('status', 'alle').strip().lower()
+    if status_filter not in ('actief', 'inactief', 'alle'):
+        status_filter = 'alle'
+
     # Tel gekoppelde classificaties per categorie
     subq = (
         db.session.query(
@@ -527,13 +541,22 @@ def vraagcategorieen():
         .group_by(QuestionClassification.category_id)
         .subquery()
     )
-    categories_with_count = (
+    query = (
         db.session.query(QuestionCategory, func.coalesce(subq.c.aantal_vragen, 0))
         .outerjoin(subq, QuestionCategory.id == subq.c.category_id)
+    )
+
+    if status_filter == 'actief':
+        query = query.filter(QuestionCategory.actief == True)
+    elif status_filter == 'inactief':
+        query = query.filter(QuestionCategory.actief == False)
+
+    categories_with_count = (
+        query
         .order_by(QuestionCategory.volgorde.asc(), QuestionCategory.naam.asc())
         .all()
     )
-    return render_template('platform/vraagcategorieen.html', categories_with_count=categories_with_count)
+    return render_template('platform/vraagcategorieen.html', categories_with_count=categories_with_count, status_filter=status_filter)
 
 
 @platform_bp.route('/vraagcategorieen/nieuw', methods=['GET', 'POST'])
@@ -610,6 +633,9 @@ def vraagcategorie_toggle(cat_id):
     db.session.commit()
     status_str = 'geactiveerd' if cat.actief else 'gedeactiveerd'
     flash(f'Categorie "{cat.naam}" is {status_str}.', 'info')
+    status_param = request.args.get('status')
+    if status_param and status_param in ('actief', 'inactief', 'alle'):
+        return redirect(url_for('platform.vraagcategorieen', status=status_param))
     return redirect(url_for('platform.vraagcategorieen'))
 
 
@@ -644,6 +670,9 @@ def vraagcategorie_volgorde(cat_id, richting):
     if ander:
         cat.volgorde, ander.volgorde = ander.volgorde, cat.volgorde
         db.session.commit()
+    status_param = request.args.get('status')
+    if status_param and status_param in ('actief', 'inactief', 'alle'):
+        return redirect(url_for('platform.vraagcategorieen', status=status_param))
     return redirect(url_for('platform.vraagcategorieen'))
 
 

@@ -7,9 +7,25 @@
         <h1 class="dd-page-title mb-0"><i class="bi bi-bar-chart-steps me-2 text-primary"></i>Leeftijdscategorieën</h1>
         <p class="dd-page-subtitle mb-0">Beheer de leeftijdscategorieën van bezoekers</p>
     </div>
-    <a href="{{ url_for('admin.leeftijdscategorie_nieuw') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>Nieuwe categorie
-    </a>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Status filter">
+            <a href="{{ url_for('admin.leeftijdscategorieën', status='alle') }}"
+               class="btn {% if status_filter == 'alle' or not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Alle
+            </a>
+            <a href="{{ url_for('admin.leeftijdscategorieën', status='actief') }}"
+               class="btn {% if status_filter == 'actief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-check-circle me-1"></i>Enkel actieve
+            </a>
+            <a href="{{ url_for('admin.leeftijdscategorieën', status='inactief') }}"
+               class="btn {% if status_filter == 'inactief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-eye-slash me-1"></i>Enkel gedeactiveerde
+            </a>
+        </div>
+        <a href="{{ url_for('admin.leeftijdscategorie_nieuw') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Nieuwe categorie
+        </a>
+    </div>
 </div>
 
 <div class="card">
@@ -31,11 +47,11 @@
                     <tr>
                         <td class="ps-3">
                             <div class="d-flex gap-1">
-                                <a href="{{ url_for('admin.leeftijdscategorie_volgorde', item_id=item.id, richting='omhoog') }}"
+                                <a href="{{ url_for('admin.leeftijdscategorie_volgorde', item_id=item.id, richting='omhoog', status=status_filter) }}"
                                    class="btn btn-light btn-sort {% if loop.first %}disabled{% endif %}" title="Omhoog">
                                     <i class="bi bi-chevron-up"></i>
                                 </a>
-                                <a href="{{ url_for('admin.leeftijdscategorie_volgorde', item_id=item.id, richting='omlaag') }}"
+                                <a href="{{ url_for('admin.leeftijdscategorie_volgorde', item_id=item.id, richting='omlaag', status=status_filter) }}"
                                    class="btn btn-light btn-sort {% if loop.last %}disabled{% endif %}" title="Omlaag">
                                     <i class="bi bi-chevron-down"></i>
                                 </a>
@@ -72,7 +88,7 @@
                                class="btn btn-sm btn-outline-primary" title="Wijzigen">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            <a href="{{ url_for('admin.leeftijdscategorie_toggle', item_id=item.id) }}"
+                            <a href="{{ url_for('admin.leeftijdscategorie_toggle', item_id=item.id, status=status_filter) }}"
                                class="btn btn-sm {% if item.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
                                title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
                                 <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
@@ -99,10 +115,16 @@
         {% else %}
         <div class="text-center py-5">
             <i class="bi bi-bar-chart-steps fs-1 text-muted mb-3 d-block"></i>
+            {% if status_filter and status_filter != 'alle' %}
+            <p class="text-muted">Geen leeftijdscategorieën gevonden met status "{{ status_filter }}".</p>
+            <a href="{{ url_for('admin.leeftijdscategorieën', status='alle') }}" class="btn btn-sm btn-outline-secondary">Toon alle categorieën</a>
+            {% else %}
             <p class="text-muted">Geen leeftijdscategorieën gedefinieerd.</p>
             <a href="{{ url_for('admin.leeftijdscategorie_nieuw') }}" class="btn btn-sm btn-primary">Eerste toevoegen</a>
+            {% endif %}
         </div>
         {% endif %}
     </div>
 </div>
 {% endblock %}
+

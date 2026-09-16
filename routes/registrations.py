@@ -1,5 +1,5 @@
 from datetime import date
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, session
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 from extensions import db
@@ -319,6 +319,200 @@ def nieuw():
 
     return render_template('registrations/add.html', **keuzes, datum_vandaag=str(date.today()),
                            default_digidokter_id=default_digidokter_id)
+
+
+@reg_bp.route('/registraties/snel', methods=['GET', 'POST'])
+@login_required
+@writer_required
+def snel():
+    from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model, filter_op_organisatie
+    org_id = get_huidige_organisatie_id()
+    keuzes = _keuzelijsten()
+
+    # Bereken default digidokter (eerst uit sessie, anders ingelogde gebruiker)
+    sessie_digidokter_id = session.get('snelle_reg_digidokter_id')
+    default_digidokter_id = None
+    if sessie_digidokter_id:
+        dd_chk = Digidokter.query.filter_by(id=sessie_digidokter_id, organisatie_id=org_id, actief=True).first()
+        if dd_chk:
+            default_digidokter_id = dd_chk.id
+
+    if not default_digidokter_id and current_user.is_authenticated:
+        dd_match = Digidokter.query.filter_by(
+            user_id=current_user.id,
+            organisatie_id=org_id,
+            actief=True
+        ).first()
+        if not dd_match:
+            dd_match = Digidokter.query.filter(
+                db.func.lower(Digidokter.naam) == db.func.lower(current_user.naam),
+                Digidokter.organisatie_id == org_id,
+                Digidokter.actief == True
+            ).first()
+        if dd_match:
+            default_digidokter_id = dd_match.id
+
+    # Bereken default locatie (eerst uit sessie, anders eerste consultatielocatie indien beschikbaar)
+    sessie_locatie_id = session.get('snelle_reg_locatie_id')
+    default_locatie_id = None
+    if sessie_locatie_id:
+        loc_chk = Location.query.filter_by(id=sessie_locatie_id, organisatie_id=org_id, actief=True).first()
+        if loc_chk:
+            default_locatie_id = loc_chk.id
+    if not default_locatie_id and keuzes['consultatie_locaties']:
+        default_locatie_id = keuzes['consultatie_locaties'][0].id
+
+    # Datum
+    sessie_datum = session.get('snelle_reg_datum', str(date.today()))
+
+    # Aantal registraties vandaag voor deze organisatie
+    vandaag_telling = filter_op_organisatie(Registration.query, Registration).filter(Registration.datum == date.today()).count()
+
+    if request.method == 'POST':
+        datum_str = request.form.get('datum', str(date.today()))
+        try:
+            datum = date.fromisoformat(datum_str)
+        except ValueError:
+            datum = date.today()
+            datum_str = str(date.today())
+
+        client = request.form.get('client', '').strip()
+        digidokter_id = request.form.get('digidokter_id', 0, type=int)
+        nieuwe_klant = request.form.get('nieuwe_klant') == 'ja'
+        herkomst_id = request.form.get('herkomst_id', 0, type=int) or None
+        geslacht = request.form.get('geslacht', '').strip() or None
+        onderwerp = request.form.get('onderwerp', '').strip()
+        leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', 0, type=int)
+        toestel_id = request.form.get('toestel_id', 0, type=int)
+        locatie_id = request.form.get('locatie_id', 0, type=int) or None
+        actie = request.form.get('actie', 'volgende')  # 'volgende' of 'overzicht'
+
+        # Sla sessievoorkeuren op
+        if digidokter_id:
+            session['snelle_reg_digidokter_id'] = digidokter_id
+        if locatie_id:
+            session['snelle_reg_locatie_id'] = locatie_id
+        session['snelle_reg_datum'] = datum_str
+
+        fouten = []
+        if not client:
+            fouten.append('Naam of initialen van de bezoeker is verplicht.')
+        if not digidokter_id:
+            fouten.append('Digidokter is verplicht.')
+        else:
+            dd = db.session.get(Digidokter, digidokter_id)
+            if not dd or dd.organisatie_id != org_id:
+                fouten.append('Ongeldige digidokter geselecteerd.')
+
+        if geslacht:
+            geldige_genders = {g.naam.lower(): g.naam for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
+            if geslacht.lower() in geldige_genders:
+                geslacht = geldige_genders[geslacht.lower()]
+            elif geslacht.lower() not in ('man', 'vrouw'):
+                fouten.append('Ongeldige genderidentiteit geselecteerd.')
+
+        if herkomst_id:
+            h = db.session.get(Herkomst, herkomst_id)
+            if not h or h.organisatie_id != org_id:
+                fouten.append('Ongeldige herkomst geselecteerd.')
+
+        if not onderwerp:
+            fouten.append('Onderwerp/vraag is verplicht.')
+
+        if not leeftijdscategorie_id:
+            fouten.append('Leeftijdscategorie is verplicht.')
+        else:
+            ac = db.session.get(AgeCategory, leeftijdscategorie_id)
+            if not ac or ac.organisatie_id != org_id:
+                fouten.append('Ongeldige leeftijdscategorie geselecteerd.')
+
+        if not toestel_id:
+            fouten.append('Toestel is verplicht.')
+        else:
+            dev = db.session.get(Device, toestel_id)
+            if not dev or dev.organisatie_id != org_id:
+                fouten.append('Ongeldig toestel geselecteerd.')
+
+        consultatie_locaties = keuzes['consultatie_locaties']
+        if consultatie_locaties and len(consultatie_locaties) > 1:
+            if not locatie_id:
+                fouten.append('Locatie is verplicht.')
+            else:
+                loc = db.session.get(Location, locatie_id)
+                if not loc or loc.organisatie_id != org_id:
+                    fouten.append('Ongeldige locatie geselecteerd.')
+        elif len(consultatie_locaties) == 1:
+            locatie_id = consultatie_locaties[0].id
+        else:
+            locatie_id = None
+
+        if fouten:
+            for f in fouten:
+                flash(f, 'danger')
+            return render_template(
+                'registrations/quick.html',
+                **keuzes,
+                datum_vandaag=datum_str,
+                default_digidokter_id=digidokter_id or default_digidokter_id,
+                default_locatie_id=locatie_id or default_locatie_id,
+                vandaag_telling=vandaag_telling,
+                form_data=request.form
+            )
+
+        reg = Registration(
+            registratienummer=Registration.genereer_registratienummer(org_id, datum.year),
+            datum=datum,
+            client=client,
+            digidokter_id=digidokter_id,
+            nieuwe_klant=nieuwe_klant,
+            herkomst_id=herkomst_id,
+            geslacht=geslacht,
+            onderwerp=onderwerp,
+            leeftijdscategorie_id=leeftijdscategorie_id,
+            toestel_id=toestel_id,
+            locatie_id=locatie_id,
+            aangemaakt_door_id=current_user.id,
+        )
+        set_organisatie_id_op_model(reg)
+        try:
+            db.session.add(reg)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Fout bij toevoegen snelle registratie: {e}")
+            flash('Er is een fout opgetreden bij het opslaan van de registratie.', 'danger')
+            return render_template(
+                'registrations/quick.html',
+                **keuzes,
+                datum_vandaag=datum_str,
+                default_digidokter_id=digidokter_id or default_digidokter_id,
+                default_locatie_id=locatie_id or default_locatie_id,
+                vandaag_telling=vandaag_telling,
+                form_data=request.form
+            )
+
+        # Start asynchrone AI-vraagclassificatie op de achtergrond
+        try:
+            from utils.ai_classifier import trigger_asynchrone_classificatie
+            trigger_asynchrone_classificatie(reg.id)
+        except Exception:
+            pass
+
+        flash(f'⚡ Registratie {reg.registratienummer} ({reg.client}) succesvol opgeslagen!', 'success')
+        
+        if actie == 'overzicht':
+            return redirect(url_for('reg.lijst'))
+        
+        return redirect(url_for('reg.snel'))
+
+    return render_template(
+        'registrations/quick.html',
+        **keuzes,
+        datum_vandaag=sessie_datum,
+        default_digidokter_id=default_digidokter_id,
+        default_locatie_id=default_locatie_id,
+        vandaag_telling=vandaag_telling
+    )
 
 
 @reg_bp.route('/registraties/<int:reg_id>')

@@ -174,7 +174,7 @@
                     <i class="bi bi-calendar3 text-warning fs-5"></i>
                     <div>
                         <div class="text-white-50 small" style="font-size:0.75rem;">Sessiedatum</div>
-                        <div class="fw-semibold">{{ datum_vandaag }}</div>
+                        <div class="fw-semibold" id="display_datum">{{ form_data.datum if form_data else datum_vandaag }}</div>
                     </div>
                 </div>
 
@@ -184,8 +184,9 @@
                     <i class="bi bi-person-badge text-info fs-5"></i>
                     <div>
                         <div class="text-white-50 small" style="font-size:0.75rem;">Digidokter / Helper</div>
-                        <div class="fw-semibold">
-                            {% for d in digidokters if d.id == default_digidokter_id %}
+                        <div class="fw-semibold" id="display_digidokter">
+                            {% set current_digidokter_id = (form_data.digidokter_id|int if form_data and form_data.digidokter_id else default_digidokter_id) %}
+                            {% for d in digidokters if d.id == current_digidokter_id %}
                                 {{ d.naam }}
                             {% else %}
                                 <span class="text-warning">Niet gekozen</span>
@@ -200,12 +201,24 @@
                     <i class="bi bi-geo-alt text-danger fs-5"></i>
                     <div>
                         <div class="text-white-50 small" style="font-size:0.75rem;">Locatie</div>
-                        <div class="fw-semibold">
-                            {% for loc in consultatie_locaties if loc.id == default_locatie_id %}
+                        <div class="fw-semibold" id="display_locatie">
+                            {% set current_locatie_id = (form_data.locatie_id|int if form_data and form_data.locatie_id else default_locatie_id) %}
+                            {% for loc in consultatie_locaties if loc.id == current_locatie_id %}
                                 {{ loc.naam }}
                             {% else %}
                                 <span class="text-warning">Niet gekozen</span>
                             {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% elif consultatie_locaties and consultatie_locaties|length == 1 %}
+                <div class="vr bg-secondary opacity-50 d-none d-sm-block"></div>
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-geo-alt text-danger fs-5"></i>
+                    <div>
+                        <div class="text-white-50 small" style="font-size:0.75rem;">Locatie</div>
+                        <div class="fw-semibold" id="display_locatie">
+                            {{ consultatie_locaties[0].naam }}
                         </div>
                     </div>
                 </div>
@@ -227,13 +240,13 @@
         <div class="collapse mt-3 pt-3 border-top border-secondary border-opacity-50" id="sessieInstellingenCollapse">
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-sm-4">
-                    <label class="form-label text-white-50 small mb-1">Sessiedatum</label>
-                    <input type="date" form="quickRegForm" class="form-control form-control-sm bg-dark text-white border-secondary"
-                           name="datum" value="{{ form_data.datum if form_data else datum_vandaag }}">
+                    <label for="sessie_datum_input" class="form-label text-white-50 small mb-1">Sessiedatum</label>
+                    <input type="date" class="form-control form-control-sm bg-dark text-white border-secondary"
+                           id="sessie_datum_input" name="sessie_datum" value="{{ form_data.datum if form_data else datum_vandaag }}">
                 </div>
                 <div class="col-12 col-sm-4">
-                    <label class="form-label text-white-50 small mb-1">Digidokter</label>
-                    <select form="quickRegForm" class="form-select form-select-sm bg-dark text-white border-secondary" name="digidokter_id">
+                    <label for="sessie_digidokter_select" class="form-label text-white-50 small mb-1">Digidokter</label>
+                    <select class="form-select form-select-sm bg-dark text-white border-secondary" id="sessie_digidokter_select" name="sessie_digidokter_id">
                         <option value="">— Kies digidokter —</option>
                         {% for d in digidokters %}
                         <option value="{{ d.id }}" {{ 'selected' if (form_data and form_data.digidokter_id == d.id|string) or (not form_data and default_digidokter_id == d.id) }}>
@@ -244,8 +257,8 @@
                 </div>
                 {% if consultatie_locaties and consultatie_locaties|length > 1 %}
                 <div class="col-12 col-sm-4">
-                    <label class="form-label text-white-50 small mb-1">Locatie</label>
-                    <select form="quickRegForm" class="form-select form-select-sm bg-dark text-white border-secondary" name="locatie_id">
+                    <label for="sessie_locatie_select" class="form-label text-white-50 small mb-1">Locatie</label>
+                    <select class="form-select form-select-sm bg-dark text-white border-secondary" id="sessie_locatie_select" name="sessie_locatie_id">
                         <option value="">— Kies locatie —</option>
                         {% for loc in consultatie_locaties %}
                         <option value="{{ loc.id }}" {{ 'selected' if (form_data and form_data.locatie_id == loc.id|string) or (not form_data and default_locatie_id == loc.id) }}>
@@ -578,20 +591,52 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Synchroniseer sessie-collapse velden met verborgen inputs indien gewijzigd
-    const collapseEl = document.getElementById('sessieInstellingenCollapse');
-    if (collapseEl) {
-        collapseEl.addEventListener('change', function(e) {
-            const target = e.target;
-            if (target.name === 'datum') {
-                const hidden = document.getElementById('hidden_datum');
-                if (hidden) hidden.value = target.value;
-            } else if (target.name === 'digidokter_id') {
-                const hidden = document.getElementById('hidden_digidokter_id');
-                if (hidden) hidden.value = target.value;
-            } else if (target.name === 'locatie_id') {
-                const hidden = document.getElementById('hidden_locatie_id');
-                if (hidden) hidden.value = target.value;
+    // Synchroniseer sessie-collapse velden met verborgen inputs EN de hoofding (real-time visual update)
+    const datumInput = document.getElementById('sessie_datum_input');
+    const digidokterSelect = document.getElementById('sessie_digidokter_select');
+    const locatieSelect = document.getElementById('sessie_locatie_select');
+
+    const hiddenDatum = document.getElementById('hidden_datum');
+    const hiddenDigidokter = document.getElementById('hidden_digidokter_id');
+    const hiddenLocatie = document.getElementById('hidden_locatie_id');
+
+    const displayDatum = document.getElementById('display_datum');
+    const displayDigidokter = document.getElementById('display_digidokter');
+    const displayLocatie = document.getElementById('display_locatie');
+
+    if (datumInput) {
+        const updateDatum = function() {
+            if (hiddenDatum) hiddenDatum.value = datumInput.value;
+            if (displayDatum) displayDatum.textContent = datumInput.value || 'Niet gekozen';
+        };
+        datumInput.addEventListener('input', updateDatum);
+        datumInput.addEventListener('change', updateDatum);
+    }
+
+    if (digidokterSelect) {
+        digidokterSelect.addEventListener('change', function() {
+            if (hiddenDigidokter) hiddenDigidokter.value = digidokterSelect.value;
+            if (displayDigidokter) {
+                const selectedText = digidokterSelect.options[digidokterSelect.selectedIndex]?.text?.trim();
+                if (digidokterSelect.value && selectedText && !selectedText.startsWith('—')) {
+                    displayDigidokter.textContent = selectedText;
+                } else {
+                    displayDigidokter.innerHTML = '<span class="text-warning">Niet gekozen</span>';
+                }
+            }
+        });
+    }
+
+    if (locatieSelect) {
+        locatieSelect.addEventListener('change', function() {
+            if (hiddenLocatie) hiddenLocatie.value = locatieSelect.value;
+            if (displayLocatie) {
+                const selectedText = locatieSelect.options[locatieSelect.selectedIndex]?.text?.trim();
+                if (locatieSelect.value && selectedText && !selectedText.startsWith('—')) {
+                    displayLocatie.textContent = selectedText;
+                } else {
+                    displayLocatie.innerHTML = '<span class="text-warning">Niet gekozen</span>';
+                }
             }
         });
     }

@@ -247,3 +247,43 @@ class TestVraagcategorieen(BaseTestCase):
                 self.assertTrue(mock_classify.called)
         finally:
             self.app.config['ENABLE_ASYNC_CLASSIFIER_TEST'] = False
+
+    def test_asynchrone_batch_analyse_en_status(self):
+        from unittest.mock import patch
+        from utils.ai_classifier import _batch_status, _batch_lock, get_batch_status
+
+        self.login("SuperAdmin", "password123")
+
+        # 1. Test status endpoint when idle
+        res = self.client.get('/platform/vraagclassificaties/batch-status')
+        self.assertEqual(res.status_code, 200)
+        status_data = res.get_json()
+        self.assertIn('is_running', status_data)
+        self.assertIn('processed', status_data)
+        self.assertIn('total', status_data)
+
+        # 2. Test trigger batch analysis asynchronously with mocked worker
+        with patch('utils.ai_classifier.seed_retroactieve_classificaties') as mock_seed:
+            mock_seed.return_value = (5, 0)
+            res = self.client.post('/platform/vraagclassificaties/batch-analyse', follow_redirects=True)
+            self.assertEqual(res.status_code, 200)
+            html = res.data.decode('utf-8')
+            self.assertIn('Batch-analyse is gestart op de achtergrond', html)
+            self.assertIn('id="batch-progress-container"', html)
+
+            import time
+            time.sleep(0.2)
+            self.assertTrue(mock_seed.called)
+
+        # 3. Check duplicate prevention
+        with _batch_lock:
+            _batch_status['is_running'] = True
+        try:
+            res_dup = self.client.post('/platform/vraagclassificaties/batch-analyse', follow_redirects=True)
+            self.assertEqual(res_dup.status_code, 200)
+            html_dup = res_dup.data.decode('utf-8')
+            self.assertIn('Er is momenteel al een batch-analyse actief', html_dup)
+        finally:
+            with _batch_lock:
+                _batch_status['is_running'] = False
+

@@ -30,5 +30,10 @@ class AgendaItem(db.Model):
     locatie = db.relationship('Location', backref=db.backref('agenda_items', lazy=True))
     digidokters = db.relationship('Digidokter', secondary=agenda_digidokters, backref=db.backref('agenda_items', lazy='dynamic'))
 
+    __table_args__ = (
+        db.Index('ix_agenda_items_org_datum', 'organisatie_id', 'datum'),
+    )
+
     def __repr__(self):
         return f'<AgendaItem {self.datum} {self.uur_van}-{self.uur_tot}>'
+

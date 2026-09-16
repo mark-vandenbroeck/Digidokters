@@ -698,6 +698,9 @@ def vraagclassificaties():
     categorieen = QuestionCategory.query.order_by(QuestionCategory.volgorde.asc(), QuestionCategory.naam.asc()).all()
     organisaties = Organisatie.query.filter(Organisatie.slug != 'sjabloon').order_by(Organisatie.naam.asc()).all()
 
+    from utils.ai_classifier import get_batch_status
+    batch_status = get_batch_status()
+
     return render_template(
         'platform/vraagclassificaties.html',
         pagination=pagination,
@@ -710,7 +713,8 @@ def vraagclassificaties():
         geselecteerde_cat=cat_id,
         filter_onzeker=filter_onzeker,
         filter_handmatig=filter_handmatig,
-        geselecteerde_org=filter_org
+        geselecteerde_org=filter_org,
+        batch_status=batch_status
     )
 
 
@@ -760,16 +764,25 @@ def vraagclassificatie_heranalyse(classif_id):
 @login_required
 @platform_admin_required
 def vraagclassificaties_batch_analyse():
-    from utils.ai_classifier import seed_retroactieve_classificaties
+    from utils.ai_classifier import trigger_asynchrone_batch_analyse
     try:
-        verwerkt, fouten = seed_retroactieve_classificaties(batch_size=25)
-        if verwerkt > 0:
-            flash(f'Succesvol {verwerkt} consultaties geclassificeerd met Gemini AI (mislukt: {fouten}).', 'success')
+        started, msg = trigger_asynchrone_batch_analyse()
+        if started:
+            flash(msg, 'info')
         else:
-            flash('Geen ongeclassificeerde consultaties gevonden om te verwerken.', 'info')
+            flash(msg, 'warning')
     except Exception as e:
-        flash(f'Fout tijdens batch-analyse: {str(e)}', 'danger')
+        flash(f'Fout bij het starten van de batch-analyse: {str(e)}', 'danger')
 
     return redirect(url_for('platform.vraagclassificaties'))
+
+
+@platform_bp.route('/vraagclassificaties/batch-status')
+@login_required
+@platform_admin_required
+def vraagclassificaties_batch_status():
+    from flask import jsonify
+    from utils.ai_classifier import get_batch_status
+    return jsonify(get_batch_status())
 
 

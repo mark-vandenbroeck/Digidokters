@@ -28,6 +28,9 @@ class Registration(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('organisatie_id', 'registratienummer', name='uq_registration_org_num'),
+        db.Index('ix_registrations_org_datum', 'organisatie_id', 'datum'),
+        db.Index('ix_registrations_org_digidokter', 'organisatie_id', 'digidokter_id'),
+        db.Index('ix_registrations_org_locatie', 'organisatie_id', 'locatie_id'),
     )
 
     def __repr__(self):

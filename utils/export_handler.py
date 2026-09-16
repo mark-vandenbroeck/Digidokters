@@ -1,8 +1,10 @@
-"""Export handler: genereert CSV en XLSX bestanden van gefilterde registraties."""
 import io
 from datetime import date
 import pandas as pd
+from sqlalchemy.orm import joinedload
 from models.registration import Registration
+from models.age_category import AgeCategory
+from models.device import Device
 from extensions import db
 
 
@@ -13,11 +15,20 @@ def _haal_registraties(
     leeftijdscategorie_id: int | None = None,
     toestel_id: int | None = None,
 ) -> list:
-    """Haal gefilterde registraties op als lijst van dicts."""
+    """Haal gefilterde registraties op als lijst van dicts met eager loading."""
     from utils.tenant import get_huidige_organisatie_id
     org_id = get_huidige_organisatie_id()
-    query = db.session.query(Registration).filter(Registration.organisatie_id == org_id).order_by(
-        Registration.datum.desc(), Registration.registratienummer.desc()
+    query = (
+        db.session.query(Registration)
+        .options(
+            joinedload(Registration.digidokter),
+            joinedload(Registration.herkomst),
+            joinedload(Registration.locatie),
+            joinedload(Registration.leeftijdscategorie).joinedload(AgeCategory.mapped_to),
+            joinedload(Registration.toestel).joinedload(Device.mapped_to),
+        )
+        .filter(Registration.organisatie_id == org_id)
+        .order_by(Registration.datum.desc(), Registration.registratienummer.desc())
     )
 
     if van_datum:
@@ -27,11 +38,9 @@ def _haal_registraties(
     if digidokter_id:
         query = query.filter(Registration.digidokter_id == digidokter_id)
     if leeftijdscategorie_id:
-        from models.age_category import AgeCategory
         mapped_l_ids = [c.id for c in AgeCategory.query.filter_by(mapped_to_id=leeftijdscategorie_id).all()]
         query = query.filter(Registration.leeftijdscategorie_id.in_([leeftijdscategorie_id] + mapped_l_ids))
     if toestel_id:
-        from models.device import Device
         mapped_t_ids = [t.id for t in Device.query.filter_by(mapped_to_id=toestel_id).all()]
         query = query.filter(Registration.toestel_id.in_([toestel_id] + mapped_t_ids))
 

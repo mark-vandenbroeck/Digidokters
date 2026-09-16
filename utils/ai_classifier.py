@@ -6,6 +6,7 @@ Ondersteunt automatische categorisatie, batchverwerking en retroactieve seeding.
 import os
 import json
 import time
+import threading
 import certifi
 import requests
 from datetime import datetime, timezone
@@ -245,7 +246,10 @@ def seed_retroactieve_classificaties(batch_size=25, progress_callback=None):
             totaal_verwerkt += len(chunk)
 
             if progress_callback:
-                progress_callback(totaal_verwerkt, totaal_te_doen)
+                try:
+                    progress_callback(totaal_verwerkt, totaal_te_doen, totaal_fouten)
+                except TypeError:
+                    progress_callback(totaal_verwerkt, totaal_te_doen)
 
             # Korte pauze tussen batches om rate limits te vermijden
             time.sleep(0.5)
@@ -253,6 +257,11 @@ def seed_retroactieve_classificaties(batch_size=25, progress_callback=None):
         except Exception as e:
             db.session.rollback()
             totaal_fouten += len(chunk)
+            if progress_callback:
+                try:
+                    progress_callback(totaal_verwerkt, totaal_te_doen, totaal_fouten)
+                except TypeError:
+                    progress_callback(totaal_verwerkt, totaal_te_doen)
             print(f"Fout bij verwerken van batch {i}-{i+len(chunk)}: {e}")
 
     return totaal_verwerkt, totaal_fouten
@@ -320,3 +329,89 @@ def trigger_asynchrone_classificatie(registration_id, app=None):
     thread = threading.Thread(target=_async_worker, daemon=True)
     thread.start()
     return thread
+
+
+_batch_lock = threading.Lock()
+_batch_status = {
+    'is_running': False,
+    'total': 0,
+    'processed': 0,
+    'errors': 0,
+    'started_at': None,
+    'finished_at': None,
+    'message': ''
+}
+
+
+def get_batch_status():
+    """Haal de huidige status van de achtergrond-batchanalyse op."""
+    with _batch_lock:
+        return dict(_batch_status)
+
+
+def trigger_asynchrone_batch_analyse(app=None, batch_size=25):
+    """
+    Start een achtergrond-thread om alle ongeclassificeerde registraties
+    asynchroon te analyseren zonder de webserver te blokkeren.
+    Voorkomt gelijktijdige meervoudige runs.
+    """
+    import threading
+    from flask import current_app
+
+    if app is None:
+        try:
+            app = current_app._get_current_object()
+        except RuntimeError:
+            app = None
+
+    with _batch_lock:
+        if _batch_status['is_running']:
+            return False, "Er is momenteel al een batch-analyse actief op de achtergrond."
+
+        _batch_status['is_running'] = True
+        _batch_status['total'] = 0
+        _batch_status['processed'] = 0
+        _batch_status['errors'] = 0
+        _batch_status['started_at'] = datetime.now(timezone.utc).isoformat()
+        _batch_status['finished_at'] = None
+        _batch_status['message'] = "Batch-analyse gestart..."
+
+    def _update_progress(verwerkt, totaal, fouten=0):
+        with _batch_lock:
+            _batch_status['total'] = totaal
+            _batch_status['processed'] = verwerkt
+            _batch_status['errors'] = fouten
+            _batch_status['message'] = f"{verwerkt} van {totaal} consultaties verwerkt ({fouten} fouten)..."
+
+    def _async_batch_worker():
+        if app:
+            with app.app_context():
+                _do_run()
+        else:
+            _do_run()
+
+    def _do_run():
+        try:
+            verwerkt, fouten = seed_retroactieve_classificaties(
+                batch_size=batch_size,
+                progress_callback=_update_progress
+            )
+            with _batch_lock:
+                _batch_status['is_running'] = False
+                _batch_status['finished_at'] = datetime.now(timezone.utc).isoformat()
+                if verwerkt > 0:
+                    _batch_status['message'] = f"Voltooid: {verwerkt} consultaties succesvol geclassificeerd (mislukt: {fouten})."
+                else:
+                    _batch_status['message'] = "Voltooid: geen ongeclassificeerde consultaties gevonden."
+        except Exception as e:
+            with _batch_lock:
+                _batch_status['is_running'] = False
+                _batch_status['finished_at'] = datetime.now(timezone.utc).isoformat()
+                _batch_status['message'] = f"Fout tijdens batch-analyse: {str(e)}"
+            if app:
+                app.logger.error(f"Fout in asynchrone batch-analyse: {e}")
+
+    thread = threading.Thread(target=_async_batch_worker, daemon=True)
+    thread.start()
+    return True, "Batch-analyse is gestart op de achtergrond. U kunt de applicatie gewoon blijven gebruiken."
+

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from extensions import db
 
@@ -13,8 +13,9 @@ class EvaluationForm(db.Model):
     titel = db.Column(db.String(150), default='Evaluatieformulier', nullable=False)
     toelichting = db.Column(db.Text, nullable=True)
     actief = db.Column(db.Boolean, default=True, nullable=False)
-    aangemaakt_op = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    gewijzigd_op = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    aangemaakt_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    gewijzigd_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                             onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
         db.UniqueConstraint('organisatie_id', 'activity_type_id', name='uq_eval_form_org_activity_type'),
@@ -71,11 +72,12 @@ class EvaluationResponse(db.Model):
     form_id = db.Column(db.Integer, db.ForeignKey('evaluatie_formulieren.id', ondelete='CASCADE'), nullable=False, index=True)
     digidokter_id = db.Column(db.Integer, db.ForeignKey('digidokters.id', ondelete='SET NULL'), nullable=True, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
-    ingediend_op = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    ingediend_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     antwoorden = db.Column(db.JSON, nullable=False)  # Dict: {"<vraag_id>": "antwoord"}
 
     __table_args__ = (
         db.UniqueConstraint('agenda_item_id', 'digidokter_id', name='uq_eval_response_agenda_digidokter'),
+        db.Index('ix_eval_response_org_agenda', 'organisatie_id', 'agenda_item_id'),
     )
 
     # Relaties
@@ -96,7 +98,7 @@ class EvaluationInvitation(db.Model):
     agenda_item_id = db.Column(db.Integer, db.ForeignKey('agenda_items.id', ondelete='CASCADE'), nullable=False, index=True)
     digidokter_id = db.Column(db.Integer, db.ForeignKey('digidokters.id', ondelete='CASCADE'), nullable=False, index=True)
     token = db.Column(db.String(64), unique=True, nullable=False, index=True)
-    verzonden_op = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    verzonden_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     is_ingevuld = db.Column(db.Boolean, default=False, nullable=False)
     herinnering_verzonden_op = db.Column(db.DateTime, nullable=True)
     herinnering_aantal = db.Column(db.Integer, default=0, nullable=False)

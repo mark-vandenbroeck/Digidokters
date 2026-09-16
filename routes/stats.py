@@ -1,4 +1,3 @@
-"""Statistieken routes."""
 from datetime import date
 from flask import Blueprint, render_template, request
 from flask_login import login_required
@@ -10,6 +9,7 @@ from models.age_category import AgeCategory
 from models.device import Device
 from models.question_category import QuestionCategory
 from models.question_classification import QuestionClassification
+from utils.helpers import safe_int, safe_str
 
 stats_bp = Blueprint('stats', __name__)
 
@@ -44,16 +44,13 @@ def _weekelijkse_telling(jaar):
 @stats_bp.route('/statistieken')
 @login_required
 def overzicht():
-    jaar_param = request.args.get('jaar')
+    jaar_param = safe_str(request.args.get('jaar'))
     if jaar_param == 'alle':
         jaar = 'alle'
     else:
-        try:
-            jaar = int(jaar_param) if jaar_param else date.today().year
-        except (ValueError, TypeError):
-            jaar = date.today().year
+        jaar = safe_int(jaar_param, default=date.today().year) or date.today().year
 
-    actieve_tab = request.args.get('tab', 'visitors')
+    actieve_tab = safe_str(request.args.get('tab'), default='visitors') or 'visitors'
     if actieve_tab not in ('visitors', 'volunteers', 'questions'):
         actieve_tab = 'visitors'
 

@@ -2,6 +2,7 @@
 from functools import wraps
 from flask import flash, redirect, url_for, session
 from flask_login import current_user
+from models.constants import ROLE_PLATFORMBEHEERDER, ROLE_BEHEERDER, ROLE_LEZER
 
 
 def admin_required(f):
@@ -15,11 +16,11 @@ def admin_required(f):
         if not org_id:
             return redirect(url_for('auth.select_org'))
             
-        if current_user.rol == 'platformbeheerder':
+        if current_user.rol == ROLE_PLATFORMBEHEERDER:
             return f(*args, **kwargs)
             
         uo = next((x for x in current_user.user_organisaties if x.organisatie_id == org_id and x.actief and x.organisatie.actief), None)
-        if not uo or uo.rol != 'beheerder':
+        if not uo or uo.rol != ROLE_BEHEERDER:
             flash('U heeft geen toegang tot deze pagina.', 'danger')
             return redirect(url_for('reg.lijst'))
         return f(*args, **kwargs)
@@ -43,7 +44,7 @@ def platform_admin_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
             return redirect(url_for('auth.login'))
-        if current_user.rol != 'platformbeheerder':
+        if current_user.rol != ROLE_PLATFORMBEHEERDER:
             flash('U heeft geen toegang tot deze pagina.', 'danger')
             return redirect(url_for('reg.lijst'))
         return f(*args, **kwargs)
@@ -61,11 +62,11 @@ def writer_required(f):
         if not org_id:
             return redirect(url_for('auth.select_org'))
             
-        if current_user.rol == 'platformbeheerder':
+        if current_user.rol == ROLE_PLATFORMBEHEERDER:
             return f(*args, **kwargs)
             
         uo = next((x for x in current_user.user_organisaties if x.organisatie_id == org_id and x.actief and x.organisatie.actief), None)
-        if not uo or uo.rol == 'lezer':
+        if not uo or uo.rol == ROLE_LEZER:
             flash('U heeft geen schrijfrechten voor deze organisatie.', 'danger')
             return redirect(url_for('reg.lijst'))
         return f(*args, **kwargs)

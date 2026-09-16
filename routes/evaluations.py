@@ -1,4 +1,4 @@
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time, timedelta, timezone
 import json
 import secrets
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
@@ -173,7 +173,7 @@ def verstuur_uitnodigingen_voor_sessie(agenda_item, host_url=None):
                 agenda_item_id=agenda_item.id,
                 digidokter_id=dd.id,
                 token=token,
-                verzonden_op=datetime.utcnow(),
+                verzonden_op=datetime.now(timezone.utc),
                 is_ingevuld=False
             )
             db.session.add(invitation)
@@ -221,7 +221,7 @@ Digidokters Team
             success, msg = verstuur_email([email], onderwerp, inhoud)
             if success:
                 verzonden_namen.append(f"{dd.naam} ({email})")
-                invitation.verzonden_op = datetime.utcnow()
+                invitation.verzonden_op = datetime.now(timezone.utc)
                 db.session.commit()
             else:
                 fouten.append(f"{dd.naam} ({msg})")
@@ -269,7 +269,7 @@ def verstuur_herinneringen_voor_sessie(agenda_item, host_url=None):
                 agenda_item_id=agenda_item.id,
                 digidokter_id=dd.id,
                 token=token,
-                verzonden_op=datetime.utcnow(),
+                verzonden_op=datetime.now(timezone.utc),
                 is_ingevuld=False
             )
             db.session.add(invitation)
@@ -316,7 +316,7 @@ Digidokters Team
             success, msg = verstuur_email([email], onderwerp, inhoud)
             if success:
                 verzonden_namen.append(f"{dd.naam} ({email})")
-                invitation.herinnering_verzonden_op = datetime.utcnow()
+                invitation.herinnering_verzonden_op = datetime.now(timezone.utc)
                 invitation.herinnering_aantal = (invitation.herinnering_aantal or 0) + 1
                 db.session.commit()
             else:
@@ -358,19 +358,35 @@ def controleer_en_verstuur_afgelopen_evaluaties(org_id, host_url=None, async_mod
                 .all()
             )
 
+            if not afgelopen_items:
+                return 0
+
+            item_ids = [it.id for it in afgelopen_items]
+            existing_responses = set(
+                db.session.query(EvaluationResponse.agenda_item_id, EvaluationResponse.digidokter_id)
+                .filter(EvaluationResponse.agenda_item_id.in_(item_ids))
+                .all()
+            )
+            existing_invitations = set(
+                db.session.query(EvaluationInvitation.agenda_item_id, EvaluationInvitation.digidokter_id)
+                .filter(EvaluationInvitation.agenda_item_id.in_(item_ids))
+                .all()
+            )
+
             totaal_verzonden = 0
             for item in afgelopen_items:
+                needs_sending = False
                 for dd in item.digidokters:
                     if not dd.email:
                         continue
-                    reeds_ingevuld = EvaluationResponse.query.filter_by(agenda_item_id=item.id, digidokter_id=dd.id).first()
-                    if reeds_ingevuld:
+                    if (item.id, dd.id) in existing_responses:
                         continue
-                    inv = EvaluationInvitation.query.filter_by(agenda_item_id=item.id, digidokter_id=dd.id).first()
-                    if not inv:
-                        count, namen, _ = verstuur_uitnodigingen_voor_sessie(item, host_url)
-                        totaal_verzonden += count
+                    if (item.id, dd.id) not in existing_invitations:
+                        needs_sending = True
                         break
+                if needs_sending:
+                    count, namen, _ = verstuur_uitnodigingen_voor_sessie(item, host_url)
+                    totaal_verzonden += count
             return totaal_verzonden
 
     if async_mode and not current_app.config.get('TESTING'):
@@ -775,7 +791,7 @@ def invullen_sessie(agenda_id):
             form_id=form.id,
             digidokter_id=dd_id,
             user_id=current_user.id if current_user.is_authenticated else None,
-            ingediend_op=datetime.utcnow(),
+            ingediend_op=datetime.now(timezone.utc),
             antwoorden=antwoorden
         )
         db.session.add(reactie)
@@ -852,7 +868,7 @@ def invullen_token(token):
             form_id=form.id,
             digidokter_id=dd.id,
             user_id=dd.user_id if dd else None,
-            ingediend_op=datetime.utcnow(),
+            ingediend_op=datetime.now(timezone.utc),
             antwoorden=antwoorden
         )
         db.session.add(reactie)

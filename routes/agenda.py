@@ -1,14 +1,15 @@
 from datetime import date, datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
 from flask_login import login_required, current_user
+from sqlalchemy.orm import joinedload, selectinload
 from extensions import db
 from models.agenda import AgendaItem
 from models.activity_type import ActivityType
 from models.location import Location
 from models.digidokter import Digidokter
-from sqlalchemy.orm import joinedload, selectinload
 from utils.decorators import writer_required
 from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model, filter_op_organisatie
+from utils.helpers import safe_int, safe_date, safe_str
 
 agenda_bp = Blueprint('agenda', __name__)
 
@@ -34,15 +35,15 @@ def lijst():
     
     # Haal filter parameters op
     toon_verleden = request.args.get('toon_verleden') == 'on'
-    datum_van = request.args.get('datum_van', '').strip()
-    datum_tot = request.args.get('datum_tot', '').strip()
-    type_id = request.args.get('type_id', 0, type=int)
-    locatie_id = request.args.get('locatie_id', 0, type=int)
-    digidokter_id = request.args.get('digidokter_id', 0, type=int)
+    datum_van = safe_str(request.args.get('datum_van'))
+    datum_tot = safe_str(request.args.get('datum_tot'))
+    type_id = safe_int(request.args.get('type_id'), default=0) or 0
+    locatie_id = safe_int(request.args.get('locatie_id'), default=0) or 0
+    digidokter_id = safe_int(request.args.get('digidokter_id'), default=0) or 0
     
     # Haal sorteer parameters op
-    sort_by = request.args.get('sort_by', 'datum').strip()
-    direction = request.args.get('direction', 'asc').strip()
+    sort_by = safe_str(request.args.get('sort_by'), default='datum') or 'datum'
+    direction = safe_str(request.args.get('direction'), default='asc') or 'asc'
     
     # Bouw query op met eager loading voor optimale performance (voorkomt N+1 queries)
     query = (
@@ -254,24 +255,31 @@ def nieuw():
                 if len(items_to_save) >= 100:
                     break
 
-        for d in items_to_save:
-            item = AgendaItem(
-                datum=d,
-                uur_van=uur_van,
-                uur_tot=uur_tot,
-                type_id=type_id,
-                locatie_id=locatie_id,
-                omschrijving=omschrijving,
-                is_terugkerend=is_terugkerend,
-                interval=interval,
-                einddatum=einddatum,
-                reeks_id=reeks_id
-            )
-            set_organisatie_id_op_model(item)
-            item.digidokters = selected_digidokters
-            db.session.add(item)
-            
-        db.session.commit()
+        try:
+            for d in items_to_save:
+                item = AgendaItem(
+                    datum=d,
+                    uur_van=uur_van,
+                    uur_tot=uur_tot,
+                    type_id=type_id,
+                    locatie_id=locatie_id,
+                    omschrijving=omschrijving,
+                    is_terugkerend=is_terugkerend,
+                    interval=interval,
+                    einddatum=einddatum,
+                    reeks_id=reeks_id
+                )
+                set_organisatie_id_op_model(item)
+                item.digidokters = selected_digidokters
+                db.session.add(item)
+                
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Fout bij toevoegen agenda-item: {e}")
+            flash('Er is een fout opgetreden bij het opslaan van het agenda-item.', 'danger')
+            return render_template('agenda/item_form.html', actie='Toevoegen', item=None, **keuzes, form_data=request.form)
+
         if is_terugkerend:
             flash(f'{len(items_to_save)} agenda-items succesvol toegevoegd aan de reeks.', 'success')
         else:
@@ -361,9 +369,15 @@ def wijzigen(item_id):
         item.omschrijving = omschrijving
         item.digidokters = selected_digidokters
         
-        db.session.commit()
-        flash('Agenda-item succesvol bijgewerkt.', 'success')
-        return redirect(url_for('agenda.lijst'))
+        try:
+            db.session.commit()
+            flash('Agenda-item succesvol bijgewerkt.', 'success')
+            return redirect(url_for('agenda.lijst'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Fout bij bijwerken agenda-item {item_id}: {e}")
+            flash('Er is een fout opgetreden bij het bijwerken van het agenda-item.', 'danger')
+            return render_template('agenda/item_form.html', actie='Wijzigen', item=item, **keuzes, form_data=request.form)
 
     return render_template('agenda/item_form.html', actie='Wijzigen', item=item, **keuzes)
 
@@ -379,13 +393,19 @@ def verwijderen(item_id):
 
     verwijder_reeks = request.form.get('verwijder_reeks') == 'true'
 
-    if verwijder_reeks and item.reeks_id:
-        # Verwijder de hele reeks
-        AgendaItem.query.filter_by(organisatie_id=org_id, reeks_id=item.reeks_id).delete()
-        flash('De gehele reeks van activiteiten is succesvol verwijderd.', 'success')
-    else:
-        db.session.delete(item)
-        flash('Agenda-item succesvol verwijderd.', 'success')
+    try:
+        if verwijder_reeks and item.reeks_id:
+            # Verwijder de hele reeks
+            AgendaItem.query.filter_by(organisatie_id=org_id, reeks_id=item.reeks_id).delete()
+            flash('De gehele reeks van activiteiten is succesvol verwijderd.', 'success')
+        else:
+            db.session.delete(item)
+            flash('Agenda-item succesvol verwijderd.', 'success')
 
-    db.session.commit()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Fout bij verwijderen agenda-item {item_id}: {e}")
+        flash('Er is een fout opgetreden bij het verwijderen van het agenda-item.', 'danger')
+
     return redirect(url_for('agenda.lijst'))

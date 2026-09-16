@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from flask_login import UserMixin
 from extensions import db, login_manager
+from models.constants import ROLE_PLATFORMBEHEERDER, ROLE_BEHEERDER, ROLE_MEDEWERKER, ROLE_LEZER
 
 
 class User(UserMixin, db.Model):
@@ -11,7 +12,7 @@ class User(UserMixin, db.Model):
     naam = db.Column(db.String(100), unique=True, nullable=False, index=True)
     email = db.Column(db.String(150), unique=True, nullable=True, index=True)
     wachtwoord_hash = db.Column(db.String(256), nullable=False)
-    rol = db.Column(db.String(20), nullable=False, default='medewerker')  # 'medewerker' | 'beheerder'
+    rol = db.Column(db.String(20), nullable=False, default=ROLE_MEDEWERKER)
     actief = db.Column(db.Boolean, default=True, nullable=False)
     moet_wachtwoord_wijzigen = db.Column(db.Boolean, default=False, nullable=False)
     aangemaakt_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -29,20 +30,20 @@ class User(UserMixin, db.Model):
 
 
     def is_beheerder(self):
-        if self.rol == 'platformbeheerder':
+        if self.rol == ROLE_PLATFORMBEHEERDER:
             return True
         from flask import session, has_request_context
         if has_request_context():
             org_id = session.get('organisatie_id')
             if org_id:
                 for uo in self.user_organisaties:
-                    if uo.organisatie_id == org_id and uo.rol == 'beheerder' and uo.actief:
+                    if uo.organisatie_id == org_id and uo.rol == ROLE_BEHEERDER and uo.actief:
                         return True
                 return False
-        return self.rol == 'beheerder'
+        return self.rol == ROLE_BEHEERDER
 
     def is_lezer(self):
-        if self.rol == 'platformbeheerder':
+        if self.rol == ROLE_PLATFORMBEHEERDER:
             return False
         from flask import session, has_request_context
         if has_request_context():
@@ -50,8 +51,9 @@ class User(UserMixin, db.Model):
             if org_id:
                 for uo in self.user_organisaties:
                     if uo.organisatie_id == org_id and uo.actief:
-                        return uo.rol == 'lezer'
-        return self.rol == 'lezer'
+                        return uo.rol == ROLE_LEZER
+                return False
+        return self.rol == ROLE_LEZER
 
     def __repr__(self):
         return f'<User {self.naam}>'

@@ -1,7 +1,7 @@
-"""Registraties routes: lijst, toevoegen, bekijken, wijzigen."""
 from datetime import date
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user
+from sqlalchemy.orm import joinedload
 from extensions import db
 from models.registration import Registration
 from models.digidokter import Digidokter
@@ -9,8 +9,8 @@ from models.age_category import AgeCategory
 from models.device import Device
 from models.herkomst import Herkomst
 from models.location import Location
-from sqlalchemy.orm import joinedload
 from utils.decorators import writer_required
+from utils.helpers import safe_int, safe_date, safe_str
 
 reg_bp = Blueprint('reg', __name__)
 
@@ -38,17 +38,17 @@ def index():
 @reg_bp.route('/registraties')
 @login_required
 def lijst():
-    pagina = request.args.get('pagina', 1, type=int)
-    zoek = request.args.get('zoek', '').strip()
-    filter_digidokter = request.args.get('digidokter', 0, type=int)
-    filter_locatie = request.args.get('locatie', 0, type=int)
-    filter_toestel = request.args.get('toestel', type=int) or request.args.get('toesteltype', 0, type=int)
-    filter_leeftijd = request.args.get('leeftijd', type=int) or request.args.get('leeftijdscategorie', 0, type=int)
-    filter_geslacht = request.args.get('geslacht', '').strip().lower()
-    filter_datum_van = request.args.get('datum_van', '')
-    filter_datum_tot = request.args.get('datum_tot', '')
-    sort_by = request.args.get('sort_by', 'datum').strip()
-    direction = request.args.get('direction', 'desc').strip()
+    pagina = safe_int(request.args.get('pagina'), default=1) or 1
+    zoek = safe_str(request.args.get('zoek'))
+    filter_digidokter = safe_int(request.args.get('digidokter'), default=0) or 0
+    filter_locatie = safe_int(request.args.get('locatie'), default=0) or 0
+    filter_toestel = safe_int(request.args.get('toestel')) or safe_int(request.args.get('toesteltype'), default=0) or 0
+    filter_leeftijd = safe_int(request.args.get('leeftijd')) or safe_int(request.args.get('leeftijdscategorie'), default=0) or 0
+    filter_geslacht = safe_str(request.args.get('geslacht')).lower()
+    filter_datum_van = safe_str(request.args.get('datum_van'))
+    filter_datum_tot = safe_str(request.args.get('datum_tot'))
+    sort_by = safe_str(request.args.get('sort_by'), default='datum') or 'datum'
+    direction = safe_str(request.args.get('direction'), default='desc') or 'desc'
 
     from utils.tenant import filter_op_organisatie
     query = (
@@ -289,8 +289,15 @@ def nieuw():
             aangemaakt_door_id=current_user.id,
         )
         set_organisatie_id_op_model(reg)
-        db.session.add(reg)
-        db.session.commit()
+        try:
+            db.session.add(reg)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Fout bij toevoegen registratie: {e}")
+            flash('Er is een fout opgetreden bij het opslaan van de registratie.', 'danger')
+            return render_template('registrations/add.html', **keuzes, datum_vandaag=datum_str,
+                                   form_data=request.form, default_digidokter_id=default_digidokter_id)
 
         # Start asynchrone AI-vraagclassificatie op de achtergrond
         try:
@@ -415,7 +422,14 @@ def wijzigen(reg_id):
         reg.leeftijdscategorie_id = leeftijdscategorie_id
         reg.toestel_id = toestel_id
         reg.locatie_id = locatie_id
-        db.session.commit()
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Fout bij bijwerken registratie {reg.id}: {e}")
+            flash('Er is een fout opgetreden bij het bijwerken van de registratie.', 'danger')
+            return render_template('registrations/edit.html', reg=reg, **keuzes)
 
         # Indien onderwerp gewijzigd of nog niet geclassificeerd, heranalyseer asynchroon
         if onderwerp != oude_onderwerp or not reg.classification:
@@ -443,8 +457,15 @@ def verwijderen(reg_id):
     if reg.organisatie_id != org_id:
         abort(403)
 
-    db.session.delete(reg)
-    db.session.commit()
+    reg_nummer = reg.registratienummer
+    try:
+        db.session.delete(reg)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Fout bij verwijderen registratie {reg_id}: {e}")
+        flash('Er is een fout opgetreden bij het verwijderen van de registratie.', 'danger')
+        return redirect(url_for('reg.lijst'))
     
     # GDPR: Verwijder ook alle audit logs die gekoppeld zijn aan deze registratie
     try:
@@ -455,5 +476,5 @@ def verwijderen(reg_id):
         # Mocht de audit log opschoning mislukken, loggen we het maar blokkeren we de redirects niet
         current_app.logger.error(f"Fout bij het opschonen van audit logs voor registratie {reg_id}: {str(e)}")
 
-    flash(f'Registratie {reg.registratienummer} is succesvol verwijderd.', 'success')
+    flash(f'Registratie {reg_nummer} is succesvol verwijderd.', 'success')
     return redirect(url_for('reg.lijst'))

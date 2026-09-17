@@ -283,13 +283,6 @@
                 <i class="bi bi-chevron-down dd-nav-chevron"></i>
             </div>
             <div class="collapse show" id="nav-data">
-                {% if current_user.is_beheerder() and session.get('organisatie_id') %}
-                <a href="{{ url_for('ie.importeer') }}"
-                   class="dd-nav-link {% if request.endpoint == 'ie.importeer' %}active{% endif %}">
-                    <i class="bi bi-cloud-upload"></i>
-                    <span>Importeren</span>
-                </a>
-                {% endif %}
                 <a href="{{ url_for('ie.exporteer') }}"
                    class="dd-nav-link {% if request.endpoint == 'ie.exporteer' %}active{% endif %}">
                     <i class="bi bi-cloud-download"></i>

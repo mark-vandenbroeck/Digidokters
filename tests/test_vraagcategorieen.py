@@ -287,3 +287,57 @@ class TestVraagcategorieen(BaseTestCase):
             with _batch_lock:
                 _batch_status['is_running'] = False
 
+    def test_vraagclassificaties_detail_modal_rendering(self):
+        """Test dat op de vraagclassificaties pagina rijen klikbaar zijn en de details popup modal gerenderd wordt."""
+        self.login("SuperAdmin", "password123")
+
+        cat = QuestionCategory(naam="E-mail & Accounts", omschrijving="Vragen over webmail, wachtwoorden", actief=True)
+        db.session.add(cat)
+        db.session.commit()
+
+        reg = Registration(
+            registratienummer="2026-0777",
+            datum=date(2026, 3, 20),
+            client="Mevrouw Jansen",
+            digidokter_id=self.digidokter.id,
+            leeftijdscategorie_id=self.age_category.id,
+            toestel_id=self.device.id,
+            organisatie_id=self.org.id,
+            onderwerp="Kan niet meer inloggen op Gmail",
+            nieuwe_klant=True,
+            geslacht="vrouw"
+        )
+        db.session.add(reg)
+        db.session.commit()
+
+        cls = QuestionClassification(
+            registration_id=reg.id,
+            category_id=cat.id,
+            zekerheid=0.96,
+            toelichting="Vraag over inloggen op Google / Gmail account.",
+            model_naam="gemini-2.5-flash",
+            is_handmatig_aangepast=False
+        )
+        db.session.add(cls)
+        db.session.commit()
+
+        res = self.client.get('/platform/vraagclassificaties')
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode('utf-8')
+
+        # Check clickable row attributes
+        self.assertIn(f'data-bs-target="#regModal{cls.id}"', html)
+        self.assertIn('data-bs-toggle="modal"', html)
+
+        # Check modal existence and details
+        self.assertIn(f'id="regModal{cls.id}"', html)
+        self.assertIn('Details Registratie', html)
+        self.assertIn('2026-0777', html)
+        self.assertIn('Mevrouw Jansen', html)
+        self.assertIn('Kan niet meer inloggen op Gmail', html)
+        self.assertIn('E-mail &amp; Accounts', html)
+        self.assertIn('96%', html)
+        self.assertIn('Vraag over inloggen op Google / Gmail account.', html)
+        self.assertIn('Ja – nieuwe bezoeker', html)
+
+

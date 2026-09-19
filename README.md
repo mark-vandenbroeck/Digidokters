@@ -47,13 +47,17 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 
 ## 📋 Features & Functionaliteiten
 
-### 1. Bezoekenregistratie
-*   Medewerkers en beheerders kunnen snel binnenlopende bezoekers registreren.
-*   Bij het openen van het formulier wordt de ingelogde gebruiker automatisch geselecteerd als Digidokter.
+### 1. Bezoekenregistratie & Balieformulier ('Nieuw bezoek')
+*   **Geoptimaliseerd Balieformulier:** De optie 'Nieuw bezoek' is speciaal ontworpen voor touchscreens, tablets en drukke inloopmomenten.
+*   **Sticky Sessie-Context:** Datum, actieve Digidokter en consultatielocatie blijven gedurende de hele sessie automatisch bewaard en vooraf geselecteerd.
+*   **Touch Segmented Buttons:** Grote, vlot tikbare knoppen voor 'Nieuwe bezoeker (Ja/Nee)', geslacht, leeftijdscategorie en toesteltype.
+*   **Snelle Onderwerp-Tags:** Met één tik populaire thema's (itsme, WhatsApp, E-mail, Smartschool, Wifi/Router) toevoegen aan de hulpvraag.
+*   **Opslaan & Volgende bezoeker:** Eén opvallende actieknop slaat de consultatie op en zet het scherm direct klaar voor de volgende bezoeker.
+*   **Detailpagina & AI-Inzage:** Op de detailpagina van een registratie worden alle gegevens overzichtelijk getoond, inclusief de AI-vraagclassificatie (toegewezen categorie, zekerheidsscore in % en de toelichting/motivatie van het model).
 *   **Dynamische Genderidentiteit:** Het geslacht van de bezoeker wordt gekozen uit de geconfigureerde genderidentiteiten van de organisatie (standaard 'Man' en 'Vrouw', uitbreidbaar via stamgegevens).
 *   **Consultatielocaties:** Indien er binnen de organisatie meerdere locaties zijn gemarkeerd als *"Gebruikt voor consultaties"*, kan de specifieke locatie direct worden geselecteerd. Bij exact één consultatielocatie wordt deze automatisch zonder extra dropdown toegekend.
 *   **Realtime Asynchrone AI-classificatie:** Zodra een consultatie wordt opgeslagen of bewerkt, wordt de vraag op de achtergrond binnen 1-2 seconden geanalyseerd via Google Gemini AI en toegekend aan de passende categorie.
-*   Vrijwilligers (digidokters) met de rol `medewerker` hebben ook de mogelijkheid om registraties te wissen bij foutieve invoer.
+*   Vrijwilligers (digidokters) met de rol `medewerker` hebben ook de mogelijkheid om registraties te wissen bij invoerfouten.
 
 ### 2. Agenda & Planning
 *   Ondersteunt eenmalige en terugkerende activiteiten (dagelijks, wekelijks, maandelijks) met een optionele einddatum.
@@ -101,6 +105,7 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 
 ### 8. Stamgegevensbeheer & Veilig Wissen
 *   **Volledig beheer van keuzelijsten:** Beheerders en platformbeheerders kunnen binnen hun organisatie locaties, activiteitstypes, leeftijdscategorieën, toestellen, herkomstbronnen, **genderidentiteiten** en **functies** aanmaken, bewerken, activeren/deactiveren en handmatig van volgorde veranderen.
+*   **Statusfilters op alle pagina's:** Elke stamgegevens-beheerpagina bevat een handige statusfilter (*Alle items*, *Enkel actieve items*, *Enkel gedeactiveerde items*) om direct een overzichtelijk beeld te krijgen.
 *   **Locaties voor Consultaties:** Locaties kunnen worden aangeduid met de optie *"Gebruikt voor consultaties"*. Enkel locaties met deze vlag verschijnen bij de registratie van consultaties en in het consultatielocatiefilter.
 *   **Mapping van gedeactiveerde entries:** Gedeactiveerde leeftijdscategorieën en toesteltypes kunnen in het beheer worden gekoppeld (gemapt) naar een actieve categorie. Historische consultaties blijven intact in de database, maar worden in overzichten, filters, detailweergaven, statistieken en exports automatisch getoond en geaggregeerd onder de gemapte actieve categorie.
 *   **Geavanceerde filters in het consultatieoverzicht:** De overzichtspagina van registraties bevat kolommen en filters op zoekterm, digidokter, locatie, toesteltype, geslacht, leeftijdscategorie en datum (van-tot). De dropdowns tonen enkel actieve opties; filteren op een optie matcht automatisch ook historische registraties met een gekoppelde inactieve entry.
@@ -166,7 +171,7 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
 *   **Automatische Real-time Classificatie:** Consultatievragen worden bij het opslaan op de achtergrond (asynchroon via daemon threads) geanalyseerd door Google Gemini AI (`gemini-2.5-flash`) en ingedeeld in 10 gestandaardiseerde hoofdcategorieën.
 *   **Betrouwbaarheid & Motivatie:** Ieder resultaat bevat een zekerheidsscore (0–100%) en een motivatie/toelichting van het model.
 *   **Beheer van Vraagcategorieën (`/platform/vraagcategorieen`):** Centrale lijst van categorieën met AI-richtlijnen en definities. Alleen toegankelijk voor platformbeheerders.
-*   **Monitoring & Handmatige Correcties (`/platform/vraagclassificaties`):** Overzichtstabel met filters op onzekere AI-scores (< 80%), organisatie en categorie. Platformbeheerders kunnen classificaties handmatig overriden of met één klik opnieuw laten analyseren door de AI.
+*   **Monitoring & Interactieve Detail-Popups (`/platform/vraagclassificaties`):** Overzichtstabel met filters op onzekere AI-scores (< 80%), organisatie en categorie. Alle rijen zijn klikbaar en openen direct een popup-modal met de volledige registratiedetails. Platformbeheerders kunnen classificaties handmatig overriden of met één klik opnieuw laten analyseren door de AI.
 *   **Asynchrone Batch-analyse:** De knop "Batch-analyse starten" draait volledig asynchroon in de achtergrond met realtime statusindicatie (`/api/vraagclassificaties/batch-status`), waardoor de app direct bruikbaar blijft zonder time-outs of vastlopende webpagina's.
 *   **Batch- & CLI-seeding:** Ondersteunt batchverwerking van historische consultaties via `flask seed-vragenanalyse` of de batchknop in de webinterface.
 

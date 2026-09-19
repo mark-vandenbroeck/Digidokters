@@ -115,6 +115,7 @@ def maak_backup(org_id: int) -> dict:
             joinedload(Registration.leeftijdscategorie),
             joinedload(Registration.toestel),
             joinedload(Registration.herkomst),
+            joinedload(Registration.gender_identity),
             joinedload(Registration.locatie),
             joinedload(Registration.aangemaakt_door_user),
         )
@@ -324,6 +325,7 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                     herkomsten_map[name] = h.id
 
             # 5b. Herstel genderidentiteiten
+            gender_identities_map = {}
             if 'gender_identities' in data:
                 for g_data in data.get('gender_identities', []):
                     g = GenderIdentity(
@@ -333,12 +335,15 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                         organisatie_id=org_id
                     )
                     db.session.add(g)
-                db.session.flush()
+                    db.session.flush()
+                    gender_identities_map[g.naam.lower()] = g.id
             else:
                 # Fallback defaults
                 for idx, name in enumerate(['Man', 'Vrouw']):
-                    db.session.add(GenderIdentity(naam=name, actief=True, volgorde=idx, organisatie_id=org_id))
-                db.session.flush()
+                    g = GenderIdentity(naam=name, actief=True, volgorde=idx, organisatie_id=org_id)
+                    db.session.add(g)
+                    db.session.flush()
+                    gender_identities_map[name.lower()] = g.id
 
             # 5c. Herstel functies
             functies_map = {}
@@ -426,6 +431,9 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                 herkomst_naam = r_data.get('herkomst')
                 h_id = herkomsten_map.get(herkomst_naam) if herkomst_naam else None
 
+                geslacht_val = r_data.get('geslacht')
+                g_id = gender_identities_map.get(geslacht_val.lower()) if (geslacht_val and isinstance(geslacht_val, str)) else None
+
                 reg_datum = datetime.fromisoformat(r_data['datum']).date() if r_data.get('datum') else None
                 created_at = datetime.fromisoformat(r_data['aangemaakt_op']) if r_data.get('aangemaakt_op') else datetime.now(timezone.utc)
                 modified_at = datetime.fromisoformat(r_data['gewijzigd_op']) if r_data.get('gewijzigd_op') else datetime.now(timezone.utc)
@@ -436,7 +444,7 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                     client=r_data['client'],
                     nieuwe_klant=r_data.get('nieuwe_klant', False),
                     herkomst_id=h_id,
-                    geslacht=r_data.get('geslacht'),
+                    gender_identity_id=g_id,
                     onderwerp=r_data['onderwerp'],
                     digidokter_id=d_id,
                     leeftijdscategorie_id=c_id,

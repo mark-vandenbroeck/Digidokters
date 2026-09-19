@@ -202,26 +202,44 @@ def overzicht():
         db.session.query(func.count(Registration.id)).filter(Registration.nieuwe_klant == True)
     ).scalar() or 0
 
-    # Per geslacht
-    per_geslacht_raw = (
+    # Per geslacht / gender
+    from models.gender_identity import GenderIdentity
+    gender_identities = (
+        GenderIdentity.query
+        .filter_by(organisatie_id=org_id)
+        .order_by(GenderIdentity.volgorde.asc(), GenderIdentity.naam.asc())
+        .all()
+    )
+    gender_counts_raw = (
         jaar_filter(
             db.session.query(
-                Registration.geslacht,
+                Registration.gender_identity_id,
                 func.count(Registration.id).label('aantal')
             )
         )
-        .group_by(Registration.geslacht)
+        .group_by(Registration.gender_identity_id)
         .all()
     )
+    gender_counts = {r[0]: r[1] for r in gender_counts_raw}
+
     per_geslacht = []
-    for r in per_geslacht_raw:
-        if r.geslacht == 'man':
-            label = 'Man'
-        elif r.geslacht == 'vrouw':
-            label = 'Vrouw'
-        else:
-            label = 'Niet gespecificeerd'
-        per_geslacht.append((label, r.aantal))
+    seen_gender_ids = set()
+
+    for g in gender_identities:
+        per_geslacht.append((g.naam, gender_counts.get(g.id, 0)))
+        seen_gender_ids.add(g.id)
+
+    overige_gender_ids = [gid for gid in gender_counts if gid is not None and gid not in seen_gender_ids]
+    if overige_gender_ids:
+        overige_genders = GenderIdentity.query.filter(GenderIdentity.id.in_(overige_gender_ids)).order_by(GenderIdentity.volgorde.asc(), GenderIdentity.naam.asc()).all()
+        for g in overige_genders:
+            per_geslacht.append((g.naam, gender_counts.get(g.id, 0)))
+            seen_gender_ids.add(g.id)
+
+    zonder_gender_aantal = gender_counts.get(None, 0)
+    if zonder_gender_aantal > 0:
+        per_geslacht.append(('Niet gespecificeerd', zonder_gender_aantal))
+
     per_geslacht = sorted(per_geslacht, key=lambda x: x[1], reverse=True)
 
     # Recente 10 dagen met meeste bezoeken

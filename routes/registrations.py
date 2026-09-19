@@ -88,13 +88,17 @@ def lijst():
     if filter_geslacht in ('onbekend', 'geen'):
         query = query.filter(
             db.or_(
-                Registration.geslacht.is_(None),
-                Registration.geslacht == '',
-                Registration.geslacht.ilike('onbekend')
+                Registration.gender_identity_id.is_(None),
+                Registration.gender_identity.has(db.func.lower(GenderIdentity.naam) == 'onbekend')
             )
         )
     elif filter_geslacht:
-        query = query.filter(Registration.geslacht.ilike(filter_geslacht))
+        if filter_geslacht.isdigit():
+            query = query.filter(Registration.gender_identity_id == int(filter_geslacht))
+        else:
+            query = query.filter(
+                Registration.gender_identity.has(db.func.lower(GenderIdentity.naam) == filter_geslacht.lower())
+            )
     if filter_datum_van:
         try:
             query = query.filter(Registration.datum >= date.fromisoformat(filter_datum_van))
@@ -232,11 +236,14 @@ def nieuw():
             if not dd or dd.organisatie_id != org_id:
                 fouten.append('Ongeldige digidokter geselecteerd.')
                 
+        gender_identity_id = None
         if geslacht:
-            geldige_genders = {g.naam.lower(): g.naam for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
-            if geslacht.lower() in geldige_genders:
-                geslacht = geldige_genders[geslacht.lower()]
-            elif geslacht.lower() not in ('man', 'vrouw'):
+            geldige_genders = {g.naam.lower(): g for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
+            if geslacht.isdigit() and int(geslacht) in [g.id for g in geldige_genders.values()]:
+                gender_identity_id = int(geslacht)
+            elif geslacht.lower() in geldige_genders:
+                gender_identity_id = geldige_genders[geslacht.lower()].id
+            else:
                 fouten.append('Ongeldige genderidentiteit geselecteerd.')
 
         if herkomst_id:
@@ -289,12 +296,13 @@ def nieuw():
             digidokter_id=digidokter_id,
             nieuwe_klant=nieuwe_klant,
             herkomst_id=herkomst_id,
-            geslacht=geslacht,
+            gender_identity_id=gender_identity_id,
             onderwerp=onderwerp,
             leeftijdscategorie_id=leeftijdscategorie_id,
             toestel_id=toestel_id,
             locatie_id=locatie_id,
             aangemaakt_door_id=current_user.id,
+            organisatie_id=org_id,
         )
         set_organisatie_id_op_model(reg)
         try:
@@ -404,11 +412,14 @@ def snel():
             if not dd or dd.organisatie_id != org_id:
                 fouten.append('Ongeldige digidokter geselecteerd.')
 
+        gender_identity_id = None
         if geslacht:
-            geldige_genders = {g.naam.lower(): g.naam for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
-            if geslacht.lower() in geldige_genders:
-                geslacht = geldige_genders[geslacht.lower()]
-            elif geslacht.lower() not in ('man', 'vrouw'):
+            geldige_genders = {g.naam.lower(): g for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
+            if geslacht.isdigit() and int(geslacht) in [g.id for g in geldige_genders.values()]:
+                gender_identity_id = int(geslacht)
+            elif geslacht.lower() in geldige_genders:
+                gender_identity_id = geldige_genders[geslacht.lower()].id
+            else:
                 fouten.append('Ongeldige genderidentiteit geselecteerd.')
 
         if herkomst_id:
@@ -466,12 +477,13 @@ def snel():
             digidokter_id=digidokter_id,
             nieuwe_klant=nieuwe_klant,
             herkomst_id=herkomst_id,
-            geslacht=geslacht,
+            gender_identity_id=gender_identity_id,
             onderwerp=onderwerp,
             leeftijdscategorie_id=leeftijdscategorie_id,
             toestel_id=toestel_id,
             locatie_id=locatie_id,
             aangemaakt_door_id=current_user.id,
+            organisatie_id=org_id,
         )
         set_organisatie_id_op_model(reg)
         try:
@@ -569,11 +581,14 @@ def wijzigen(reg_id):
             if not dd or dd.organisatie_id != org_id:
                 fouten.append('Ongeldige digidokter geselecteerd.')
                 
+        gender_identity_id = None
         if geslacht:
-            geldige_genders = {g.naam.lower(): g.naam for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
-            if geslacht.lower() in geldige_genders:
-                geslacht = geldige_genders[geslacht.lower()]
-            elif geslacht.lower() not in ('man', 'vrouw'):
+            geldige_genders = {g.naam.lower(): g for g in filter_op_organisatie(GenderIdentity.query, GenderIdentity).all()}
+            if geslacht.isdigit() and int(geslacht) in [g.id for g in geldige_genders.values()]:
+                gender_identity_id = int(geslacht)
+            elif geslacht.lower() in geldige_genders:
+                gender_identity_id = geldige_genders[geslacht.lower()].id
+            else:
                 fouten.append('Ongeldige genderidentiteit geselecteerd.')
 
         if herkomst_id:
@@ -623,7 +638,7 @@ def wijzigen(reg_id):
         reg.digidokter_id = digidokter_id
         reg.nieuwe_klant = nieuwe_klant
         reg.herkomst_id = herkomst_id
-        reg.geslacht = geslacht
+        reg.gender_identity_id = gender_identity_id
         reg.onderwerp = onderwerp
         reg.leeftijdscategorie_id = leeftijdscategorie_id
         reg.toestel_id = toestel_id

@@ -147,3 +147,51 @@ class TestGenderIdentity(BaseTestCase):
         res_list = self.client.get('/registraties?geslacht=Andere')
         self.assertEqual(res_list.status_code, 200)
         self.assertIn('Bezoeker Divers', res_list.data.decode('utf-8'))
+
+    def test_migrate_gender_identities_case_insensitive_per_org(self):
+        from scripts.migrate_gender_identity_fk import migrate_gender_identities
+
+        # Maak 2e organisatie aan met eigen genderidentiteiten
+        org2 = Organisatie(naam="Tweede Gemeente", slug="tweede-gemeente", actief=True)
+        db.session.add(org2)
+        db.session.commit()
+
+        g_org2_vrouw = GenderIdentity(naam="Vrouw", actief=True, volgorde=1, organisatie_id=org2.id)
+        g_org2_man = GenderIdentity(naam="Man", actief=True, volgorde=2, organisatie_id=org2.id)
+        db.session.add_all([g_org2_vrouw, g_org2_man])
+        db.session.commit()
+
+        # Maak registraties met tekstuele geslachtwaarden in de db
+        import sqlalchemy as sa
+        with db.engine.begin() as conn:
+            # Voeg registratie toe voor org 1 met lowercase 'man'
+            conn.execute(sa.text("""
+                INSERT INTO registrations (registratienummer, datum, client, digidokter_id, nieuwe_klant, onderwerp, leeftijdscategorie_id, toestel_id, organisatie_id, aangemaakt_op, gewijzigd_op, gender_identity_id)
+                VALUES ('2026-9901', '2026-04-10', 'Jan Test Org1', :dd_id, 0, 'Test', :cat_id, :dev_id, :org_id, '2026-04-10 10:00:00', '2026-04-10 10:00:00', NULL)
+            """), {"dd_id": self.digidokter.id, "cat_id": self.age_category.id, "dev_id": self.device.id, "org_id": self.org.id})
+
+            # Voeg registratie toe voor org 2 met uppercase 'VROUW'
+            conn.execute(sa.text("""
+                INSERT INTO registrations (registratienummer, datum, client, digidokter_id, nieuwe_klant, onderwerp, leeftijdscategorie_id, toestel_id, organisatie_id, aangemaakt_op, gewijzigd_op, gender_identity_id)
+                VALUES ('2026-9902', '2026-04-10', 'Marie Test Org2', :dd_id, 0, 'Test', :cat_id, :dev_id, :org_id, '2026-04-10 10:00:00', '2026-04-10 10:00:00', NULL)
+            """), {"dd_id": self.digidokter.id, "cat_id": self.age_category.id, "dev_id": self.device.id, "org_id": org2.id})
+
+        # Test met @geslacht.setter direct
+        r1 = Registration.query.filter_by(registratienummer='2026-9901').first()
+        r1.geslacht = "  mAn  "
+        db.session.commit()
+        self.assertEqual(r1.gender_identity_id, self.gender_man.id)
+        self.assertEqual(r1.geslacht, "Man")
+
+        r2 = Registration.query.filter_by(registratienummer='2026-9902').first()
+        r2.geslacht = "VROUW"
+        db.session.commit()
+        self.assertEqual(r2.gender_identity_id, g_org2_vrouw.id)
+        self.assertEqual(r2.geslacht, "Vrouw")
+
+        # Test migrate script dry-run en live
+        res_dry = migrate_gender_identities(dry_run=True)
+        self.assertTrue(res_dry)
+        res_live = migrate_gender_identities(dry_run=False)
+        self.assertTrue(res_live)
+

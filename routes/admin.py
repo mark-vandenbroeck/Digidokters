@@ -976,7 +976,7 @@ def genderidentiteit_verwijderen(item_id):
     count = (
         Registration.query
         .filter(Registration.organisatie_id == org_id)
-        .filter(db.func.lower(Registration.geslacht) == item.naam.lower())
+        .filter(Registration.gender_identity_id == item.id)
         .count()
     )
     if count > 0:

@@ -32,19 +32,12 @@ def get_usage_counts(model: Type[db.Model], org_id: int) -> dict[int, int]:
             .all()
         )
     if name == 'GenderIdentity':
-        # Haal alle genderidentiteiten op voor deze organisatie
-        from models.gender_identity import GenderIdentity
-        genders = GenderIdentity.query.filter_by(organisatie_id=org_id).all()
-        usage = {}
-        for g in genders:
-            cnt = (
-                Registration.query
-                .filter(Registration.organisatie_id == org_id)
-                .filter(db.func.lower(Registration.geslacht) == g.naam.lower())
-                .count()
-            )
-            usage[g.id] = cnt
-        return usage
+        return dict(
+            db.session.query(Registration.gender_identity_id, db.func.count(Registration.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Registration.gender_identity_id)
+            .all()
+        )
     if name == 'Digidokter':
         return dict(
             db.session.query(Registration.digidokter_id, db.func.count(Registration.id))

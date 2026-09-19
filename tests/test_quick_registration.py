@@ -25,7 +25,7 @@ class TestQuickRegistration(BaseTestCase):
         res = self.client.get('/registraties/snel')
         self.assertEqual(res.status_code, 200)
         html = res.data.decode('utf-8')
-        self.assertIn('Snelle balie-registratie', html)
+        self.assertIn('Nieuw bezoek', html)
         self.assertIn('Opslaan & Volgende bezoeker', html)
         self.assertIn('itsme', html)
         self.assertIn('WhatsApp', html)

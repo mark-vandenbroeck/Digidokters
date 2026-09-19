@@ -155,12 +155,7 @@
                 </a>
                 {% if not current_user.is_lezer() %}
                 <a href="{{ url_for('reg.snel') }}"
-                   class="dd-nav-link {% if request.endpoint == 'reg.snel' %}active{% endif %}">
-                    <i class="bi bi-lightning-charge-fill text-warning"></i>
-                    <span>Snelle registratie</span>
-                </a>
-                <a href="{{ url_for('reg.nieuw') }}"
-                   class="dd-nav-link {% if request.endpoint == 'reg.nieuw' %}active{% endif %}">
+                   class="dd-nav-link {% if request.endpoint in ('reg.snel', 'reg.nieuw') %}active{% endif %}">
                     <i class="bi bi-plus-circle"></i>
                     <span>Nieuw bezoek</span>
                 </a>

@@ -9,10 +9,7 @@
     </div>
     {% if not current_user.is_lezer() %}
     <div class="d-flex gap-2">
-        <a href="{{ url_for('reg.snel') }}" class="btn btn-outline-warning text-dark fw-medium shadow-sm">
-            <i class="bi bi-lightning-charge-fill text-warning me-1"></i>Snelle registratie
-        </a>
-        <a href="{{ url_for('reg.nieuw') }}" class="btn btn-primary">
+        <a href="{{ url_for('reg.snel') }}" class="btn btn-primary">
             <i class="bi bi-plus-lg me-1"></i>Nieuw bezoek
         </a>
     </div>
@@ -255,7 +252,7 @@
             {% if zoek or filter_digidokter or filter_locatie or filter_toestel or filter_leeftijd or filter_geslacht or filter_datum_van or filter_datum_tot %}
             <a href="{{ url_for('reg.lijst') }}" class="btn btn-sm btn-outline-secondary">Filters wissen</a>
             {% else %}
-            <a href="{{ url_for('reg.nieuw') }}" class="btn btn-sm btn-primary">Eerste bezoek registreren</a>
+            <a href="{{ url_for('reg.snel') }}" class="btn btn-sm btn-primary">Eerste bezoek registreren</a>
             {% endif %}
         </div>
         {% endif %}

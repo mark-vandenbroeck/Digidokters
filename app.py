@@ -82,14 +82,16 @@ def create_app(config_class=Config):
 
     @app.context_processor
     def inject_global_template_vars():
-        res = {'feedback_meldingen': [], 'huidige_organisatie': None, 'is_sjabloon_org': False}
+        res = {'feedback_meldingen': [], 'huidige_organisatie': None, 'is_sjabloon_org': False, 'openstaande_evaluaties_telling': 0}
         if not current_user.is_authenticated:
             return res
         try:
             from utils.feedback_tracker import get_feedback_meldingen
             from utils.tenant import get_huidige_organisatie
+            from routes.evaluations import get_openstaande_evaluaties_telling_voor_user
             org_id = session.get('organisatie_id')
             res['feedback_meldingen'] = get_feedback_meldingen(current_user, org_id)
+            res['openstaande_evaluaties_telling'] = get_openstaande_evaluaties_telling_voor_user(current_user, org_id)
             huidige_org = get_huidige_organisatie()
             res['huidige_organisatie'] = huidige_org
             res['is_sjabloon_org'] = bool(huidige_org and huidige_org.slug == 'sjabloon')

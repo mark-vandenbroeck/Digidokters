@@ -15,7 +15,7 @@
         {% endif %}
         <div>
             <h1 class="dd-page-title mb-0"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Evaluatieresultaten</h1>
-            <p class="dd-page-subtitle mb-0">Overzicht van ingevulde evaluaties per sessie en activiteit</p>
+            <p class="dd-page-subtitle mb-0">Overzicht van evaluaties per sessie en activiteit</p>
         </div>
     </div>
     {% if current_user.is_beheerder() %}
@@ -27,11 +27,26 @@
     {% endif %}
 </div>
 
+{% if openstaande_sessies and openstaande_sessies|length > 0 and not mijn_openstaand %}
+<div class="alert alert-warning border border-warning-subtle shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill fs-4 text-warning me-3"></i>
+        <div>
+            <div class="fw-bold text-dark">Je hebt {{ openstaande_sessies|length }} openstaande evaluatie{% if openstaande_sessies|length > 1 %}s{% endif %}</div>
+            <div class="small text-muted">Er zijn afgelopen activiteiten waarvoor jouw feedback nog ontbreekt.</div>
+        </div>
+    </div>
+    <a href="{{ url_for('eval.resultaten', mijn_openstaand='1') }}" class="btn btn-sm btn-warning text-dark fw-semibold">
+        <i class="bi bi-funnel me-1"></i>Toon alleen mijn openstaande evaluaties ({{ openstaande_sessies|length }})
+    </a>
+</div>
+{% endif %}
+
 <!-- Filters -->
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body p-3">
         <form method="GET" action="{{ url_for('eval.resultaten') }}" class="row g-3 align-items-center">
-            <div class="col-12 col-md-5 col-lg-4">
+            <div class="col-12 col-md-4">
                 <label class="form-label small fw-semibold text-muted mb-1">Filter op Activiteitstype</label>
                 <select name="type_id" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="0">Alle activiteitstypes met evaluatie</option>
@@ -40,17 +55,26 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-12 col-md-5 col-lg-4 pt-md-3">
+            <div class="col-12 col-md-4 pt-md-3">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="mijn_openstaand" name="mijn_openstaand"
+                           {% if mijn_openstaand %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="form-check-label small fw-semibold text-dark cursor-pointer" for="mijn_openstaand">
+                        <i class="bi bi-pencil-square text-warning me-1"></i>Enkel mijn openstaande evaluaties
+                    </label>
+                </div>
+            </div>
+            <div class="col-12 col-md-4 pt-md-3">
                 <div class="form-check form-switch mb-0">
                     <input class="form-check-input" type="checkbox" role="switch" id="enkel_ingevuld" name="enkel_ingevuld"
                            {% if enkel_ingevuld %}checked{% endif %} onchange="this.form.submit()">
                     <label class="form-check-label small fw-semibold text-dark cursor-pointer" for="enkel_ingevuld">
-                        <i class="bi bi-funnel-fill text-primary me-1"></i>Enkel activiteiten met minstens 1 ingevulde evaluatie
+                        <i class="bi bi-funnel-fill text-primary me-1"></i>Enkel sessies met reacties
                     </label>
                 </div>
             </div>
-            {% if type_filter or enkel_ingevuld %}
-            <div class="col-auto pt-md-3 ms-auto">
+            {% if type_filter or enkel_ingevuld or mijn_openstaand %}
+            <div class="col-12 text-end pt-2">
                 <a href="{{ url_for('eval.resultaten') }}" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-x-lg me-1"></i>Wis filters
                 </a>
@@ -64,7 +88,8 @@
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
         <h2 class="h6 mb-0 fw-bold text-uppercase text-muted tracking-wider">
-            <i class="bi bi-collection me-2"></i>Sessies ({{ sessies|length }})
+            <i class="bi bi-collection me-2"></i>
+            {% if mijn_openstaand %}Mijn Openstaande Evaluaties{% else %}Sessies{% endif %} ({{ sessies|length }})
         </h2>
     </div>
     <div class="card-body p-0">
@@ -76,15 +101,18 @@
                         <th class="ps-3">Datum & Tijd</th>
                         <th>Activiteit</th>
                         <th>Locatie</th>
-                        <th>Aanwezige Digidokters</th>
-                        <th>Aantal Reacties</th>
+                        <th>Digidokters</th>
+                        <th>Jouw Status</th>
+                        <th>Totaal Reacties</th>
                         <th class="pe-3 text-end">Acties</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in sessies %}
                     {% set reacties = item.evaluatie_reacties %}
-                    <tr>
+                    {% set is_ingevuld_door_mij = item.id in ingevulde_agenda_ids %}
+                    {% set is_mijn_sessie = (huidige_dd and (huidige_dd in item.digidokters)) %}
+                    <tr class="{% if not is_ingevuld_door_mij and is_mijn_sessie and item.datum <= date_today %}table-warning-subtle{% endif %}">
                         <td class="ps-3">
                             <div class="fw-semibold text-dark">{{ item.datum.strftime('%d-%m-%Y') }}</div>
                             <small class="text-muted">{{ item.uur_van }} - {{ item.uur_tot }}</small>
@@ -98,27 +126,53 @@
                         <td>
                             <div class="d-flex flex-wrap gap-1">
                                 {% for dd in item.digidokters %}
-                                    <span class="badge bg-light text-dark border">{{ dd.naam }}</span>
+                                    <span class="badge {% if huidige_dd and dd.id == huidige_dd.id %}bg-primary text-white{% else %}bg-light text-dark border{% endif %}">{{ dd.naam }}</span>
                                 {% else %}
                                     <span class="text-muted small fst-italic">Geen</span>
                                 {% endfor %}
                             </div>
                         </td>
                         <td>
-                            {% if reacties|length > 0 %}
+                            {% if is_ingevuld_door_mij %}
                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                    <i class="bi bi-check-circle-fill me-1"></i>Ingevuld
+                                </span>
+                            {% elif is_mijn_sessie and item.datum <= date_today %}
+                                <span class="badge bg-warning text-dark border border-warning px-2 py-1">
+                                    <i class="bi bi-exclamation-circle-fill me-1"></i>Nog invullen
+                                </span>
+                            {% elif is_mijn_sessie %}
+                                <span class="badge bg-light text-muted border px-2 py-1">
+                                    <i class="bi bi-clock me-1"></i>Toekomstig
+                                </span>
+                            {% else %}
+                                <span class="badge bg-light text-muted border px-2 py-1" title="Je was niet gekoppeld als digidokter aan deze activiteit">
+                                    <i class="bi bi-dash me-1"></i>Niet aanwezig
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if reacties|length > 0 %}
+                                <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1">
                                     <i class="bi bi-chat-left-check me-1"></i>{{ reacties|length }} reactie(s)
                                 </span>
                             {% else %}
                                 <span class="badge bg-light text-muted border px-2 py-1">
-                                    Nog geen reacties
+                                    0 reacties
                                 </span>
                             {% endif %}
                         </td>
                         <td class="pe-3 text-end text-nowrap">
-                            <a href="{{ url_for('eval.sessie_detail', agenda_id=item.id) }}" class="btn btn-sm btn-primary">
-                                <i class="bi bi-eye me-1"></i>Bekijk antwoorden
-                            </a>
+                            <div class="d-inline-flex gap-1">
+                                {% if not is_ingevuld_door_mij and is_mijn_sessie and item.datum <= date_today %}
+                                <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" class="btn btn-sm btn-warning fw-semibold" title="Formulier nu invullen via de app">
+                                    <i class="bi bi-pencil-square me-1"></i>Invullen
+                                </a>
+                                {% endif %}
+                                <a href="{{ url_for('eval.sessie_detail', agenda_id=item.id) }}" class="btn btn-sm btn-outline-primary" title="Bekijk alle reacties">
+                                    <i class="bi bi-eye me-1"></i>Antwoorden
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -128,7 +182,11 @@
         {% else %}
         <div class="text-center py-5 text-muted">
             <i class="bi bi-inbox fs-1 mb-2 d-block opacity-50"></i>
+            {% if mijn_openstaand %}
+            <p class="mb-0 fw-semibold">Geweldig! Je hebt momenteel geen openstaande evaluaties.</p>
+            {% else %}
             <p class="mb-0">Geen sessies met evaluatieformulieren gevonden.</p>
+            {% endif %}
         </div>
         {% endif %}
     </div>

@@ -167,9 +167,14 @@
                 </a>
                 {% if not current_user.is_lezer() %}
                 <a href="{{ url_for('eval.resultaten') }}"
-                   class="dd-nav-link {% if request.endpoint and request.endpoint in ('eval.resultaten', 'eval.sessie_detail') %}active{% endif %}">
-                    <i class="bi bi-chat-square-quote"></i>
-                    <span>Evaluaties</span>
+                   class="dd-nav-link d-flex align-items-center justify-content-between {% if request.endpoint and request.endpoint in ('eval.resultaten', 'eval.sessie_detail') %}active{% endif %}">
+                    <div>
+                        <i class="bi bi-chat-square-quote"></i>
+                        <span>Evaluaties</span>
+                    </div>
+                    {% if openstaande_evaluaties_telling and openstaande_evaluaties_telling > 0 %}
+                    <span class="badge rounded-pill bg-warning text-dark font-monospace" style="font-size: 0.75rem;" title="{{ openstaande_evaluaties_telling }} openstaande evaluatie(s)">{{ openstaande_evaluaties_telling }}</span>
+                    {% endif %}
                 </a>
                 {% endif %}
             </div>

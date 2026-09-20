@@ -75,6 +75,9 @@
                         {% if token and huidige_dd %}
                             <div class="fw-bold text-dark fs-6">{{ huidige_dd.naam }}</div>
                             <input type="hidden" name="digidokter_id" value="{{ huidige_dd.id }}">
+                        {% elif huidige_dd and (huidige_dd in item.digidokters or not item.digidokters) %}
+                            <div class="fw-bold text-dark fs-6">{{ huidige_dd.naam }}</div>
+                            <input type="hidden" name="digidokter_id" value="{{ huidige_dd.id }}">
                         {% elif item.digidokters %}
                             <select class="form-select" id="digidokter_id" name="digidokter_id" required>
                                 {% if not huidige_dd %}
@@ -87,7 +90,7 @@
                                 {% endfor %}
                             </select>
                         {% else %}
-                            <input type="text" class="form-control" value="{{ current_user.naam if current_user.is_authenticated else '' }}" readonly>
+                            <div class="fw-bold text-dark fs-6">{{ current_user.naam if current_user.is_authenticated else 'Medewerker' }}</div>
                         {% endif %}
                     </div>
 

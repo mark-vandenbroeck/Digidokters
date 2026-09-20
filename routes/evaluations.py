@@ -608,6 +608,89 @@ def vraag_volgorde(vraag_id, richting):
 
 
 # ═══════════════════════════════════════════════════════════════
+# OPENSTAANDE EVALUATIES HELPER
+# ═══════════════════════════════════════════════════════════════
+
+def get_huidige_digidokter_voor_user(user, org_id):
+    """Zoekt het gekoppelde Digidokter record voor een gebruiker binnen een organisatie."""
+    if not user or not user.is_authenticated:
+        return None
+    
+    # 1. Match op user_id
+    dd = Digidokter.query.filter_by(user_id=user.id, organisatie_id=org_id).first()
+    if dd:
+        return dd
+        
+    # 2. Match op naam
+    if user.naam:
+        dd = Digidokter.query.filter(
+            Digidokter.organisatie_id == org_id,
+            db.func.lower(Digidokter.naam) == user.naam.strip().lower()
+        ).first()
+        if dd:
+            return dd
+            
+    # 3. Match op e-mailadres via User relatie
+    if user.email:
+        dd = (
+            Digidokter.query
+            .filter_by(organisatie_id=org_id)
+            .join(User, Digidokter.user_id == User.id)
+            .filter(db.func.lower(User.email) == user.email.strip().lower())
+            .first()
+        )
+        if dd:
+            return dd
+
+    return None
+
+
+def get_openstaande_evaluaties_voor_user(user, org_id):
+    """Haalt alle afgelopen sessies op waarvoor de ingelogde gebruiker/digidokter nog een evaluatie moet invullen."""
+    if not user or not user.is_authenticated:
+        return []
+    
+    huidige_dd = get_huidige_digidokter_voor_user(user, org_id)
+    if not huidige_dd:
+        # Als de gebruiker geen digidokter is binnen deze organisatie, zijn er geen persoonlijke evaluaties
+        return []
+
+    # Zoek sessies met evaluatieplicht (tot en met vandaag) waarbij DEZE digidokter gekoppeld/aanwezig was
+    sessies = (
+        AgendaItem.query
+        .filter_by(organisatie_id=org_id)
+        .join(ActivityType, AgendaItem.type_id == ActivityType.id)
+        .filter(ActivityType.heeft_evaluatie == True)
+        .filter(AgendaItem.datum <= date.today())
+        .filter(AgendaItem.digidokters.any(Digidokter.id == huidige_dd.id))
+        .order_by(AgendaItem.datum.desc(), AgendaItem.uur_van.desc())
+        .all()
+    )
+    
+    openstaand = []
+    for s in sessies:
+        reeds = EvaluationResponse.query.filter(
+            EvaluationResponse.agenda_item_id == s.id,
+            db.or_(
+                EvaluationResponse.user_id == user.id,
+                EvaluationResponse.digidokter_id == huidige_dd.id
+            )
+        ).first()
+        if not reeds:
+            openstaand.append(s)
+            
+    return openstaand
+
+
+def get_openstaande_evaluaties_telling_voor_user(user, org_id):
+    """Geeft het aantal openstaande evaluaties voor een gebruiker."""
+    try:
+        return len(get_openstaande_evaluaties_voor_user(user, org_id))
+    except Exception:
+        return 0
+
+
+# ═══════════════════════════════════════════════════════════════
 # RESULTATEN & OVERZICHT (BEHEERDERS & MEDEWERKERS)
 # ═══════════════════════════════════════════════════════════════
 
@@ -616,11 +699,15 @@ def vraag_volgorde(vraag_id, richting):
 @login_required
 @writer_required
 def resultaten():
-    """Overzicht van ingevulde evaluaties per sessie."""
+    """Overzicht van ingevulde evaluaties per sessie en persoonlijke openstaande evaluaties."""
     org_id = get_huidige_organisatie_id()
 
     type_filter = request.args.get('type_id', 0, type=int)
     enkel_ingevuld = request.args.get('enkel_ingevuld') == 'on' or request.args.get('enkel_ingevuld') == '1'
+    mijn_openstaand = request.args.get('mijn_openstaand') == 'on' or request.args.get('mijn_openstaand') == '1'
+
+    huidige_dd = get_huidige_digidokter_voor_user(current_user, org_id)
+    dd_id = huidige_dd.id if huidige_dd else None
 
     query = (
         AgendaItem.query
@@ -634,7 +721,31 @@ def resultaten():
     if enkel_ingevuld:
         query = query.filter(AgendaItem.evaluatie_reacties.any())
 
-    sessies = query.order_by(AgendaItem.datum.desc(), AgendaItem.uur_van.desc()).all()
+    all_sessies = query.order_by(AgendaItem.datum.desc(), AgendaItem.uur_van.desc()).all()
+
+    # Bepaal welke sessies al zijn ingevuld door de ingelogde gebruiker
+    ingevulde_agenda_ids = set()
+    if all_sessies:
+        sessie_ids = [s.id for s in all_sessies]
+        filter_conds = [EvaluationResponse.user_id == current_user.id]
+        if dd_id:
+            filter_conds.append(EvaluationResponse.digidokter_id == dd_id)
+        resp_records = db.session.query(EvaluationResponse.agenda_item_id).filter(
+            EvaluationResponse.agenda_item_id.in_(sessie_ids),
+            db.or_(*filter_conds)
+        ).all()
+        ingevulde_agenda_ids = {r[0] for r in resp_records}
+
+    # Openstaande sessies voor de huidige medewerker (enkel sessies waar de medewerker aan gekoppeld is)
+    if huidige_dd:
+        openstaande_sessies = [s for s in all_sessies if s.datum <= date.today() and s.id not in ingevulde_agenda_ids and (huidige_dd in s.digidokters)]
+    else:
+        openstaande_sessies = []
+
+    sessies = all_sessies
+    if mijn_openstaand:
+        sessies = openstaande_sessies
+
     types = filter_op_organisatie(ActivityType.query.filter_by(heeft_evaluatie=True), ActivityType).all()
 
     return render_template(
@@ -642,7 +753,12 @@ def resultaten():
         sessies=sessies,
         types=types,
         type_filter=type_filter,
-        enkel_ingevuld=enkel_ingevuld
+        enkel_ingevuld=enkel_ingevuld,
+        mijn_openstaand=mijn_openstaand,
+        ingevulde_agenda_ids=ingevulde_agenda_ids,
+        openstaande_sessies=openstaande_sessies,
+        huidige_dd=huidige_dd,
+        date_today=date.today()
     )
 
 

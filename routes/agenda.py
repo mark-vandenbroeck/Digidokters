@@ -120,6 +120,24 @@ def lijst():
         if not uo or uo.rol == 'lezer':
             kan_schrijven = False
 
+    # Evaluatiestatus ophalen voor ingelogde gebruiker
+    from routes.evaluations import get_openstaande_evaluaties_voor_user, get_huidige_digidokter_voor_user
+    from models.evaluation import EvaluationResponse
+    openstaande_evaluaties = get_openstaande_evaluaties_voor_user(current_user, org_id)
+    openstaande_agenda_ids = {s.id for s in openstaande_evaluaties}
+
+    huidige_dd = get_huidige_digidokter_voor_user(current_user, org_id)
+
+    filter_conds = [EvaluationResponse.user_id == current_user.id]
+    if huidige_dd:
+        filter_conds.append(EvaluationResponse.digidokter_id == huidige_dd.id)
+
+    ingevulde_records = db.session.query(EvaluationResponse.agenda_item_id).filter(
+        EvaluationResponse.organisatie_id == org_id,
+        db.or_(*filter_conds)
+    ).all()
+    ingevulde_agenda_ids = {r[0] for r in ingevulde_records}
+
     return render_template(
         'agenda/lijst.html',
         items=items,
@@ -132,6 +150,11 @@ def lijst():
         filter_digidokter_id=digidokter_id,
         sort_by=sort_by,
         direction=direction,
+        openstaande_evaluaties=openstaande_evaluaties,
+        openstaande_agenda_ids=openstaande_agenda_ids,
+        ingevulde_agenda_ids=ingevulde_agenda_ids,
+        huidige_dd=huidige_dd,
+        vandaag=date.today(),
         **keuzes
     )
 

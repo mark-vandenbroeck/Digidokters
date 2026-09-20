@@ -86,8 +86,12 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 *   **Dynamische Vragenlijst-editor:** Beheerders kunnen per activiteitstype dynamisch een onbeperkt aantal vragen toevoegen, bewerken, van volgorde wisselen of verwijderen.
 *   **Ondersteunde Vraagtypes:** Multiple choice (met configureerbare opties horizontaal gerangschikt) en vrije open tekstvelden, met optionele verplichting.
 *   **Geautomatiseerde E-mailuitnodigingen & Herinneringen:** Na afloop van een sessie worden gekoppelde digidokters automatisch uitgenodigd via een unieke, beveiligde token-URL (`/evaluaties/invullen/<token>`). Beheerders kunnen uitnodigingen ook handmatig verzenden en gerichte herinneringsmails sturen naar digidokters die het formulier nog niet hebben ingevuld, inclusief visuele statusindicatoren per digidokter.
-*   **Registratie:** Inzendingen registreren de specifieke digidokter, de timestamp (`ingediend_op`) en de antwoorden als JSON data, met bescherming tegen dubbel invullen.
-*   **Resultatenoverzicht & Filter:** Inzage in alle reacties per activiteit met filter *"Enkel activiteiten met minstens 1 ingevulde evaluatie"* en detailinzage per sessie.
+*   **In-App Formulier Invullen & Notificaties:** Vrijwilligers en medewerkers kunnen hun evaluaties niet alleen via de e-maillink, maar ook direct later via de webapplicatie invullen (`/evaluaties/agenda/<id>/invullen`):
+    *   *Agenda Attentiebanners & Actieknoppen:* In de agenda verschijnt een waarschuwingsbanner met het aantal openstaande evaluaties en een knop "Evaluatie invullen" bij voltooide activiteiten waar de vrijwilliger aanwezig was.
+    *   *Menu-notificatiebadge:* Naast het menu-item "Evaluaties" toont een opvallende badge het aantal nog in te vullen formulieren voor de ingelogde gebruiker.
+    *   *Snelfilter & Statusoverzicht:* Op het evaluatie-overzicht kunnen medewerkers met één klik filteren op "Enkel mijn openstaande evaluaties", met duidelijke statusindicatoren (*Ingevuld*, *Nog invullen*, *Niet aanwezig*).
+*   **Registratie:** Inzendingen registreren de specifieke digidokter, het gebruikersaccount (`user_id`), de timestamp (`ingediend_op`) en de antwoorden als JSON data, met bescherming tegen dubbel invullen.
+*   **Resultatenoverzicht & Filter:** Inzage in alle reacties per activiteit met filters op activiteitstype, reacties en persoonlijke openstaande formulieren, inclusief detailinzage per sessie.
 
 ### 6. Wachtwoord Vergeten & Herstelprocedure
 *   Ingebouwde herstelprocedure via het inlogscherm.

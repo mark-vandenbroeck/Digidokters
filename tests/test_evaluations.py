@@ -418,3 +418,125 @@ class TestEvaluations(BaseTestCase):
             email_body = args[2]
             self.assertIn("Omschrijving: Thema: Slimme meters en energiebesparing", email_body)
 
+    def test_in_app_evaluation_workflow(self):
+        """Test dat een ingelogde medewerker een evaluatie via de app kan invullen en de openstaande status wordt bijgewerkt."""
+        from routes.evaluations import get_openstaande_evaluaties_voor_user, get_openstaande_evaluaties_telling_voor_user
+
+        # Maak formulier met een vraag
+        form = EvaluationForm(
+            organisatie_id=self.org.id,
+            activity_type_id=self.type_digicafe.id,
+            titel="Digicafé Evaluatieformulier",
+            actief=True
+        )
+        db.session.add(form)
+        db.session.flush()
+
+        vraag = EvaluationQuestion(
+            form_id=form.id,
+            vraag_tekst="Hoeveel bezoekers waren er?",
+            type="multiple_choice",
+            opties=["1-5", "6-10", "10+"],
+            volgorde=1,
+            verplicht=True
+        )
+        db.session.add(vraag)
+
+        # Maak afgelopen sessie
+        sessie = AgendaItem(
+            datum=date.today() - timedelta(days=1),
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Sessie gisteren",
+            organisatie_id=self.org.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        # Login als medewerker
+        self.login('tim@test.com', 'password123')
+
+        # 1. Controleer openstaande evaluatie telling vóór invullen
+        openstaand = get_openstaande_evaluaties_voor_user(self.medewerker_user, self.org.id)
+        self.assertEqual(len(openstaand), 1)
+        self.assertEqual(openstaand[0].id, sessie.id)
+        self.assertEqual(get_openstaande_evaluaties_telling_voor_user(self.medewerker_user, self.org.id), 1)
+
+        # 2. Bezoek agenda pagina (moet notificatie banner & link bevatten)
+        resp_agenda = self.client.get('/agenda?toon_verleden=on')
+        self.assertEqual(resp_agenda.status_code, 200)
+        self.assertIn('openstaande evaluatie', resp_agenda.get_data(as_text=True).lower())
+
+        # 3. Bezoek evaluaties resultaten pagina met mijn_openstaand filter
+        resp_eval_results = self.client.get('/evaluaties/resultaten?mijn_openstaand=1')
+        self.assertEqual(resp_eval_results.status_code, 200)
+        self.assertIn('Digicaf', resp_eval_results.get_data(as_text=True))
+        self.assertIn('Invullen', resp_eval_results.get_data(as_text=True))
+
+        # 4. Open formulier via de in-app route
+        resp_form = self.client.get(f'/evaluaties/agenda/{sessie.id}/invullen')
+        self.assertEqual(resp_form.status_code, 200)
+        self.assertIn('Digicafé Evaluatieformulier', resp_form.get_data(as_text=True))
+
+        # 5. Verstuur formulier
+        resp_post = self.client.post(
+            f'/evaluaties/agenda/{sessie.id}/invullen',
+            data={
+                f'vraag_{vraag.id}': '6-10',
+                'digidokter_id': self.digidokter.id
+            },
+            follow_redirects=True
+        )
+        self.assertEqual(resp_post.status_code, 200)
+        self.assertIn('Bedankt voor het invullen van de evaluatie!', resp_post.get_data(as_text=True))
+
+        # 6. Controleer dat evaluatierespons in DB staat
+        reactie = EvaluationResponse.query.filter_by(agenda_item_id=sessie.id).first()
+        self.assertIsNotNone(reactie)
+        self.assertEqual(reactie.user_id, self.medewerker_user.id)
+        self.assertEqual(reactie.digidokter_id, self.digidokter.id)
+        self.assertEqual(reactie.antwoorden.get(str(vraag.id)), '6-10')
+
+        # 7. Controleer dat openstaande telling nu 0 is
+        openstaand_na = get_openstaande_evaluaties_voor_user(self.medewerker_user, self.org.id)
+        self.assertEqual(len(openstaand_na), 0)
+        self.assertEqual(get_openstaande_evaluaties_telling_voor_user(self.medewerker_user, self.org.id), 0)
+
+        # 8. Poging tot opnieuw invullen toont melding dat het al is ingevuld
+        resp_herhaald = self.client.post(
+            f'/evaluaties/agenda/{sessie.id}/invullen',
+            data={f'vraag_{vraag.id}': '1-5', 'digidokter_id': self.digidokter.id},
+            follow_redirects=True
+        )
+        self.assertIn('Je hebt dit evaluatieformulier al eerder ingevuld', resp_herhaald.get_data(as_text=True))
+
+        # 9. Test dat een gebruiker die NIET gekoppeld/aanwezig was GEEN openstaande evaluatie krijgt
+        sessie2 = AgendaItem(
+            datum=date.today() - timedelta(days=2),
+            uur_van="10:00",
+            uur_tot="12:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Sessie van andere digidokter",
+            organisatie_id=self.org.id
+        )
+        andere_dd = Digidokter(naam="Andere Vrijwilliger", actief=True, organisatie_id=self.org.id)
+        db.session.add(andere_dd)
+        db.session.flush()
+        sessie2.digidokters.append(andere_dd)
+        db.session.add(sessie2)
+        db.session.commit()
+
+        # Voor UserTim (die niet gekoppeld is aan sessie2) moet het aantal openstaand 0 zijn
+        openstaand_tim = get_openstaande_evaluaties_voor_user(self.medewerker_user, self.org.id)
+        self.assertEqual(len(openstaand_tim), 0)
+
+        # En op de resultatenpagina mag sessie2 niet gemarkeerd staan als "Nog invullen" voor UserTim
+        resp_results = self.client.get('/evaluaties/resultaten')
+        self.assertIn('Niet aanwezig', resp_results.get_data(as_text=True))
+
+
+

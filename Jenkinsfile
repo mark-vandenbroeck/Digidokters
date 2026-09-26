@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'python:3.13-slim'
+            image 'python:3.12.4-slim'
             // Nodig zodat pip packages kan installeren; args indien specifieke rechten nodig zijn
             args '-u root:root'
         }

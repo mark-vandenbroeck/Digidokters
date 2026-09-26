@@ -108,9 +108,17 @@
                         <i class="bi bi-person-circle fs-5 text-primary"></i>
                         <span class="fw-bold text-dark">{{ reactie.digidokter.naam if reactie.digidokter else (reactie.user.naam if reactie.user else 'Onbekende digidokter') }}</span>
                     </div>
-                    <small class="text-muted">
-                        <i class="bi bi-clock me-1"></i>Ingevuld op {{ reactie.ingediend_op.strftime('%d-%m-%Y om %H:%M') }}
-                    </small>
+                    <div class="d-flex align-items-center gap-2">
+                        <small class="text-muted">
+                            <i class="bi bi-clock me-1"></i>Ingevuld op {{ reactie.ingediend_op.strftime('%d-%m-%Y om %H:%M') }}
+                        </small>
+                        {% set kan_bewerken = (current_user.rol == 'platformbeheerder') or current_user.is_beheerder() or (reactie.user_id and reactie.user_id == current_user.id) or (huidige_dd and reactie.digidokter_id == huidige_dd.id) or (reactie.digidokter and reactie.digidokter.user_id == current_user.id) %}
+                        {% if kan_bewerken %}
+                        <a href="{{ url_for('eval.reactie_bewerken', response_id=reactie.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Evaluatie bewerken">
+                            <i class="bi bi-pencil me-1"></i>Bewerken
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="card-body p-3">
                     <div class="d-flex flex-column gap-3">

@@ -196,12 +196,17 @@ class TestEvaluations(BaseTestCase):
         self.assertEqual(reactie.antwoorden.get(str(v2.id)), 'Zeer geslaagde namiddag met actieve senioren.')
         self.assertIsNotNone(reactie.ingediend_op)
 
-        # Opnieuw proberen in te vullen voor dezelfde digidokter moet een melding geven
+        # Opnieuw invullen door dezelfde digidokter werkt de evaluatie bij in plaats van te weigeren
         resp_dup = self.client.post(f'/evaluaties/agenda/{agenda_item.id}/invullen', data={
             'digidokter_id': self.digidokter.id,
-            f'vraag_{v1.id}': 'Weinig'
+            f'vraag_{v1.id}': 'Weinig',
+            f'vraag_{v2.id}': 'Aangepaste opmerking.'
         }, follow_redirects=True)
-        self.assertIn(b'al eerder ingevuld', resp_dup.data)
+        self.assertEqual(resp_dup.status_code, 200)
+        self.assertIn('succesvol bijgewerkt', resp_dup.get_data(as_text=True).lower())
+        db.session.refresh(reactie)
+        self.assertEqual(reactie.antwoorden.get(str(v1.id)), 'Weinig')
+        self.assertEqual(reactie.antwoorden.get(str(v2.id)), 'Aangepaste opmerking.')
 
     def test_evaluation_token_direct_link(self):
         """Test dat een digidokter via de unieke e-mail link (token) de evaluatie kan invullen."""
@@ -505,13 +510,15 @@ class TestEvaluations(BaseTestCase):
         self.assertEqual(len(openstaand_na), 0)
         self.assertEqual(get_openstaande_evaluaties_telling_voor_user(self.medewerker_user, self.org.id), 0)
 
-        # 8. Poging tot opnieuw invullen toont melding dat het al is ingevuld
+        # 8. Opnieuw invullen werkt de evaluatie netjes bij
         resp_herhaald = self.client.post(
             f'/evaluaties/agenda/{sessie.id}/invullen',
             data={f'vraag_{vraag.id}': '1-5', 'digidokter_id': self.digidokter.id},
             follow_redirects=True
         )
-        self.assertIn('Je hebt dit evaluatieformulier al eerder ingevuld', resp_herhaald.get_data(as_text=True))
+        self.assertIn('succesvol bijgewerkt', resp_herhaald.get_data(as_text=True).lower())
+        db.session.refresh(reactie)
+        self.assertEqual(reactie.antwoorden.get(str(vraag.id)), '1-5')
 
         # 9. Test dat een gebruiker die NIET gekoppeld/aanwezig was GEEN openstaande evaluatie krijgt
         sessie2 = AgendaItem(
@@ -537,6 +544,223 @@ class TestEvaluations(BaseTestCase):
         # En op de resultatenpagina mag sessie2 niet gemarkeerd staan als "Nog invullen" voor UserTim
         resp_results = self.client.get('/evaluaties/resultaten')
         self.assertIn('Niet aanwezig', resp_results.get_data(as_text=True))
+
+    def test_author_can_edit_submitted_evaluation_via_route(self):
+        """Test dat een auteur via de bewerk-route zijn/haar evaluatie kan aanpassen."""
+        sessie = AgendaItem(
+            datum=date.today() - timedelta(days=1),
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id,
+            organisatie_id=self.org.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        form = EvaluationForm(organisatie_id=self.org.id, activity_type_id=self.type_digicafe.id, titel="Test Form")
+        db.session.add(form)
+        db.session.flush()
+        v1 = EvaluationQuestion(form_id=form.id, vraag_tekst="Vraag 1", type="open_tekst", volgorde=1, verplicht=True)
+        db.session.add(v1)
+        db.session.commit()
+
+        reactie = EvaluationResponse(
+            organisatie_id=self.org.id,
+            agenda_item_id=sessie.id,
+            form_id=form.id,
+            digidokter_id=self.digidokter.id,
+            user_id=self.medewerker_user.id,
+            antwoorden={str(v1.id): "Oorspronkelijk antwoord"}
+        )
+        db.session.add(reactie)
+        db.session.commit()
+
+        self.login('UserTim', 'password123')
+
+        # GET bewerkpagina toont bestaand antwoord
+        resp_get = self.client.get(f'/evaluaties/reactie/{reactie.id}/bewerken')
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertIn('Oorspronkelijk antwoord', resp_get.get_data(as_text=True))
+        self.assertIn('Bewerken', resp_get.get_data(as_text=True))
+
+        # POST bewerking
+        resp_post = self.client.post(f'/evaluaties/reactie/{reactie.id}/bewerken', data={
+            f'vraag_{v1.id}': 'Gewijzigd door auteur',
+            'digidokter_id': self.digidokter.id
+        }, follow_redirects=True)
+        self.assertEqual(resp_post.status_code, 200)
+        self.assertIn('succesvol bijgewerkt', resp_post.get_data(as_text=True).lower())
+
+        db.session.refresh(reactie)
+        self.assertEqual(reactie.antwoorden.get(str(v1.id)), 'Gewijzigd door auteur')
+
+    def test_beheerder_and_platformbeheerder_can_edit_any_evaluation(self):
+        """Test dat beheerders en platformbeheerders evaluaties van anderen kunnen bewerken."""
+        sessie = AgendaItem(
+            datum=date.today() - timedelta(days=1),
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id,
+            organisatie_id=self.org.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        form = EvaluationForm(organisatie_id=self.org.id, activity_type_id=self.type_digicafe.id, titel="Test Form")
+        db.session.add(form)
+        db.session.flush()
+        v1 = EvaluationQuestion(form_id=form.id, vraag_tekst="Vraag 1", type="open_tekst", volgorde=1, verplicht=True)
+        db.session.add(v1)
+        db.session.commit()
+
+        # Reactie ingevuld door medewerker UserTim
+        reactie = EvaluationResponse(
+            organisatie_id=self.org.id,
+            agenda_item_id=sessie.id,
+            form_id=form.id,
+            digidokter_id=self.digidokter.id,
+            user_id=self.medewerker_user.id,
+            antwoorden={str(v1.id): "Ingevuld door Tim"}
+        )
+        db.session.add(reactie)
+        db.session.commit()
+
+        # 1. Beheerder Mark logt in en bewerkt de evaluatie van Tim
+        self.login('AdminMark', 'password123')
+        resp_admin = self.client.post(f'/evaluaties/reactie/{reactie.id}/bewerken', data={
+            f'vraag_{v1.id}': 'Aangepast door Beheerder Mark',
+            'digidokter_id': self.digidokter.id
+        }, follow_redirects=True)
+        self.assertEqual(resp_admin.status_code, 200)
+        self.assertIn('succesvol bijgewerkt', resp_admin.get_data(as_text=True).lower())
+
+        db.session.refresh(reactie)
+        self.assertEqual(reactie.antwoorden.get(str(v1.id)), 'Aangepast door Beheerder Mark')
+
+        # 2. Platformbeheerder logt in en bewerkt de evaluatie
+        self.login('SuperPlatform', 'password123')
+        resp_pf = self.client.post(f'/evaluaties/reactie/{reactie.id}/bewerken', data={
+            f'vraag_{v1.id}': 'Aangepast door Platformbeheerder',
+            'digidokter_id': self.digidokter.id
+        }, follow_redirects=True)
+        self.assertEqual(resp_pf.status_code, 200)
+        self.assertIn('succesvol bijgewerkt', resp_pf.get_data(as_text=True).lower())
+
+        db.session.refresh(reactie)
+        self.assertEqual(reactie.antwoorden.get(str(v1.id)), 'Aangepast door Platformbeheerder')
+
+    def test_unauthorized_medewerker_cannot_edit_others_evaluation(self):
+        """Test dat een andere medewerker (niet auteur, niet beheerder) de evaluatie van iemand anders niet mag aanpassen."""
+        sessie = AgendaItem(
+            datum=date.today() - timedelta(days=1),
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id,
+            organisatie_id=self.org.id
+        )
+        db.session.add(sessie)
+        db.session.commit()
+
+        form = EvaluationForm(organisatie_id=self.org.id, activity_type_id=self.type_digicafe.id, titel="Test Form")
+        db.session.add(form)
+        db.session.flush()
+        v1 = EvaluationQuestion(form_id=form.id, vraag_tekst="Vraag 1", type="open_tekst", volgorde=1, verplicht=True)
+        db.session.add(v1)
+        db.session.commit()
+
+        # Reactie van Digidokter Mark
+        dd_mark = Digidokter(naam="Digidokter Mark", actief=True, organisatie_id=self.org.id, user_id=self.admin_user.id)
+        db.session.add(dd_mark)
+        db.session.commit()
+
+        reactie = EvaluationResponse(
+            organisatie_id=self.org.id,
+            agenda_item_id=sessie.id,
+            form_id=form.id,
+            digidokter_id=dd_mark.id,
+            user_id=self.admin_user.id,
+            antwoorden={str(v1.id): "Origineel van Mark"}
+        )
+        db.session.add(reactie)
+        db.session.commit()
+
+        # Medewerker Tim logt in en probeert Marks reactie aan te passen
+        self.login('UserTim', 'password123')
+        resp_edit = self.client.post(f'/evaluaties/reactie/{reactie.id}/bewerken', data={
+            f'vraag_{v1.id}': 'Poging tot illegale wijziging door Tim'
+        }, follow_redirects=True)
+        self.assertEqual(resp_edit.status_code, 200)
+        self.assertIn('geen rechten om deze evaluatie te bewerken', resp_edit.get_data(as_text=True).lower())
+
+        # Reactie moet ongewijzigd blijven
+        db.session.refresh(reactie)
+        self.assertEqual(reactie.antwoorden.get(str(v1.id)), 'Origineel van Mark')
+
+    def test_author_can_edit_evaluation_via_token(self):
+        """Test dat een digidokter via de token link met bewerken=1 antwoorden kan wijzigen."""
+        sessie = AgendaItem(
+            datum=date.today() - timedelta(days=1),
+            uur_van="10:00",
+            uur_tot="12:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id,
+            organisatie_id=self.org.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        form = EvaluationForm(organisatie_id=self.org.id, activity_type_id=self.type_digicafe.id, titel="Token Form")
+        db.session.add(form)
+        db.session.flush()
+        v1 = EvaluationQuestion(form_id=form.id, vraag_tekst="Hoe was het?", type="multiple_choice", opties=["Goed", "Slecht"], volgorde=1, verplicht=True)
+        db.session.add(v1)
+        db.session.commit()
+
+        invitation = EvaluationInvitation(
+            agenda_item_id=sessie.id,
+            digidokter_id=self.digidokter.id,
+            token="token_wijzigen_test",
+            is_ingevuld=True
+        )
+        reactie = EvaluationResponse(
+            organisatie_id=self.org.id,
+            agenda_item_id=sessie.id,
+            form_id=form.id,
+            digidokter_id=self.digidokter.id,
+            antwoorden={str(v1.id): "Slecht"}
+        )
+        db.session.add_all([invitation, reactie])
+        db.session.commit()
+
+        self.logout()
+
+        # 1. Bezoek token link zonder bewerken param toont reeds ingevuld met knop om te wijzigen
+        resp_bedankt = self.client.get('/evaluaties/invullen/token_wijzigen_test')
+        self.assertEqual(resp_bedankt.status_code, 200)
+        self.assertIn('Reeds ingevuld', resp_bedankt.get_data(as_text=True))
+        self.assertIn('Antwoorden wijzigen', resp_bedankt.get_data(as_text=True))
+
+        # 2. Bezoek token link met bewerken=1 toont formulier met bestaande antwoorden
+        resp_form = self.client.get('/evaluaties/invullen/token_wijzigen_test?bewerken=1')
+        self.assertEqual(resp_form.status_code, 200)
+        self.assertIn('Evaluatie bewerken', resp_form.get_data(as_text=True))
+
+        # 3. Formulier inzenden met gewijzigde waarde
+        resp_submit = self.client.post('/evaluaties/invullen/token_wijzigen_test', data={
+            f'vraag_{v1.id}': 'Goed'
+        }, follow_redirects=True)
+        self.assertEqual(resp_submit.status_code, 200)
+        self.assertIn('Wijzigingen opgeslagen', resp_submit.get_data(as_text=True))
+
+        db.session.refresh(reactie)
+        self.assertEqual(reactie.antwoorden.get(str(v1.id)), 'Goed')
+
 
 
 

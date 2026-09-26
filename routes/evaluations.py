@@ -762,6 +762,27 @@ def resultaten():
     )
 
 
+from models.constants import ROLE_PLATFORMBEHEERDER, ROLE_BEHEERDER
+
+
+def kan_evaluatie_bewerken(user, reactie, org_id):
+    """Controleert of een gebruiker een ingevulde evaluatie mag bewerken."""
+    if not user or not user.is_authenticated:
+        return False
+    if getattr(user, 'rol', None) == ROLE_PLATFORMBEHEERDER:
+        return True
+    if hasattr(user, 'is_beheerder') and user.is_beheerder():
+        return True
+    if reactie.user_id and reactie.user_id == user.id:
+        return True
+    if reactie.digidokter and reactie.digidokter.user_id == user.id:
+        return True
+    huidige_dd = get_huidige_digidokter_voor_user(user, org_id)
+    if huidige_dd and reactie.digidokter_id == huidige_dd.id:
+        return True
+    return False
+
+
 @eval_bp.route('/evaluaties/sessie/<int:agenda_id>')
 @eval_bp.route('/admin/evaluaties/sessie/<int:agenda_id>')
 @login_required
@@ -777,6 +798,7 @@ def sessie_detail(agenda_id):
     reacties = EvaluationResponse.query.filter_by(agenda_item_id=item.id).order_by(EvaluationResponse.ingediend_op.desc()).all()
     uitnodigingen = EvaluationInvitation.query.filter_by(agenda_item_id=item.id).all()
     uitnodigingen_map = {inv.digidokter_id: inv for inv in uitnodigingen}
+    huidige_dd = get_huidige_digidokter_voor_user(current_user, org_id)
 
     return render_template(
         'admin/evaluaties/sessie_detail.html',
@@ -784,7 +806,8 @@ def sessie_detail(agenda_id):
         form=form,
         reacties=reacties,
         uitnodigingen=uitnodigingen,
-        uitnodigingen_map=uitnodigingen_map
+        uitnodigingen_map=uitnodigingen_map,
+        huidige_dd=huidige_dd
     )
 
 
@@ -847,13 +870,77 @@ def verstuur_herinneringen(agenda_id):
 
 
 # ═══════════════════════════════════════════════════════════════
-# FORMULIER INVULLEN (VOOR DIGIDOKTERS / MEDEWERKERS)
+# FORMULIER INVULLEN & BEWERKEN (VOOR DIGIDOKTERS / MEDEWERKERS / BEHEERDERS)
 # ═══════════════════════════════════════════════════════════════
+
+@eval_bp.route('/evaluaties/reactie/<int:response_id>/bewerken', methods=['GET', 'POST'])
+@eval_bp.route('/admin/evaluaties/reactie/<int:response_id>/bewerken', methods=['GET', 'POST'])
+@login_required
+@writer_required
+def reactie_bewerken(response_id):
+    """Bewerken van een eerder ingezonden evaluatiereactie door de auteur, beheerder of platformbeheerder."""
+    org_id = get_huidige_organisatie_id()
+    reactie = db.session.get(EvaluationResponse, response_id)
+    if not reactie or (reactie.organisatie_id != org_id and current_user.rol != ROLE_PLATFORMBEHEERDER):
+        abort(404)
+
+    if not kan_evaluatie_bewerken(current_user, reactie, org_id):
+        flash('U heeft geen rechten om deze evaluatie te bewerken.', 'danger')
+        return redirect(url_for('eval.sessie_detail', agenda_id=reactie.agenda_item_id))
+
+    item = reactie.agenda_item
+    form = EvaluationForm.query.filter_by(activity_type_id=item.type_id, organisatie_id=reactie.organisatie_id).first()
+    if not form:
+        form = get_or_create_evaluation_form(item.type_id, reactie.organisatie_id)
+
+    huidige_dd = reactie.digidokter or get_huidige_digidokter_voor_user(current_user, org_id)
+
+    if request.method == 'POST':
+        dd_id = request.form.get('digidokter_id', type=int)
+        if dd_id:
+            reactie.digidokter_id = dd_id
+
+        antwoorden = {}
+        ontbrekende_vragen = []
+        for vraag in form.vragen:
+            key = f"vraag_{vraag.id}"
+            val = request.form.get(key, '').strip()
+            if vraag.verplicht and not val:
+                ontbrekende_vragen.append(vraag.vraag_tekst)
+            antwoorden[str(vraag.id)] = val
+
+        if ontbrekende_vragen:
+            flash('Gelieve alle verplichte vragen in te vullen.', 'danger')
+            return render_template(
+                'evaluaties/invullen.html',
+                item=item,
+                form=form,
+                huidige_dd=huidige_dd,
+                antwoorden=antwoorden,
+                is_edit=True,
+                reactie=reactie
+            )
+
+        reactie.antwoorden = antwoorden
+        db.session.commit()
+        flash('Evaluatie succesvol bijgewerkt.', 'success')
+        return redirect(url_for('eval.sessie_detail', agenda_id=item.id))
+
+    return render_template(
+        'evaluaties/invullen.html',
+        item=item,
+        form=form,
+        huidige_dd=huidige_dd,
+        antwoorden=reactie.antwoorden or {},
+        is_edit=True,
+        reactie=reactie
+    )
+
 
 @eval_bp.route('/evaluaties/agenda/<int:agenda_id>/invullen', methods=['GET', 'POST'])
 @login_required
 def invullen_sessie(agenda_id):
-    """Formulier invullen voor een ingelogde gebruiker/digidokter."""
+    """Formulier invullen of bewerken voor een ingelogde gebruiker/digidokter."""
     org_id = get_huidige_organisatie_id()
     item = db.session.get(AgendaItem, agenda_id)
     if not item or item.organisatie_id != org_id:
@@ -862,24 +949,23 @@ def invullen_sessie(agenda_id):
     form = get_or_create_evaluation_form(item.type_id, org_id)
 
     # Bepaal actieve digidokter voor de huidige ingelogde gebruiker
-    huidige_dd = Digidokter.query.filter_by(user_id=current_user.id, organisatie_id=org_id).first()
-    if not huidige_dd and current_user.naam:
-        huidige_dd = Digidokter.query.filter(
-            Digidokter.organisatie_id == org_id,
-            db.func.lower(Digidokter.naam) == db.func.lower(current_user.naam)
-        ).first()
+    huidige_dd = get_huidige_digidokter_voor_user(current_user, org_id)
+
+    # Zoek eventuele bestaande reactie voor deze digidokter / gebruiker
+    bestaand = None
+    if huidige_dd:
+        bestaand = EvaluationResponse.query.filter_by(agenda_item_id=item.id, digidokter_id=huidige_dd.id).first()
+    if not bestaand and current_user.is_authenticated:
+        bestaand = EvaluationResponse.query.filter_by(agenda_item_id=item.id, user_id=current_user.id).first()
 
     if request.method == 'POST':
         dd_id = request.form.get('digidokter_id', type=int)
         if not dd_id and huidige_dd:
             dd_id = huidige_dd.id
 
-        # Controleer of digidokter al ingevuld heeft
-        if dd_id:
+        # Controleer of er een bestaande reactie is
+        if dd_id and not bestaand:
             bestaand = EvaluationResponse.query.filter_by(agenda_item_id=item.id, digidokter_id=dd_id).first()
-            if bestaand:
-                flash('Je hebt dit evaluatieformulier al eerder ingevuld voor deze sessie. Bedankt!', 'info')
-                return redirect(url_for('agenda.lijst'))
 
         # Verwerk antwoorden
         antwoorden = {}
@@ -892,14 +978,28 @@ def invullen_sessie(agenda_id):
             antwoorden[str(vraag.id)] = val
 
         if ontbrekende_vragen:
-            flash(f'Gelieve alle verplichte vragen in te vullen.', 'danger')
+            flash('Gelieve alle verplichte vragen in te vullen.', 'danger')
             return render_template(
                 'evaluaties/invullen.html',
                 item=item,
                 form=form,
                 huidige_dd=huidige_dd,
-                antwoorden=antwoorden
+                antwoorden=antwoorden,
+                is_edit=bool(bestaand),
+                reactie=bestaand
             )
+
+        if bestaand:
+            if not kan_evaluatie_bewerken(current_user, bestaand, org_id):
+                flash('U heeft geen rechten om deze evaluatie te bewerken.', 'danger')
+                return redirect(url_for('agenda.lijst'))
+
+            bestaand.antwoorden = antwoorden
+            if dd_id:
+                bestaand.digidokter_id = dd_id
+            db.session.commit()
+            flash('Evaluatie succesvol bijgewerkt.', 'success')
+            return redirect(url_for('agenda.lijst'))
 
         reactie = EvaluationResponse(
             organisatie_id=org_id,
@@ -927,14 +1027,16 @@ def invullen_sessie(agenda_id):
         item=item,
         form=form,
         huidige_dd=huidige_dd,
-        antwoorden={}
+        antwoorden=bestaand.antwoorden if bestaand else {},
+        is_edit=bool(bestaand),
+        reactie=bestaand
     )
 
 
 @eval_bp.route('/evaluaties/invullen/<token>', methods=['GET', 'POST'])
 @limiter.limit("30 per minute")
 def invullen_token(token):
-    """Direct formulier invullen via de token uit de e-mail (zowel voor ingelogde als niet-ingelogde digidokters)."""
+    """Direct formulier invullen of bewerken via de token uit de e-mail (zowel voor ingelogde als niet-ingelogde digidokters)."""
     invitation = EvaluationInvitation.query.filter_by(token=token).first()
     if not invitation:
         flash('Ongeldige of verlopen evaluatielink.', 'danger')
@@ -949,12 +1051,15 @@ def invullen_token(token):
 
     # Check of al ingevuld
     bestaand = EvaluationResponse.query.filter_by(agenda_item_id=item.id, digidokter_id=dd.id).first()
-    if bestaand or invitation.is_ingevuld:
+    is_bewerken = request.args.get('bewerken') == '1' or request.args.get('wijzigen') == '1'
+
+    if (bestaand or invitation.is_ingevuld) and not is_bewerken and request.method == 'GET':
         return render_template(
             'evaluaties/bedankt.html',
             item=item,
             dd=dd,
-            reeds_ingevuld=True
+            reeds_ingevuld=True,
+            token=token
         )
 
     if request.method == 'POST':
@@ -975,7 +1080,22 @@ def invullen_token(token):
                 form=form,
                 huidige_dd=dd,
                 token=token,
-                antwoorden=antwoorden
+                antwoorden=antwoorden,
+                is_edit=bool(bestaand),
+                reactie=bestaand
+            )
+
+        if bestaand:
+            bestaand.antwoorden = antwoorden
+            invitation.is_ingevuld = True
+            db.session.commit()
+            return render_template(
+                'evaluaties/bedankt.html',
+                item=item,
+                dd=dd,
+                reeds_ingevuld=False,
+                is_gewijzigd=True,
+                token=token
             )
 
         reactie = EvaluationResponse(
@@ -995,7 +1115,8 @@ def invullen_token(token):
             'evaluaties/bedankt.html',
             item=item,
             dd=dd,
-            reeds_ingevuld=False
+            reeds_ingevuld=False,
+            token=token
         )
 
     return render_template(
@@ -1004,5 +1125,7 @@ def invullen_token(token):
         form=form,
         huidige_dd=dd,
         token=token,
-        antwoorden={}
+        antwoorden=bestaand.antwoorden if bestaand else {},
+        is_edit=bool(bestaand),
+        reactie=bestaand
     )

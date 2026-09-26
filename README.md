@@ -90,7 +90,11 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
     *   *Agenda Attentiebanners & Actieknoppen:* In de agenda verschijnt een waarschuwingsbanner met het aantal openstaande evaluaties en een knop "Evaluatie invullen" bij voltooide activiteiten waar de vrijwilliger aanwezig was.
     *   *Menu-notificatiebadge:* Naast het menu-item "Evaluaties" toont een opvallende badge het aantal nog in te vullen formulieren voor de ingelogde gebruiker.
     *   *Snelfilter & Statusoverzicht:* Op het evaluatie-overzicht kunnen medewerkers met één klik filteren op "Enkel mijn openstaande evaluaties", met duidelijke statusindicatoren (*Ingevuld*, *Nog invullen*, *Niet aanwezig*).
-*   **Registratie:** Inzendingen registreren de specifieke digidokter, het gebruikersaccount (`user_id`), de timestamp (`ingediend_op`) en de antwoorden als JSON data, met bescherming tegen dubbel invullen.
+*   **Wijzigen na Inzending (Auteurs, Beheerders & Platformbeheerders):** Ingevulde evaluatieformulieren kunnen na verzending flexibel worden aangepast:
+    *   *Auteurs:* Kunnen hun ingediende reactie heropenen en bijwerken via de in-app bewerkknop of via de unieke e-mail tokenlink (*"Antwoorden wijzigen"*).
+    *   *Beheerders & Platformbeheerders:* Kunnen evaluatiereacties van alle sessies binnen hun organisatie (of platformbreed) inzien en corrigeren via de sessiedetailpagina (`/evaluaties/reactie/<id>/bewerken`).
+    *   *Onbevoegden:* Reguliere medewerkers die niet de auteur zijn en lezers kunnen andermans ingevulde evaluaties niet wijzigen.
+*   **Registratie:** Inzendingen registreren de specifieke digidokter, het gebruikersaccount (`user_id`), de timestamp (`ingediend_op`) en de antwoorden als JSON data, met bescherming tegen dubbele records.
 *   **Resultatenoverzicht & Filter:** Inzage in alle reacties per activiteit met filters op activiteitstype, reacties en persoonlijke openstaande formulieren, inclusief detailinzage per sessie.
 
 ### 6. Wachtwoord Vergeten & Herstelprocedure

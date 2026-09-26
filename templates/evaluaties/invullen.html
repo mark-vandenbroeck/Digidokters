@@ -14,12 +14,32 @@
                 <span class="text-muted small">
                     <i class="bi bi-calendar3 me-1"></i>{{ item.datum.strftime('%d-%m-%Y') }} ({{ item.uur_van }} - {{ item.uur_tot }})
                 </span>
+                {% if is_edit %}
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle fs-6 px-2.5 py-1">
+                    <i class="bi bi-pencil me-1"></i>Bewerken
+                </span>
+                {% endif %}
             </div>
-            <h1 class="h3 fw-bold text-dark mb-1">{{ form.titel }}</h1>
+            <h1 class="h3 fw-bold text-dark mb-1">
+                {% if is_edit %}
+                    Evaluatie bewerken: {{ form.titel }}
+                {% else %}
+                    {{ form.titel }}
+                {% endif %}
+            </h1>
             {% if form.toelichting %}
                 <p class="text-muted mb-0">{{ form.toelichting }}</p>
             {% endif %}
         </div>
+
+        {% if is_edit %}
+        <div class="alert alert-info border border-info-subtle shadow-sm py-2 px-3 mb-4 d-flex align-items-center gap-2">
+            <i class="bi bi-pencil-square fs-5 text-info"></i>
+            <div>
+                <strong>Evaluatie bewerken:</strong> Je past een eerder ingezonden evaluatieformulier aan. Pas je antwoorden aan en klik op <em>Wijzigingen opslaan</em>.
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Flash messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -75,20 +95,24 @@
                         {% if token and huidige_dd %}
                             <div class="fw-bold text-dark fs-6">{{ huidige_dd.naam }}</div>
                             <input type="hidden" name="digidokter_id" value="{{ huidige_dd.id }}">
-                        {% elif huidige_dd and (huidige_dd in item.digidokters or not item.digidokters) %}
+                        {% elif huidige_dd and (huidige_dd in item.digidokters or not item.digidokters) and not is_edit %}
                             <div class="fw-bold text-dark fs-6">{{ huidige_dd.naam }}</div>
                             <input type="hidden" name="digidokter_id" value="{{ huidige_dd.id }}">
                         {% elif item.digidokters %}
                             <select class="form-select" id="digidokter_id" name="digidokter_id" required>
-                                {% if not huidige_dd %}
+                                {% if not huidige_dd and not reactie %}
                                     <option value="">— Selecteer jouw naam —</option>
                                 {% endif %}
                                 {% for dd in item.digidokters %}
-                                    <option value="{{ dd.id }}" {% if huidige_dd and huidige_dd.id == dd.id %}selected{% endif %}>
+                                    {% set is_selected = (reactie and reactie.digidokter_id == dd.id) or (huidige_dd and huidige_dd.id == dd.id) %}
+                                    <option value="{{ dd.id }}" {% if is_selected %}selected{% endif %}>
                                         {{ dd.naam }}
                                     </option>
                                 {% endfor %}
                             </select>
+                        {% elif reactie and reactie.digidokter %}
+                            <div class="fw-bold text-dark fs-6">{{ reactie.digidokter.naam }}</div>
+                            <input type="hidden" name="digidokter_id" value="{{ reactie.digidokter.id }}">
                         {% else %}
                             <div class="fw-bold text-dark fs-6">{{ current_user.naam if current_user.is_authenticated else 'Medewerker' }}</div>
                         {% endif %}
@@ -150,12 +174,16 @@
 
                     <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
                         {% if current_user.is_authenticated %}
-                            <a href="{{ url_for('agenda.lijst') }}" class="btn btn-outline-secondary">Annuleren</a>
+                            <a href="{{ url_for('eval.sessie_detail', agenda_id=item.id) if is_edit else url_for('agenda.lijst') }}" class="btn btn-outline-secondary">Annuleren</a>
                         {% else %}
                             <span></span>
                         {% endif %}
                         <button type="submit" class="btn btn-primary px-4 py-2 fw-semibold">
-                            <i class="bi bi-send-fill me-2"></i>Evaluatie verzenden
+                            {% if is_edit %}
+                                <i class="bi bi-check-circle-fill me-2"></i>Wijzigingen opslaan
+                            {% else %}
+                                <i class="bi bi-send-fill me-2"></i>Evaluatie verzenden
+                            {% endif %}
                         </button>
                     </div>
                 </form>

@@ -22,9 +22,11 @@ class Config:
 
     # Database: supports both SQLite (local) and PostgreSQL (Supabase/Render)
     _db_url = os.environ.get('DATABASE_URL', 'sqlite:///digidokters.db')
-    # Fix older Heroku/Render postgres:// URLs
+    # Fix older Heroku/Render postgres:// and postgresql:// URLs to explicitly use psycopg2 driver
     if _db_url.startswith('postgres://'):
-        _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+        _db_url = _db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+    elif _db_url.startswith('postgresql://') and not _db_url.startswith('postgresql+'):
+        _db_url = _db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
     SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {

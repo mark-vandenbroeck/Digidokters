@@ -29,7 +29,7 @@ pipeline {
                     python -m venv ${VENV_DIR}
                     . ${VENV_DIR}/bin/activate
                     pip install --upgrade pip
-                    pip install -r requirements.txt
+                    pip install -r requirements-dev.txt
                 '''
             }
         }

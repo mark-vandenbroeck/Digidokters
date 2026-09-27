@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from tests.base import BaseTestCase
 from flask import session
 from models.user import User
@@ -46,7 +47,9 @@ class TestAuth(BaseTestCase):
         with self.client.session_transaction() as sess:
             self.assertEqual(sess.get('organisatie_id'), self.org.id)
 
-    def test_password_reset_lockout(self):
+    @patch('utils.mail.verstuur_email')
+    def test_password_reset_lockout(self, mock_verstuur_email):
+        mock_verstuur_email.return_value = None
         # 1. Request reset code for tim@test.com
         response = self.client.post('/wachtwoord-vergeten', data={'email': 'tim@test.com'}, follow_redirects=True)
         self.assertEqual(response.status_code, 200)
@@ -176,5 +179,3 @@ class TestAuth(BaseTestCase):
         # Controleer dat moet_wachtwoord_wijzigen nu False is
         db.session.refresh(self.medewerker_user)
         self.assertFalse(self.medewerker_user.moet_wachtwoord_wijzigen)
-
-

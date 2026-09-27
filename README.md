@@ -217,8 +217,11 @@ python3 -m venv venv
 source venv/bin/activate  # Op macOS/Linux
 # venv\Scripts\activate  # Op Windows
 
-# Dependencies installeren
+# Dependencies installeren (productie)
 pip install -r requirements.txt
+
+# Of inclusief test- en ontwikkeltools (pytest):
+pip install -r requirements-dev.txt
 ```
 
 ### 2. Environment Variables configureren
@@ -272,11 +275,16 @@ Zie de volledige [Handleiding: Agenda Import Script](file:///Users/mark/Python/D
 
 ## 🧪 Unit Tests Uitvoeren
 
-Het platform is uitgerust met een geautomatiseerde test-suite (gebaseerd op Python's ingebouwde `unittest` framework) die draait op een in-memory SQLite database.
+Het platform is uitgerust met een geautomatiseerde test-suite die draait op een in-memory SQLite database.
 
-Om alle tests uit te voeren, run je het volgende commando vanuit de hoofdmap:
+**Met pytest (aanbevolen):**
 ```bash
-PYTHONPATH=. venv/bin/python -m unittest discover -s tests
+pytest
+```
+
+**Met Python unittest:**
+```bash
+python -m unittest discover -s tests
 ```
 
 ---

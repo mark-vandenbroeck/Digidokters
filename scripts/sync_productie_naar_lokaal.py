@@ -115,6 +115,31 @@ def transform_sql_for_schema(raw_sql: str, target_schema: str) -> str:
     return "".join(out)
 
 
+def get_pg_env() -> dict:
+    """Stelt de juiste SSL CA bundle en instellingen in voor libpq/pg_dump/psql op macOS."""
+    env = os.environ.copy()
+    if not env.get("PGSSLROOTCERT"):
+        for ca_path in [
+            "/etc/ssl/cert.pem",
+            "/opt/homebrew/etc/ca-certificates/cert.pem",
+            "/etc/ssl/certs/ca-certificates.crt",
+        ]:
+            if os.path.exists(ca_path):
+                env["PGSSLROOTCERT"] = ca_path
+                break
+        else:
+            try:
+                import certifi
+                env["PGSSLROOTCERT"] = certifi.where()
+            except Exception:
+                pass
+
+    if not env.get("PGSSLMODE"):
+        env["PGSSLMODE"] = "require"
+
+    return env
+
+
 def perform_dump(prod_db_url: str, dump_file_path: Path) -> bool:
     """Voert live pg_dump uit op Supabase productie-database."""
     pg_dump_bin = find_pg_binary("pg_dump")
@@ -130,7 +155,8 @@ def perform_dump(prod_db_url: str, dump_file_path: Path) -> bool:
         "-f", str(dump_file_path),
     ]
 
-    res = subprocess.run(dump_cmd, capture_output=True, text=True)
+    pg_env = get_pg_env()
+    res = subprocess.run(dump_cmd, capture_output=True, text=True, env=pg_env)
     duration = time.time() - start_time
 
     if res.returncode != 0:
@@ -162,7 +188,8 @@ def perform_restore(dump_file_path: Path, local_db_url: str, target_schema: str)
         str(dump_file_path),
     ]
 
-    res = subprocess.run(restore_cmd, capture_output=True, text=True)
+    pg_env = get_pg_env()
+    res = subprocess.run(restore_cmd, capture_output=True, text=True, env=pg_env)
     if res.returncode != 0:
         logging.error(f"pg_restore fout (code {res.returncode}):\n{res.stderr}")
         return False
@@ -183,6 +210,7 @@ def perform_restore(dump_file_path: Path, local_db_url: str, target_schema: str)
         input=transformed_sql,
         text=True,
         capture_output=True,
+        env=pg_env,
     )
 
     duration = time.time() - start_time

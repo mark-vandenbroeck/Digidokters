@@ -414,3 +414,38 @@ class TestAdminRoutes(BaseTestCase):
         db.session.refresh(loc)
         self.assertFalse(loc.gebruikt_voor_consultaties)
         self.assertEqual(loc.naam, 'De Nieuwe Bib (Gewijzigd)')
+
+    def test_gebruikers_list_lezer_badge_display(self):
+        """Test dat gebruikers met de rol 'lezer' correct getoond worden met een Lezer-badge en in het bewerkformulier."""
+        self.login_admin()
+
+        # Maak een gebruiker met rol 'lezer' aan
+        u_lezer = User(
+            naam="Agnes De TestLezer",
+            email="agnes.lezer@test.com",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="lezer",
+            actief=True
+        )
+        db.session.add(u_lezer)
+        db.session.commit()
+        db.session.add(UserOrganisatie(user_id=u_lezer.id, organisatie_id=self.org.id, rol="lezer", actief=True))
+        db.session.commit()
+
+        # 1. Controleer de gebruikerslijst
+        res = self.client.get('/beheer/gebruikers')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        self.assertIn("Agnes De TestLezer", html)
+        self.assertIn('<span class="badge bg-info text-dark">Lezer</span>', html)
+        self.assertIn('<span class="badge bg-danger">Beheerder</span>', html)
+        self.assertIn('<span class="badge bg-secondary">Medewerker</span>', html)
+
+        # 2. Controleer het wijzigingsformulier
+        res_edit = self.client.get(f'/beheer/gebruikers/{u_lezer.id}/wijzig')
+        self.assertEqual(res_edit.status_code, 200)
+        edit_html = res_edit.get_data(as_text=True)
+
+        self.assertIn('<option value="lezer" selected>Lezer (alleen-lezen)</option>', edit_html)
+

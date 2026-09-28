@@ -49,6 +49,8 @@
                                 <td>
                                     {% if link.rol == 'beheerder' %}
                                     <span class="badge bg-danger">Beheerder</span>
+                                    {% elif link.rol == 'lezer' %}
+                                    <span class="badge bg-info text-dark">Lezer</span>
                                     {% else %}
                                     <span class="badge bg-secondary">Medewerker</span>
                                     {% endif %}

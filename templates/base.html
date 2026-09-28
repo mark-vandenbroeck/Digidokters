@@ -332,7 +332,7 @@
                     <div class="overflow-hidden">
                         <div class="fw-semibold text-white text-truncate small dd-user-name">{{ current_user.naam }}</div>
                         <div class="text-white-50" style="font-size:0.7rem">
-                            {{ 'Beheerder' if current_user.is_beheerder() else 'Medewerker' }}
+                            {{ 'Platformbeheerder' if current_user.rol == 'platformbeheerder' else ('Beheerder' if current_user.is_beheerder() else ('Lezer' if current_user.is_lezer() else 'Medewerker')) }}
                         </div>
                     </div>
                 </a>

@@ -38,7 +38,7 @@ pipeline {
             steps {
                 sh '''
                     . ${VENV_DIR}/bin/activate
-                    pytest --junitxml=results.xml
+                    pytest --junitxml=results.xml --cov=. --cov-report=xml:coverage.xml
                 '''
             }
         }
@@ -47,6 +47,7 @@ pipeline {
     post {
         always {
             junit 'results.xml'
+            recordCoverage(tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']])
         }
     }
 }

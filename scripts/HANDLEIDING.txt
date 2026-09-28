@@ -1,0 +1,137 @@
+================================================================================
+HANDLEIDING: DIGIDOKTERS DATABASE SCRIPTS
+================================================================================
+Locatie: scripts/
+Auteur:  Digidokters Team
+Datum:   September 2026
+
+Deze handleiding beschrijft het gebruik van twee scripts voor lokaal beheer en
+synchronisatie van de PostgreSQL database:
+1. restore_productie_backup.py - Automatisch inladen van productie-backups
+2. switch_schema.py            - Snel schakelen tussen test- en productiedata
+
+================================================================================
+1. SCRIPT: restore_productie_backup.py
+================================================================================
+
+DOEL:
+Dit script zoekt de meest recente PostgreSQL productie-backup (ZIP-bestand) die
+via GitHub Actions artifacts is gedownload en plaatst deze in een apart
+gereserveerd schema ('productie') in je lokale PostgreSQL database op Proxmox.
+
+Hierdoor blijft je lokale 'public' schema (met artificiële testdata) onaangeroerd.
+
+WERKING:
+1. Controleert de backup-directory (/Volumes/Extreme SSD/Digidokters backup).
+2. Detecteert het nieuwste ZIP-bestand op basis van de datum in de bestandsnaam.
+3. Controleert of dit bestand al eerder is ingeladen via het statusbestand
+   (~/.digidokters_last_restored_backup).
+4. Pakt het gecomprimeerde PostgreSQL dumpbestand (.dump) tijdelijk uit.
+5. Transformeert alle tabellen, data en relaties naar het schema 'productie'.
+6. Voert de restore uit via PostgreSQL 17 client tools (pg_restore en psql).
+7. Schrijft gedetailleerde logging naar de console en een logbestand.
+
+VEREISTEN:
+- PostgreSQL 17 client utilities (geïnstalleerd via Homebrew: postgresql@17).
+- Toegang tot de lokale PostgreSQL database (DATABASE_URL in .env).
+- De externe schijf moet gemount zijn op het moment van uitvoeren.
+
+MANUEEL GEBRUIK:
+Open een terminal in de projectmap (/Users/mark/Python/Digidokters) en voer uit:
+
+  # 1. Normale uitvoering (slaat over als backup al eerder is ingeladen):
+  python scripts/restore_productie_backup.py
+
+  # 2. Geforceerde restore (voert altijd uit, ook bij reeds ingeladen backup):
+  python scripts/restore_productie_backup.py --force
+
+  # 3. Dry-run test (pakt uit en controleert, maar wijzigt de database niet):
+  python scripts/restore_productie_backup.py --dry-run
+
+  # 4. Extra debug logging weergeven:
+  python scripts/restore_productie_backup.py --force -v
+
+BESCHIKBARE PARAMETERS:
+  --backup-dir <pad>    Pad naar de map met ZIP-bestanden
+                        (Standaard: "/Volumes/Extreme SSD/Digidokters backup")
+  --schema <naam>       Doelschema in PostgreSQL (Standaard: "productie")
+  --db-url <url>        PostgreSQL connectiestring (Standaard: uit .env)
+  --force               Negeer statusbestand en forceer restore
+  --dry-run             Voer controle uit zonder database-wijzigingen
+  --log-file <pad>      Locatie van het logbestand
+                        (Standaard: ~/Library/Logs/digidokters_backup_restore.log)
+  --no-log-file         Schrijf geen logbestand, enkel console
+  -v, --verbose         Toon uitgebreide debug-informatie
+
+AUTOMATISERING VIA CRONJOB:
+Je kunt dit script wekelijks (of dagelijks) automatisch laten draaien.
+
+1. Open je crontab configuratie:
+   crontab -e
+
+2. Voeg de volgende regel toe (bijvoorbeeld elke zondag om 07:00 uur):
+   0 7 * * 0 /opt/anaconda3/bin/python "/Users/mark/Python/Digidokters/scripts/restore_productie_backup.py" >> "$HOME/Library/Logs/digidokters_cron.log" 2>&1
+
+3. Sla op en sluit de editor.
+
+LOGBESTANDEN & MONITORING:
+- Restore logboek:  ~/Library/Logs/digidokters_backup_restore.log
+- Cron uitvoer log: ~/Library/Logs/digidokters_cron.log
+- Statusbestand:    ~/.digidokters_last_restored_backup
+
+
+================================================================================
+2. SCRIPT: switch_schema.py
+================================================================================
+
+DOEL:
+Met dit script schakel je eenvoudig tussen het 'public' schema (artificiële
+testdata) en het 'productie' schema (echte data uit productie) voor je lokale
+Flask-ontwikkelserver.
+
+WERKING:
+Het script past de variabele 'DB_SCHEMA' in je lokale .env bestand aan.
+In config.py wordt de PostgreSQL search_path dynamisch geconfigureerd:
+- DB_SCHEMA=public    -> Zoekpad: public (testdata)
+- DB_SCHEMA=productie -> Zoekpad: productie, public (productiedata)
+
+GEBRUIK:
+Open een terminal in de projectmap en voer uit:
+
+  # 1. Huidige actieve schema tonen:
+  python scripts/switch_schema.py
+
+  # 2. Overschakelen naar productiedata (kopie van productie):
+  python scripts/switch_schema.py productie
+
+  # 3. Overschakelen naar testdata (artificiële testgegevens):
+  python scripts/switch_schema.py public
+
+  # 4. Snel wisselen tussen beide (toggle):
+  python scripts/switch_schema.py toggle
+
+BELANGRIJK BIJ HET SCHAKELEN:
+- Na het wisselen van schema dien je je lokale Flask webserver te herstarten.
+- Als je bent ingelogd met een testaccount, moet je mogelijk opnieuw inloggen
+  met een account dat voorkomt in het actieve schema.
+- Visuele herkenning: Wanneer het 'productie' schema actief is, toont de webapp
+  linksboven in het menu automatisch een oranje badge met het label 'PRODUCTIE'.
+
+
+================================================================================
+3. PROBLEEMOPLOSSING (TROUBLESHOOTING)
+================================================================================
+
+Vraag: De cronjob geeft een melding "Backup-directory bestaat niet".
+Oplossing: Controleer of de externe SSD aangesloten en ontgrendeld is onder
+           de map "/Volumes/Extreme SSD".
+
+Vraag: Hoe kan ik een oudere backup uit de map restoren?
+Oplossing: Voer het restore script uit met een expliciet pad of verwijder de
+           nieuwere bestanden tijdelijk uit de map.
+
+Vraag: Kan ik het schema 'productie' handmatig inspecteren via psql of DBeaver?
+Oplossing: Ja, verbind met de database 'digidokters' op 192.168.1.247:5432.
+           Alle tabellen staan zowel onder schema 'public' als schema 'productie'.
+
+================================================================================

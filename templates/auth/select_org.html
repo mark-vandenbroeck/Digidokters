@@ -37,7 +37,7 @@
                     </span>
                     <select class="form-select border-start-0 ps-2" id="organisatie_id" name="organisatie_id" required>
                         {% for membership in memberships %}
-                        <option value="{{ membership.organisatie_id }}">{{ membership.organisatie.naam }} ({{ 'Beheerder' if membership.rol == 'beheerder' else 'Medewerker' }})</option>
+                        <option value="{{ membership.organisatie_id }}">{{ membership.organisatie.naam }} ({{ 'Beheerder' if membership.rol == 'beheerder' else ('Lezer' if membership.rol == 'lezer' else 'Medewerker') }})</option>
                         {% endfor %}
                     </select>
                 </div>

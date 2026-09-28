@@ -104,6 +104,8 @@
                             <span class="badge bg-purple-soft text-purple">Platformbeheerder</span>
                             {% elif m.rol == 'beheerder' %}
                             <span class="badge bg-danger">Beheerder</span>
+                            {% elif m.rol == 'lezer' %}
+                            <span class="badge bg-info text-dark">Lezer</span>
                             {% else %}
                             <span class="badge bg-secondary">Medewerker</span>
                             {% endif %}

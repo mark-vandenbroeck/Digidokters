@@ -95,6 +95,7 @@ def create_app(config_class=Config):
             huidige_org = get_huidige_organisatie()
             res['huidige_organisatie'] = huidige_org
             res['is_sjabloon_org'] = bool(huidige_org and huidige_org.slug == 'sjabloon')
+            res['db_schema'] = app.config.get('DB_SCHEMA', 'public')
             return res
         except Exception:
             return res

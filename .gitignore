@@ -41,5 +41,6 @@ scripts/*
 !scripts/import_agenda.py
 !scripts/migrate_gender_identity_fk.py
 !scripts/restore_productie_backup.py
+!scripts/switch_schema.py
 
 

@@ -56,6 +56,11 @@
                     <div>
                         <div class="fw-bold text-white lh-1">Digidokters</div>
                         <div class="text-white-50" style="font-size:0.7rem">Registratiesysteem</div>
+                        {% if db_schema and db_schema != 'public' %}
+                        <span class="badge bg-warning text-dark text-uppercase mt-1" style="font-size:0.65rem;" title="Verbonden met PostgreSQL schema: {{ db_schema }}">
+                            <i class="bi bi-database-fill me-1"></i>{{ db_schema }}
+                        </span>
+                        {% endif %}
                     </div>
                 </div>
             </a>

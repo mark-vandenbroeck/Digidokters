@@ -22,6 +22,7 @@ class Config:
 
     # Database: supports both SQLite (local) and PostgreSQL (Supabase/Render)
     _db_url = os.environ.get('DATABASE_URL', 'sqlite:///digidokters.db')
+    _db_schema = os.environ.get('DB_SCHEMA', 'public')
     # Fix older Heroku/Render postgres:// and postgresql:// URLs to explicitly use psycopg2 driver
     if _db_url.startswith('postgres://'):
         _db_url = _db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
@@ -37,7 +38,13 @@ class Config:
         'pool_timeout': 30,
     }
     if 'postgresql' in _db_url:
-        SQLALCHEMY_ENGINE_OPTIONS['connect_args'] = {'client_encoding': 'utf8'}
+        _connect_args = {'client_encoding': 'utf8'}
+        if _db_schema:
+            _connect_args['options'] = f'-c search_path={_db_schema},public'
+        SQLALCHEMY_ENGINE_OPTIONS['connect_args'] = _connect_args
+
+    DB_SCHEMA = _db_schema
+
 
     # Upload settings
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB

@@ -27,15 +27,30 @@ CONFIGURATIE IN .env:
 Zorg dat de Supabase connectiestring in je lokale .env staat:
   PROD_DATABASE_URL=postgresql://postgres:[WACHTWOORD]@[HOST]:5432/postgres
 
+GROOTVADER-VADER-ZOON (GFS) RETENTIESYSTEEM:
+Het script past na elke succesvolle backup automatisch een GFS retentiebeleid toe:
+- Zoon (Dagelijks):     Behoudt de meest recente backup van de laatste 7 dagen.
+- Vader (Wekelijks):    Behoudt 1 backup per week voor de laatste 4 weken.
+- Grootvader (Maandelijks): Behoudt 1 backup per maand voor de laatste 2 maanden.
+
+Oudere dumps of tussenliggende runs die buiten dit schema vallen worden automatisch
+veilig opgeschoond om schijfruimte op de SSD te besparen.
+
 GEBRUIK:
-  # 1. Volledige live dump & sync naar lokaal 'productie' schema:
+  # 1. Volledige live dump, sync naar lokaal schema én GFS retentie:
   python scripts/sync_productie_naar_lokaal.py
 
   # 2. Enkel dumpen naar de externe SSD (zonder lokale restore):
   python scripts/sync_productie_naar_lokaal.py --dump-only
 
-  # 3. Dry-run test (controleert configuratie en verbindingen):
+  # 3. Dry-run test (toont de geplande dump en het retentie-overzicht zonder te wijzigen):
   python scripts/sync_productie_naar_lokaal.py --dry-run
+
+  # 4. Aangepaste retentie-aantallen meegeven:
+  python scripts/sync_productie_naar_lokaal.py --keep-daily 14 --keep-weekly 8 --keep-monthly 6
+
+  # 5. Automatisch opschonen uitschakelen:
+  python scripts/sync_productie_naar_lokaal.py --no-prune
 
 AUTOMATISERING VIA CRONJOB:
 Voeg toe aan crontab (bv. elke dag om 06:00 uur of elke zondagochtend):

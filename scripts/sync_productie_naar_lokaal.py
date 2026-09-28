@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import time
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -36,6 +37,11 @@ from dotenv import load_dotenv
 DEFAULT_BACKUP_DIR = "/Volumes/Extreme SSD/Digidokters backup"
 DEFAULT_SCHEMA = "productie"
 DEFAULT_LOG_FILE = os.path.expanduser("~/Library/Logs/digidokters_backup_restore.log")
+
+# Retentiebeleid: Grootvader-Vader-Zoon (GFS)
+DEFAULT_KEEP_DAILY = 7      # Zoon: 7 dagelijkse backups
+DEFAULT_KEEP_WEEKLY = 4     # Vader: 4 wekelijkse backups
+DEFAULT_KEEP_MONTHLY = 2    # Grootvader: 2 maandelijkse backups
 
 # Zoekpaden voor PostgreSQL 17 client utilities op macOS / Linux
 PG_BIN_SEARCH_PATHS = [
@@ -258,6 +264,106 @@ def perform_restore(dump_file_path: Path, local_db_url: str, target_schema: str)
     return True
 
 
+def parse_backup_timestamp(path: Path) -> datetime:
+    """Extraheert timestamp uit bestandsnaam of valt terug op modificatietijd."""
+    match = re.search(r"(\d{4})[-_](\d{2})[-_](\d{2})[_-](\d{2})(\d{2})", path.name)
+    if match:
+        y, m, d, hh, mm = map(int, match.groups())
+        return datetime(y, m, d, hh, mm)
+    match_d = re.search(r"(\d{4})[-_](\d{2})[-_](\d{2})", path.name)
+    if match_d:
+        y, m, d = map(int, match_d.groups())
+        return datetime(y, m, d, 0, 0)
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime)
+    except Exception:
+        return datetime.min
+
+
+def apply_gfs_retention(
+    backup_dir: Path,
+    keep_daily: int = DEFAULT_KEEP_DAILY,
+    keep_weekly: int = DEFAULT_KEEP_WEEKLY,
+    keep_monthly: int = DEFAULT_KEEP_MONTHLY,
+    dry_run: bool = False,
+) -> tuple[dict, list]:
+    """
+    Past Grootvader-Vader-Zoon (GFS) retentie toe op de backup-directory.
+    - keep_daily: aantal dagelijkse backups (Zoon)
+    - keep_weekly: aantal wekelijkse backups (Vader)
+    - keep_monthly: aantal maandelijkse backups (Grootvader)
+    """
+    if not backup_dir.is_dir():
+        logging.warning(f"Retentie overgeslagen: map bestaat niet ({backup_dir})")
+        return {}, []
+
+    candidates = [
+        f for f in backup_dir.iterdir()
+        if f.is_file() and not f.name.startswith("._") and (f.suffix in [".dump", ".zip"] or "digidokters" in f.name)
+    ]
+
+    if not candidates:
+        logging.info("Geen backup-bestanden gevonden voor retentiebeheer.")
+        return {}, []
+
+    files_with_dt = [(f, parse_backup_timestamp(f)) for f in candidates]
+    files_with_dt.sort(key=lambda x: x[1], reverse=True)
+
+    days = defaultdict(list)
+    weeks = defaultdict(list)
+    months = defaultdict(list)
+
+    for f, dt in files_with_dt:
+        days[dt.strftime("%Y-%m-%d")].append((f, dt))
+        iso_year, iso_week, _ = dt.isocalendar()
+        weeks[f"{iso_year}-W{iso_week:02d}"].append((f, dt))
+        months[dt.strftime("%Y-%m")].append((f, dt))
+
+    keep_reasons = defaultdict(list)
+
+    # 1. Dagelijks (Zoon) - top N unieke dagen
+    for day_key in sorted(days.keys(), reverse=True)[:keep_daily]:
+        chosen_file, _ = days[day_key][0]
+        keep_reasons[chosen_file].append(f"Dagelijks ({day_key})")
+
+    # 2. Wekelijks (Vader) - top N unieke ISO-weken
+    for week_key in sorted(weeks.keys(), reverse=True)[:keep_weekly]:
+        chosen_file, _ = weeks[week_key][0]
+        keep_reasons[chosen_file].append(f"Wekelijks ({week_key})")
+
+    # 3. Maandelijks (Grootvader) - top N unieke kalendermaanden
+    for month_key in sorted(months.keys(), reverse=True)[:keep_monthly]:
+        chosen_file, _ = months[month_key][0]
+        keep_reasons[chosen_file].append(f"Maandelijks ({month_key})")
+
+    files_to_keep = set(keep_reasons.keys())
+    files_to_delete = [f for f, dt in files_with_dt if f not in files_to_keep]
+
+    logging.info("--- GFS Backup Retentie Overzicht ---")
+    logging.info(f"Totaal aanwezige backups: {len(candidates)}")
+    logging.info(f"Behouden backups ({len(files_to_keep)}):")
+    for f in sorted(files_to_keep, key=parse_backup_timestamp, reverse=True):
+        reasons_str = ", ".join(keep_reasons[f])
+        size_mb = f.stat().st_size / (1024 * 1024)
+        logging.info(f"  ✓ {f.name} ({size_mb:.1f} MB) -> [{reasons_str}]")
+
+    if files_to_delete:
+        logging.info(f"Te verwijderen verouderde backups ({len(files_to_delete)}):")
+        for f in files_to_delete:
+            if dry_run:
+                logging.info(f"  [DRY-RUN] Zou verwijderen: {f.name}")
+            else:
+                try:
+                    f.unlink()
+                    logging.info(f"  ✗ Verwijderd: {f.name}")
+                except Exception as e:
+                    logging.error(f"  ! Kon bestand niet verwijderen ({f.name}): {e}")
+    else:
+        logging.info("Geen verouderde backups die verwijderd hoeven te worden.")
+
+    return keep_reasons, files_to_delete
+
+
 def main():
     # Laad .env bestand indien aanwezig
     env_file = Path(__file__).resolve().parent.parent / ".env"
@@ -298,6 +404,29 @@ def main():
         "--dry-run",
         action="store_true",
         help="Test configuratie en paden zonder daadwerkelijk te dumpen of restoren.",
+    )
+    parser.add_argument(
+        "--keep-daily",
+        type=int,
+        default=DEFAULT_KEEP_DAILY,
+        help=f"Aantal dagelijkse backups om te behouden (Zoon, standaard: {DEFAULT_KEEP_DAILY})",
+    )
+    parser.add_argument(
+        "--keep-weekly",
+        type=int,
+        default=DEFAULT_KEEP_WEEKLY,
+        help=f"Aantal wekelijkse backups om te behouden (Vader, standaard: {DEFAULT_KEEP_WEEKLY})",
+    )
+    parser.add_argument(
+        "--keep-monthly",
+        type=int,
+        default=DEFAULT_KEEP_MONTHLY,
+        help=f"Aantal maandelijkse backups om te behouden (Grootvader, standaard: {DEFAULT_KEEP_MONTHLY})",
+    )
+    parser.add_argument(
+        "--no-prune",
+        action="store_true",
+        help="Schakel het automatisch verwijderen van verouderde backups uit.",
     )
     parser.add_argument(
         "--log-file",
@@ -353,6 +482,14 @@ def main():
 
     if args.dry_run:
         logging.info("[DRY-RUN] Alle configuraties zijn geldig. Dump en restore overgeslagen wegens --dry-run.")
+        if not args.no_prune:
+            apply_gfs_retention(
+                backup_dir_path,
+                keep_daily=args.keep_daily,
+                keep_weekly=args.keep_weekly,
+                keep_monthly=args.keep_monthly,
+                dry_run=True,
+            )
         sys.exit(0)
 
     # Stap 1: pg_dump van productie
@@ -361,15 +498,22 @@ def main():
         logging.error("=== Live Productie Sync Mislukt (Dump gefaald) ===")
         sys.exit(1)
 
-    if args.dump_only:
-        logging.info("=== Dump succesvol opgeslagen (--dump-only actief) ===")
-        sys.exit(0)
+    # Stap 2: restore naar lokaal schema (tenzij --dump-only)
+    if not args.dump_only:
+        restore_success = perform_restore(dump_path, args.local_db_url, args.schema)
+        if not restore_success:
+            logging.error("=== Live Productie Sync Mislukt (Restore gefaald) ===")
+            sys.exit(1)
 
-    # Stap 2: restore naar lokaal schema
-    restore_success = perform_restore(dump_path, args.local_db_url, args.schema)
-    if not restore_success:
-        logging.error("=== Live Productie Sync Mislukt (Restore gefaald) ===")
-        sys.exit(1)
+    # Stap 3: GFS Retentiebeheer (tenzij --no-prune)
+    if not args.no_prune:
+        apply_gfs_retention(
+            backup_dir_path,
+            keep_daily=args.keep_daily,
+            keep_weekly=args.keep_weekly,
+            keep_monthly=args.keep_monthly,
+            dry_run=False,
+        )
 
     logging.info("=== Live Productie Sync & Backup Succesvol Afgerond ===")
     sys.exit(0)
@@ -377,3 +521,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -37,6 +37,7 @@ Thumbs.db
 # Standalone local migration scripts
 migrate_*.py
 scripts/*
+!scripts/HANDLEIDING.txt
 !scripts/import_agenda.md
 !scripts/import_agenda.py
 !scripts/migrate_gender_identity_fk.py

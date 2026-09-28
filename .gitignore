@@ -43,5 +43,6 @@ scripts/*
 !scripts/migrate_gender_identity_fk.py
 !scripts/restore_productie_backup.py
 !scripts/switch_schema.py
+!scripts/sync_productie_naar_lokaal.py
 
 

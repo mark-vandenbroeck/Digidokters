@@ -5,13 +5,45 @@ Locatie: scripts/
 Auteur:  Digidokters Team
 Datum:   September 2026
 
-Deze handleiding beschrijft het gebruik van twee scripts voor lokaal beheer en
+Deze handleiding beschrijft het gebruik van scripts voor lokaal beheer en
 synchronisatie van de PostgreSQL database:
-1. restore_productie_backup.py - Automatisch inladen van productie-backups
-2. switch_schema.py            - Snel schakelen tussen test- en productiedata
+1. sync_productie_naar_lokaal.py - Rechtstreeks live dumpen van Supabase & syncen
+2. restore_productie_backup.py   - Inladen van gedownloade ZIP/dump backups
+3. switch_schema.py              - Snel schakelen tussen test- en productiedata
 
 ================================================================================
-1. SCRIPT: restore_productie_backup.py
+1. SCRIPT: sync_productie_naar_lokaal.py (AANBEVOLEN LIVE SYNC)
+================================================================================
+
+DOEL:
+Dit script maakt rechtstreeks een live backup (pg_dump) van de productie database
+op Supabase, slaat het gecomprimeerde dumpbestand op je externe SSD op en laadt
+deze meteen in het 'productie' schema van je lokale PostgreSQL database op Proxmox.
+
+Hierdoor heb je met 1 commando altijd de allernieuwste productiedata lokaal,
+zonder te hoeven wachten op GitHub Actions of bestanden te downloaden via de browser.
+
+CONFIGURATIE IN .env:
+Zorg dat de Supabase connectiestring in je lokale .env staat:
+  PROD_DATABASE_URL=postgresql://postgres:[WACHTWOORD]@[HOST]:5432/postgres
+
+GEBRUIK:
+  # 1. Volledige live dump & sync naar lokaal 'productie' schema:
+  python scripts/sync_productie_naar_lokaal.py
+
+  # 2. Enkel dumpen naar de externe SSD (zonder lokale restore):
+  python scripts/sync_productie_naar_lokaal.py --dump-only
+
+  # 3. Dry-run test (controleert configuratie en verbindingen):
+  python scripts/sync_productie_naar_lokaal.py --dry-run
+
+AUTOMATISERING VIA CRONJOB:
+Voeg toe aan crontab (bv. elke dag om 06:00 uur of elke zondagochtend):
+  0 6 * * * /opt/anaconda3/bin/python "/Users/mark/Python/Digidokters/scripts/sync_productie_naar_lokaal.py" >> "$HOME/Library/Logs/digidokters_cron.log" 2>&1
+
+
+================================================================================
+2. SCRIPT: restore_productie_backup.py (ZIP ARTEFACT RESTORE)
 ================================================================================
 
 DOEL:
@@ -81,7 +113,7 @@ LOGBESTANDEN & MONITORING:
 
 
 ================================================================================
-2. SCRIPT: switch_schema.py
+3. SCRIPT: switch_schema.py
 ================================================================================
 
 DOEL:
@@ -119,7 +151,7 @@ BELANGRIJK BIJ HET SCHAKELEN:
 
 
 ================================================================================
-3. PROBLEEMOPLOSSING (TROUBLESHOOTING)
+4. PROBLEEMOPLOSSING (TROUBLESHOOTING)
 ================================================================================
 
 Vraag: De cronjob geeft een melding "Backup-directory bestaat niet".

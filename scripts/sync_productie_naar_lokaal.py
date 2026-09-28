@@ -115,10 +115,51 @@ def transform_sql_for_schema(raw_sql: str, target_schema: str) -> str:
     return "".join(out)
 
 
+# Ingebouwd Supabase Root CA certificaat (nodig voor Supabase poolers en direct connections)
+SUPABASE_ROOT_CA = """-----BEGIN CERTIFICATE-----
+MIIDxDCCAqygAwIBAgIUbLxMod62P2ktCiAkxnKJwtE9VPYwDQYJKoZIhvcNAQEL
+BQAwazELMAkGA1UEBhMCVVMxEDAOBgNVBAgMB0RlbHdhcmUxEzARBgNVBAcMCk5l
+dyBDYXN0bGUxFTATBgNVBAoMDFN1cGFiYXNlIEluYzEeMBwGA1UEAwwVU3VwYWJh
+c2UgUm9vdCAyMDIxIENBMB4XDTIxMDQyODEwNTY1M1oXDTMxMDQyNjEwNTY1M1ow
+azELMAkGA1UEBhMCVVMxEDAOBgNVBAgMB0RlbHdhcmUxEzARBgNVBAcMCk5ldyBD
+YXN0bGUxFTATBgNVBAoMDFN1cGFiYXNlIEluYzEeMBwGA1UEAwwVU3VwYWJhc2Ug
+Um9vdCAyMDIxIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqQXW
+QyHOB+qR2GJobCq/CBmQ40G0oDmCC3mzVnn8sv4XNeWtE5XcEL0uVih7Jo4Dkx1Q
+DmGHBH1zDfgs2qXiLb6xpw/CKQPypZW1JssOTMIfQppNQ87K75Ya0p25Y3ePS2t2
+GtvHxNjUV6kjOZjEn2yWEcBdpOVCUYBVFBNMB4YBHkNRDa/+S4uywAoaTWnCJLUi
+cvTlHmMw6xSQQn1UfRQHk50DMCEJ7Cy1RxrZJrkXXRP3LqQL2ijJ6F4yMfh+Gyb4
+O4XajoVj/+R4GwywKYrrS8PrSNtwxr5StlQO8zIQUSMiq26wM8mgELFlS/32Uclt
+NaQ1xBRizkzpZct9DwIDAQABo2AwXjALBgNVHQ8EBAMCAQYwHQYDVR0OBBYEFKjX
+uXY32CztkhImng4yJNUtaUYsMB8GA1UdIwQYMBaAFKjXuXY32CztkhImng4yJNUt
+aUYsMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAB8spzNn+4VU
+tVxbdMaX+39Z50sc7uATmus16jmmHjhIHz+l/9GlJ5KqAMOx26mPZgfzG7oneL2b
+VW+WgYUkTT3XEPFWnTp2RJwQao8/tYPXWEJDc0WVQHrpmnWOFKU/d3MqBgBm5y+6
+jB81TU/RG2rVerPDWP+1MMcNNy0491CTL5XQZ7JfDJJ9CCmXSdtTl4uUQnSuv/Qx
+Cea13BX2ZgJc7Au30vihLhub52De4P/4gonKsNHYdbWjg7OWKwNv/zitGDVDB9Y2
+CMTyZKG3XEu5Ghl1LEnI3QmEKsqaCLv12BnVjbkSeZsMnevJPs1Ye6TjjJwdik5P
+o/bKiIz+Fq8=
+-----END CERTIFICATE-----
+"""
+
+def get_supabase_ca_path() -> str:
+    """Schrijft het Supabase Root CA certificaat naar een vast lokaal bestand."""
+    ca_path = os.path.expanduser("~/.digidokters_supabase_ca.crt")
+    try:
+        if not os.path.exists(ca_path) or os.path.getsize(ca_path) < 100:
+            with open(ca_path, "w", encoding="utf-8") as f:
+                f.write(SUPABASE_ROOT_CA.strip() + "\n")
+    except Exception as e:
+        logging.warning(f"Kon CA-bestand niet aanmaken ({ca_path}): {e}")
+    return ca_path
+
+
 def get_pg_env() -> dict:
     """Stelt de juiste SSL CA bundle en instellingen in voor libpq/pg_dump/psql op macOS."""
     env = os.environ.copy()
-    if not env.get("PGSSLROOTCERT"):
+    supabase_ca = get_supabase_ca_path()
+    if os.path.exists(supabase_ca):
+        env["PGSSLROOTCERT"] = supabase_ca
+    elif not env.get("PGSSLROOTCERT"):
         for ca_path in [
             "/etc/ssl/cert.pem",
             "/opt/homebrew/etc/ca-certificates/cert.pem",
@@ -127,12 +168,6 @@ def get_pg_env() -> dict:
             if os.path.exists(ca_path):
                 env["PGSSLROOTCERT"] = ca_path
                 break
-        else:
-            try:
-                import certifi
-                env["PGSSLROOTCERT"] = certifi.where()
-            except Exception:
-                pass
 
     if not env.get("PGSSLMODE"):
         env["PGSSLMODE"] = "require"

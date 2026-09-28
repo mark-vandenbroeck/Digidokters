@@ -30,7 +30,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Standaardinstellingen
-DEFAULT_BACKUP_DIR = "/Volumes/Extreme SSD/Digidokters backup"
+DEFAULT_BACKUP_DIR = "/Users/mark/Python/Digidokters-Backup"
 DEFAULT_SCHEMA = "productie"
 DEFAULT_STATE_FILE = os.path.expanduser("~/.digidokters_last_restored_backup")
 DEFAULT_LOG_FILE = os.path.expanduser("~/Library/Logs/digidokters_backup_restore.log")

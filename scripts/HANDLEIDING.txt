@@ -17,11 +17,15 @@ synchronisatie van de PostgreSQL database:
 
 DOEL:
 Dit script maakt rechtstreeks een live backup (pg_dump) van de productie database
-op Supabase, slaat het gecomprimeerde dumpbestand op je externe SSD op en laadt
+op Supabase, slaat het gecomprimeerde dumpbestand op je interne SSD op en laadt
 deze meteen in het 'productie' schema van je lokale PostgreSQL database op Proxmox.
 
 Hierdoor heb je met 1 commando altijd de allernieuwste productiedata lokaal,
 zonder te hoeven wachten op GitHub Actions of bestanden te downloaden via de browser.
+
+LOCATIE VAN BACKUPS:
+Standaard worden de backups opgeslagen in de map:
+  /Users/mark/Python/Digidokters-Backup
 
 CONFIGURATIE IN .env:
 Zorg dat de Supabase connectiestring in je lokale .env staat:
@@ -40,7 +44,7 @@ GEBRUIK:
   # 1. Volledige live dump, sync naar lokaal schema én GFS retentie:
   python scripts/sync_productie_naar_lokaal.py
 
-  # 2. Enkel dumpen naar de externe SSD (zonder lokale restore):
+  # 2. Enkel dumpen naar de backup-map (zonder lokale restore):
   python scripts/sync_productie_naar_lokaal.py --dump-only
 
   # 3. Dry-run test (toont de geplande dump en het retentie-overzicht zonder te wijzigen):
@@ -62,15 +66,15 @@ Voeg toe aan crontab (bv. elke dag om 06:00 uur of elke zondagochtend):
 ================================================================================
 
 DOEL:
-Dit script zoekt de meest recente PostgreSQL productie-backup (ZIP-bestand) die
-via GitHub Actions artifacts is gedownload en plaatst deze in een apart
+Dit script zoekt de meest recente PostgreSQL productie-backup (.zip of .dump) in
+de backup-map (/Users/mark/Python/Digidokters-Backup) en plaatst deze in een apart
 gereserveerd schema ('productie') in je lokale PostgreSQL database op Proxmox.
 
 Hierdoor blijft je lokale 'public' schema (met artificiële testdata) onaangeroerd.
 
 WERKING:
-1. Controleert de backup-directory (/Volumes/Extreme SSD/Digidokters backup).
-2. Detecteert het nieuwste ZIP-bestand op basis van de datum in de bestandsnaam.
+1. Controleert de backup-directory (/Users/mark/Python/Digidokters-Backup).
+2. Detecteert het nieuwste backup-bestand op basis van de datum in de bestandsnaam.
 3. Controleert of dit bestand al eerder is ingeladen via het statusbestand
    (~/.digidokters_last_restored_backup).
 4. Pakt het gecomprimeerde PostgreSQL dumpbestand (.dump) tijdelijk uit.
@@ -81,7 +85,6 @@ WERKING:
 VEREISTEN:
 - PostgreSQL 17 client utilities (geïnstalleerd via Homebrew: postgresql@17).
 - Toegang tot de lokale PostgreSQL database (DATABASE_URL in .env).
-- De externe schijf moet gemount zijn op het moment van uitvoeren.
 
 MANUEEL GEBRUIK:
 Open een terminal in de projectmap (/Users/mark/Python/Digidokters) en voer uit:
@@ -99,8 +102,8 @@ Open een terminal in de projectmap (/Users/mark/Python/Digidokters) en voer uit:
   python scripts/restore_productie_backup.py --force -v
 
 BESCHIKBARE PARAMETERS:
-  --backup-dir <pad>    Pad naar de map met ZIP-bestanden
-                        (Standaard: "/Volumes/Extreme SSD/Digidokters backup")
+  --backup-dir <pad>    Pad naar de map met backup-bestanden
+                        (Standaard: "/Users/mark/Python/Digidokters-Backup")
   --schema <naam>       Doelschema in PostgreSQL (Standaard: "productie")
   --db-url <url>        PostgreSQL connectiestring (Standaard: uit .env)
   --force               Negeer statusbestand en forceer restore
@@ -169,13 +172,9 @@ BELANGRIJK BIJ HET SCHAKELEN:
 4. PROBLEEMOPLOSSING (TROUBLESHOOTING)
 ================================================================================
 
-Vraag: De cronjob geeft een melding "Backup-directory bestaat niet".
-Oplossing: Controleer of de externe SSD aangesloten en ontgrendeld is onder
-           de map "/Volumes/Extreme SSD".
-
-Vraag: Hoe kan ik een oudere backup uit de map restoren?
-Oplossing: Voer het restore script uit met een expliciet pad of verwijder de
-           nieuwere bestanden tijdelijk uit de map.
+Vraag: Hoe kan ik een specifieke oudere backup restoren?
+Oplossing: Voer het restore script uit met de gewenste backup-directory of kopieer
+           het bestand tijdelijk naar de map.
 
 Vraag: Kan ik het schema 'productie' handmatig inspecteren via psql of DBeaver?
 Oplossing: Ja, verbind met de database 'digidokters' op 192.168.1.247:5432.

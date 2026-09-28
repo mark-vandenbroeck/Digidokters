@@ -3,7 +3,7 @@
 sync_productie_naar_lokaal.py
 
 Maakt rechtstreeks een live backup (pg_dump) van de Supabase productie-database,
-bewaart de dump op de externe SSD (/Volumes/Extreme SSD/Digidokters backup),
+bewaart de dump op de interne SSD (/Users/mark/Python/Digidokters-Backup),
 en restoret deze direct in het gereserveerde schema ('productie') van je lokale
 PostgreSQL database (LXC Postgres op proxmox3).
 
@@ -34,7 +34,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Standaardconfiguraties
-DEFAULT_BACKUP_DIR = "/Volumes/Extreme SSD/Digidokters backup"
+DEFAULT_BACKUP_DIR = "/Users/mark/Python/Digidokters-Backup"
 DEFAULT_SCHEMA = "productie"
 DEFAULT_LOG_FILE = os.path.expanduser("~/Library/Logs/digidokters_backup_restore.log")
 

@@ -36,5 +36,10 @@ Thumbs.db
 
 # Standalone local migration scripts
 migrate_*.py
-scripts/
+scripts/*
+!scripts/import_agenda.md
+!scripts/import_agenda.py
+!scripts/migrate_gender_identity_fk.py
+!scripts/restore_productie_backup.py
+
 

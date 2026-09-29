@@ -33,7 +33,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 6.  **Registraties (`registrations`):** Registratie van een bezoekerssessie met foreign keys naar digidokter, leeftijdscategorie, toestel, herkomst en geslacht.
 7.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
 8.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
-9.  **Documenten (`documenten`):** Bestanden (PDF, Word, Excel, afbeeldingen) opgeslagen als binaire data (`LargeBinary`) met versienummering en geïndexeerde tekstinhoud (`tekst_inhoud`).
+9.  **Documenten (`documenten`):** Bestanden (PDF, Word, OpenDocument Tekst, Excel, Markdown, afbeeldingen, tekst) opgeslagen als binaire data (`LargeBinary`) met versienummering en geïndexeerde tekstinhoud (`tekst_inhoud`).
 10. **Herkomst (`herkomst`):** Standaard keuzelijst met herkomstbronnen (bijv. website, mond-tot-mond) per organisatie.
 11. **Evaluatieformulieren & Vragen (`evaluatie_formulieren`, `evaluatie_vragen`):** Configureerbare evaluatievragenlijsten gekoppeld aan specifieke activiteitstypes (zoals Digicafé).
 12. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
@@ -74,11 +74,17 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 
 ### 4. Documentbeheer
 *   Volledige hiërarchische mappenstructuur per organisatie.
-*   Uploaden en downloaden van bestanden (PDF, Word, Excel, afbeeldingen) met een limiet van 16 MB per bestand.
+*   Uploaden en downloaden van bestanden (PDF, Word, OpenDocument, Excel, Markdown, afbeeldingen, tekst) met een limiet van 16 MB per bestand.
 *   Binaire bestandsobjecten worden direct in de database opgeslagen (`LargeBinary`), zodat ze automatisch meegaan in databasebackups en isolatie.
-*   In-browser preview voor ondersteunde bestandstypen (zoals PDF en afbeeldingen).
+*   **Rijke In-Browser Document Viewer:** Volledige browser-weergave voor een breed scala aan formaten:
+    *   *Microsoft Word (`.docx`, `.docm`) & OpenDocument Tekst (`.odt`):* Gestructureerde A4-papierweergave van koppen, alinea's, opmaak (vet/cursief/onderlijnd/doorstreept), lijsten en tabellen.
+    *   *Microsoft Excel & Spreadsheets (`.xlsx`, `.xlsm`, `.csv`, `.tsv`):* Multi-sheet tabbladen, kolomkoppen, rijnummering en interactieve zoekbalk om realtime binnen het werkblad te filteren.
+    *   *Markdown (`.md`, `.markdown`):* Renderen van Markdown naar GitHub-stijl HTML met tabellen en codeblokken.
+    *   *Platte tekst & Code (`.txt`, `.json`, `.xml`, `.log`, `.yaml`, `.sql`, etc.):* Donker thema met regelnummers en JSON formattering.
+    *   *PDF & Afbeeldingen (`.pdf`, `.png`, `.jpg`, `.webp`, `.svg`):* Directe inline weergave beveiligd met strikte CSP-sandboxing.
+    *   *Viewer Werkbalk:* Snelle knoppen voor **Afdrukken**, **Tekst kopiëren** naar het klembord en **Origineel downloaden**.
 *   **Versiebeheer:** Mogelijkheid om bestaande documenten te overschrijven, waarbij het versienummer automatisch wordt verhoogd (v1, v2, v3...).
-*   **Full-text zoeken (inclusief documentinhoud):** De zoekbalk doorzoekt niet alleen mappen, bestandsnamen en omschrijvingen, maar ook de volledige tekstinhoud van documenten (Word `.docx`, PDF `.pdf`, Excel `.xlsx` en tekstbestanden). Bij een inhoudsmatch toont de resultatentabel een badge *Gevonden in inhoud* met een contextfragment (snippet) rondom de zoekterm.
+*   **Full-text zoeken (inclusief documentinhoud):** De zoekbalk doorzoekt niet alleen mappen, bestandsnamen en omschrijvingen, maar ook de volledige tekstinhoud van documenten (Word `.docx`, OpenDocument `.odt`, PDF `.pdf`, Excel `.xlsx` en tekstbestanden). Bij een inhoudsmatch toont de resultatentabel een badge *Gevonden in inhoud* met een contextfragment (snippet) rondom de zoekterm.
 *   Toegang is afgeschermd voor gebruikers met de rol `lezer`.
 
 ### 5. Evaluatieformulieren voor Activiteiten & Digicafés
@@ -186,7 +192,7 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
 ### 14. App Documentatie (Centraal & Gemeenschappelijk)
 *   **Platformbrede Kennisbank (`/app-documentatie`):** Bevindt zich in de rubriek `Algemeen` tussen *Feedback* en *Privacy & AVG*.
 *   **Gedeeld over alle Organisaties:** Documenten (zoals gebruikershandleidingen, security-audits en technische documentatie) worden één keer geplaatst en zijn direct beschikbaar voor alle aangesloten gemeenten.
-*   **Mappen & Full-text Zoeken:** Hiërarchische mappen, documentupload tot 16 MB, inline preview (PDF/afbeeldingen), versiebeheer bij overschrijven (`v1`, `v2`...) en full-text doorzoeking van documentinhoud.
+*   **Mappen, Viewer & Full-text Zoeken:** Hiërarchische mappen, documentupload tot 16 MB, rijke in-browser viewer (Word, ODT, Excel, Markdown, PDF, afbeeldingen, tekst), versiebeheer bij overschrijven (`v1`, `v2`...) en full-text doorzoeking van documentinhoud.
 *   **Rechten:** Alle gebruikers (lezers, medewerkers, beheerders) kunnen documenten inzien en downloaden; beheeracties (uploaden, mappen, bewerken, wissen) zijn gereserveerd voor platformbeheerders.
 
 ### 15. Inklapbare Navigatie & Interface-ergonomie

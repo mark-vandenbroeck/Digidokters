@@ -54,7 +54,28 @@ def extraheer_tekst_uit_bestand(inhoud_bytes, bestandsnaam='', mime_type=''):
         except Exception:
             return None
 
-    # 3. Excel (.xlsx, .xlsm)
+    # 3. OpenDocument Tekst (.odt)
+    if ext == 'odt' or 'opendocument.text' in mime_type:
+        try:
+            import zipfile
+            import xml.etree.ElementTree as ET
+            with zipfile.ZipFile(io.BytesIO(inhoud_bytes)) as zf:
+                if 'content.xml' in zf.namelist():
+                    root = ET.fromstring(zf.read('content.xml'))
+                    delen = []
+                    for elem in root.iter():
+                        tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+                        if tag in ('p', 'h'):
+                            tekst = ''.join(elem.itertext()).strip()
+                            if tekst:
+                                delen.append(tekst)
+                    if delen:
+                        return _opschonen_tekst('\n'.join(delen))
+            return None
+        except Exception:
+            return None
+
+    # 4. Excel (.xlsx, .xlsm)
     if ext in ('xlsx', 'xlsm') or 'excel' in mime_type or 'spreadsheet' in mime_type:
         try:
             import openpyxl

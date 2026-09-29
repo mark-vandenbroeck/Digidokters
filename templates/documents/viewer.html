@@ -288,9 +288,9 @@
                 <div class="d-flex align-items-center gap-2">
                     {% if preview.ext in ['pdf'] %}
                         <i class="bi bi-file-earmark-pdf-fill fs-2 text-danger"></i>
-                    {% elif preview.ext in ['doc', 'docx'] %}
+                    {% elif preview.ext in ['doc', 'docx', 'docm', 'odt'] %}
                         <i class="bi bi-file-earmark-word-fill fs-2 text-primary"></i>
-                    {% elif preview.ext in ['xls', 'xlsx', 'csv', 'tsv'] %}
+                    {% elif preview.ext in ['xls', 'xlsx', 'xlsm', 'csv', 'tsv'] %}
                         <i class="bi bi-file-earmark-excel-fill fs-2 text-success"></i>
                     {% elif preview.ext in ['md', 'markdown'] %}
                         <i class="bi bi-markdown-fill fs-2 text-info"></i>

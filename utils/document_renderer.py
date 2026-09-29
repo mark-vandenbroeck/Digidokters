@@ -4,6 +4,7 @@ utils/document_renderer.py
 Rendert diverse documentformaten naar gestructureerde HTML en data voor de in-browser viewer.
 Ondersteunde formaten:
 - Microsoft Word (.docx, .docm)
+- OpenDocument Tekst (.odt)
 - Microsoft Excel & Spreadsheets (.xlsx, .xlsm, .csv, .tsv)
 - Markdown (.md, .markdown)
 - PDF (.pdf)
@@ -17,6 +18,8 @@ import io
 import json
 import os
 import re
+import xml.etree.ElementTree as ET
+import zipfile
 
 
 def _bepaal_extensie(bestandsnaam: str, mime_type: str = '') -> str:
@@ -29,6 +32,8 @@ def _bepaal_extensie(bestandsnaam: str, mime_type: str = '') -> str:
         return 'pdf'
     if 'word' in mime or 'document' in mime:
         return 'docx'
+    if 'opendocument.text' in mime or 'odt' in mime:
+        return 'odt'
     if 'excel' in mime or 'sheet' in mime:
         return 'xlsx'
     if 'csv' in mime:
@@ -38,6 +43,180 @@ def _bepaal_extensie(bestandsnaam: str, mime_type: str = '') -> str:
     if 'image' in mime:
         return 'png'
     return 'txt'
+
+
+def _render_odt(inhoud_bytes: bytes) -> dict:
+    """Rendert een OpenDocument Tekst (.odt) bestand naar semantische HTML."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(inhoud_bytes)) as zf:
+            if 'content.xml' not in zf.namelist():
+                return {
+                    'viewer_type': 'error',
+                    'error_message': 'Ongeldig ODT-bestand: content.xml ontbreekt.'
+                }
+            content_xml = zf.read('content.xml')
+            styles_xml = zf.read('styles.xml') if 'styles.xml' in zf.namelist() else None
+    except Exception as e:
+        return {
+            'viewer_type': 'error',
+            'error_message': f'Kon ODT-archief niet openen: {str(e)}'
+        }
+
+    try:
+        root = ET.fromstring(content_xml)
+        styles_root = ET.fromstring(styles_xml) if styles_xml else None
+
+        NS = {
+            'office': 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
+            'text': 'urn:oasis:names:tc:opendocument:xmlns:text:1.0',
+            'table': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0',
+            'style': 'urn:oasis:names:tc:opendocument:xmlns:style:1.0',
+            'fo': 'urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0',
+            'xlink': 'http://www.w3.org/1999/xlink',
+        }
+
+        # Parse text styles uit content.xml en styles.xml
+        text_styles = {}
+        all_roots = [root]
+        if styles_root is not None:
+            all_roots.append(styles_root)
+
+        for r in all_roots:
+            for style in r.findall('.//style:style', NS):
+                s_name = style.attrib.get(f'{{{NS["style"]}}}name')
+                t_prop = style.find('style:text-properties', NS)
+                if s_name and t_prop is not None:
+                    props = {}
+                    fw = t_prop.attrib.get(f'{{{NS["fo"]}}}font-weight', '')
+                    if 'bold' in fw or fw in ['700', '800', '900']:
+                        props['bold'] = True
+                    fs = t_prop.attrib.get(f'{{{NS["fo"]}}}font-style', '')
+                    if 'italic' in fs or 'oblique' in fs:
+                        props['italic'] = True
+                    if 'underline' in str(t_prop.attrib.get(f'{{{NS["style"]}}}text-underline-style', '')):
+                        props['underline'] = True
+                    if t_prop.attrib.get(f'{{{NS["style"]}}}text-line-through-style'):
+                        props['strike'] = True
+                    text_styles[s_name] = props
+
+        def render_inline(elem) -> str:
+            out = []
+            if elem.text:
+                out.append(html.escape(elem.text))
+            for child in elem:
+                tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                if tag == 's':
+                    count = int(child.attrib.get(f'{{{NS["text"]}}}c', 1))
+                    out.append(' ' * count)
+                elif tag == 'tab':
+                    out.append('&emsp;')
+                elif tag == 'line-break':
+                    out.append('<br>')
+                elif tag == 'a':
+                    href = child.attrib.get(f'{{{NS["xlink"]}}}href', '#')
+                    inner = render_inline(child)
+                    out.append(f'<a href="{html.escape(href)}" target="_blank" rel="noopener noreferrer">{inner}</a>')
+                elif tag == 'span':
+                    s_name = child.attrib.get(f'{{{NS["text"]}}}style-name')
+                    inner = render_inline(child)
+                    style_info = text_styles.get(s_name, {})
+                    if style_info.get('bold'):
+                        inner = f'<strong>{inner}</strong>'
+                    if style_info.get('italic'):
+                        inner = f'<em>{inner}</em>'
+                    if style_info.get('underline'):
+                        inner = f'<u>{inner}</u>'
+                    if style_info.get('strike'):
+                        inner = f'<del>{inner}</del>'
+                    out.append(inner)
+                else:
+                    out.append(render_inline(child))
+                if child.tail:
+                    out.append(html.escape(child.tail))
+            return ''.join(out)
+
+        body_text = root.find('.//office:text', NS)
+        if body_text is None:
+            return {
+                'viewer_type': 'word',
+                'html_content': '<p class="text-muted fst-italic">Het ODT-document bevat geen leesbare tekst.</p>',
+                'paragraph_count': 0,
+                'table_count': 0,
+            }
+
+        html_parts = []
+        paragraph_count = 0
+        table_count = 0
+
+        for elem in body_text:
+            tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+            if tag == 'h':
+                level = elem.attrib.get(f'{{{NS["text"]}}}outline-level', '1')
+                text_inner = render_inline(elem)
+                if not text_inner.strip():
+                    continue
+                lvl = int(level) if level.isdigit() else 1
+                lvl = max(1, min(lvl, 4))
+                if lvl == 1:
+                    html_parts.append(f'<h1 class="docx-h1 border-bottom pb-2 mt-4 mb-3 text-dark">{text_inner}</h1>')
+                elif lvl == 2:
+                    html_parts.append(f'<h2 class="docx-h2 mt-4 mb-2 text-dark">{text_inner}</h2>')
+                elif lvl == 3:
+                    html_parts.append(f'<h3 class="docx-h3 mt-3 mb-2 text-dark">{text_inner}</h3>')
+                else:
+                    html_parts.append(f'<h4 class="docx-h4 mt-3 mb-2 text-dark">{text_inner}</h4>')
+                paragraph_count += 1
+
+            elif tag == 'p':
+                text_inner = render_inline(elem)
+                if text_inner.strip():
+                    html_parts.append(f'<p class="docx-p mb-2">{text_inner}</p>')
+                    paragraph_count += 1
+
+            elif tag == 'list':
+                list_items = []
+                for item in elem.findall('.//text:list-item', NS):
+                    item_content = ' '.join(render_inline(p) for p in item.findall('text:p', NS))
+                    if item_content.strip():
+                        list_items.append(f'<li class="docx-li">{item_content}</li>')
+                if list_items:
+                    html_parts.append(f'<ul class="mb-3">{" ".join(list_items)}</ul>')
+                    paragraph_count += len(list_items)
+
+            elif tag == 'table':
+                table_rows = []
+                for row_idx, row in enumerate(elem.findall('.//table:table-row', NS)):
+                    cells_html = []
+                    is_header = (row_idx == 0)
+                    cell_tag = 'th' if is_header else 'td'
+                    cell_class = 'bg-light fw-bold text-dark' if is_header else ''
+                    for cell in row.findall('table:table-cell', NS):
+                        cell_inner = '<br>'.join(render_inline(p) for p in cell.findall('text:p', NS))
+                        cells_html.append(f'<{cell_tag} class="{cell_class} p-2 align-top">{cell_inner}</{cell_tag}>')
+                    table_rows.append(f'<tr>{" ".join(cells_html)}</tr>')
+                if table_rows:
+                    html_parts.append(
+                        '<div class="table-responsive my-3">'
+                        '<table class="table table-bordered table-hover docx-table mb-0">'
+                        f'{" ".join(table_rows)}'
+                        '</table>'
+                        '</div>'
+                    )
+                    table_count += 1
+
+        full_html = '\n'.join(html_parts) if html_parts else '<p class="text-muted fst-italic">Het ODT-document bevat geen leesbare tekst.</p>'
+
+        return {
+            'viewer_type': 'word',
+            'html_content': full_html,
+            'paragraph_count': paragraph_count,
+            'table_count': table_count,
+        }
+    except Exception as e:
+        return {
+            'viewer_type': 'error',
+            'error_message': f'Fout bij verwerken van ODT-inhoud: {str(e)}'
+        }
 
 
 def _render_docx(inhoud_bytes: bytes) -> dict:
@@ -341,9 +520,14 @@ def render_document_preview(inhoud_bytes: bytes, bestandsnaam: str, mime_type: s
         })
         return base_result
 
-    # 3. Microsoft Word (.docx, .docm)
+    # 3. Microsoft Word (.docx, .docm) & OpenDocument Tekst (.odt)
     if ext in ['docx', 'docm'] or 'word' in mime:
         res = _render_docx(inhoud_bytes)
+        base_result.update(res)
+        return base_result
+
+    if ext == 'odt' or 'opendocument.text' in mime:
+        res = _render_odt(inhoud_bytes)
         base_result.update(res)
         return base_result
 

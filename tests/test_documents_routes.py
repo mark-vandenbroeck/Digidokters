@@ -372,7 +372,45 @@ class TestDocumentsRoutes(BaseTestCase):
             aangemaakt_door_id=self.admin_user.id
         )
 
-        db.session.add_all([doc_word, doc_excel, doc_md, doc_csv])
+        # 5. OpenDocument Tekst (.odt)
+        import zipfile
+        odt_io = io.BytesIO()
+        with zipfile.ZipFile(odt_io, 'w') as zf:
+            content_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+            <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                                     xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+                                     xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+                                     xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+                                     xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">
+              <office:automatic-styles>
+                <style:style style:name="T1" style:family="text">
+                  <style:text-properties fo:font-weight="bold"/>
+                </style:style>
+              </office:automatic-styles>
+              <office:body>
+                <office:text>
+                  <text:h text:outline-level="1">OpenDocument Notulen</text:h>
+                  <text:p>Dit is een <text:span text:style-name="T1">belangrijke</text:span> ODT alinea.</text:p>
+                  <text:list>
+                    <text:list-item><text:p>ODT Actiepunt 1</text:p></text:list-item>
+                  </text:list>
+                </office:text>
+              </office:body>
+            </office:document-content>'''
+            zf.writestr('content.xml', content_xml.encode('utf-8'))
+        odt_bytes = odt_io.getvalue()
+
+        doc_odt = Document(
+            organisatie_id=self.org.id,
+            bestandsnaam="notulen.odt",
+            type="odt",
+            mime_type="application/vnd.oasis.opendocument.text",
+            bestandsgrootte=len(odt_bytes),
+            inhoud=odt_bytes,
+            aangemaakt_door_id=self.admin_user.id
+        )
+
+        db.session.add_all([doc_word, doc_excel, doc_md, doc_csv, doc_odt])
         db.session.commit()
 
         # Test Word Viewer
@@ -405,3 +443,12 @@ class TestDocumentsRoutes(BaseTestCase):
         csv_html = res_csv.get_data(as_text=True)
         self.assertIn("Gebruiker", csv_html)
         self.assertIn("Actief", csv_html)
+
+        # Test ODT Viewer
+        res_odt = self.client.get(f'/documenten/{doc_odt.id}/bekijken')
+        self.assertEqual(res_odt.status_code, 200)
+        odt_html = res_odt.get_data(as_text=True)
+        self.assertIn("OpenDocument Notulen", odt_html)
+        self.assertIn("<strong>belangrijke</strong>", odt_html)
+        self.assertIn("ODT Actiepunt 1", odt_html)
+        self.assertIn("docx-paper", odt_html)

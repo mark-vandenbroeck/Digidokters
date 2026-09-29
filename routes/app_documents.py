@@ -35,6 +35,8 @@ def _bepaal_bestandstype(bestandsnaam, mime_type):
         return 'pdf'
     if 'word' in mime_type or 'document' in mime_type:
         return 'docx'
+    if 'opendocument.text' in mime_type or 'odt' in mime_type:
+        return 'odt'
     if 'excel' in mime_type or 'sheet' in mime_type:
         return 'xlsx'
     if 'image' in mime_type:

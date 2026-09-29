@@ -1,11 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.12.4-slim'
-            // Nodig zodat pip packages kan installeren; args indien specifieke rechten nodig zijn
-            args '-u root:root'
-        }
-    }
+    agent any
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '20'))
@@ -24,6 +18,13 @@ pipeline {
         }
 
         stage('Setup virtualenv') {
+            agent {
+                docker {
+                    image 'python:3.12.4-slim'
+                    args '-u root:root'
+                    reuseNode true
+                }
+            }
             steps {
                 sh '''
                     python -m venv ${VENV_DIR}
@@ -35,6 +36,13 @@ pipeline {
         }
 
         stage('Run tests') {
+            agent {
+                docker {
+                    image 'python:3.12.4-slim'
+                    args '-u root:root'
+                    reuseNode true
+                }
+            }
             steps {
                 sh '''
                     . ${VENV_DIR}/bin/activate

@@ -178,16 +178,23 @@ class TestDocumentsRoutes(BaseTestCase):
         self.assertEqual(res_dl.data, b"%PDF-1.4 test pdf content")
         self.assertIn("attachment", res_dl.headers.get('Content-Disposition', ''))
 
-        # 2. Bekijken route voor PDF (inline met CSP sandbox)
+        # 2. Bekijken route voor PDF (laadt document viewer HTML template)
         res_view_pdf = self.client.get(f'/documenten/{doc_pdf.id}/bekijken')
         self.assertEqual(res_view_pdf.status_code, 200)
-        self.assertIn("sandbox", res_view_pdf.headers.get('Content-Security-Policy', ''))
-        self.assertNotIn("attachment", res_view_pdf.headers.get('Content-Disposition', ''))
+        self.assertIn("test.pdf", res_view_pdf.get_data(as_text=True))
+        self.assertIn("iframe", res_view_pdf.get_data(as_text=True))
 
-        # 3. Bekijken route voor onveilige HTML (moet attachment forceren)
-        res_view_html = self.client.get(f'/documenten/{doc_html.id}/bekijken')
-        self.assertEqual(res_view_html.status_code, 200)
-        self.assertIn("attachment", res_view_html.headers.get('Content-Disposition', ''))
+        # 3. Raw bekijken route voor PDF (inline stream met CSP sandbox)
+        res_raw_pdf = self.client.get(f'/documenten/{doc_pdf.id}/bekijken?raw=1')
+        self.assertEqual(res_raw_pdf.status_code, 200)
+        self.assertEqual(res_raw_pdf.data, b"%PDF-1.4 test pdf content")
+        self.assertIn("sandbox", res_raw_pdf.headers.get('Content-Security-Policy', ''))
+        self.assertNotIn("attachment", res_raw_pdf.headers.get('Content-Disposition', ''))
+
+        # 4. Raw bekijken route voor onveilige HTML (moet attachment forceren)
+        res_raw_html = self.client.get(f'/documenten/{doc_html.id}/bekijken?raw=1')
+        self.assertEqual(res_raw_html.status_code, 200)
+        self.assertIn("attachment", res_raw_html.headers.get('Content-Disposition', ''))
 
     def test_document_overwrite_and_edit_and_delete(self):
         """Test overschrijven (versie bump), bewerken van metagegevens en verwijderen van documenten."""
@@ -296,3 +303,105 @@ class TestDocumentsRoutes(BaseTestCase):
 
         res_lezer_upload = self.client.post('/documenten/upload', data={}, follow_redirects=True)
         self.assertIn("geen schrijfrechten", res_lezer_upload.get_data(as_text=True).lower())
+
+    def test_rich_document_viewers(self):
+        """Test the in-browser viewer for Word (.docx), Excel (.xlsx), Markdown (.md), and CSV."""
+        self.login_admin()
+        import docx
+        import openpyxl
+
+        # 1. Word Document (.docx)
+        doc_obj = docx.Document()
+        doc_obj.add_heading("Digidokters Verslag", level=1)
+        doc_obj.add_paragraph("Dit is een test paragraaf in Word formaat.")
+        docx_io = io.BytesIO()
+        doc_obj.save(docx_io)
+        docx_bytes = docx_io.getvalue()
+
+        doc_word = Document(
+            organisatie_id=self.org.id,
+            bestandsnaam="verslag.docx",
+            type="docx",
+            mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            bestandsgrootte=len(docx_bytes),
+            inhoud=docx_bytes,
+            aangemaakt_door_id=self.admin_user.id
+        )
+
+        # 2. Excel Spreadsheet (.xlsx)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Overzicht"
+        ws.append(["ID", "Naam", "Aantal"])
+        ws.append([1, "Mark", 42])
+        xlsx_io = io.BytesIO()
+        wb.save(xlsx_io)
+        xlsx_bytes = xlsx_io.getvalue()
+
+        doc_excel = Document(
+            organisatie_id=self.org.id,
+            bestandsnaam="statistieken.xlsx",
+            type="xlsx",
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bestandsgrootte=len(xlsx_bytes),
+            inhoud=xlsx_bytes,
+            aangemaakt_door_id=self.admin_user.id
+        )
+
+        # 3. Markdown (.md)
+        md_bytes = b"# Handleiding Digidokters\n\n- Punt 1\n- Punt 2\n\n**Belangrijk:** Altijd testen!"
+        doc_md = Document(
+            organisatie_id=self.org.id,
+            bestandsnaam="handleiding.md",
+            type="md",
+            mime_type="text/markdown",
+            bestandsgrootte=len(md_bytes),
+            inhoud=md_bytes,
+            aangemaakt_door_id=self.admin_user.id
+        )
+
+        # 4. CSV (.csv)
+        csv_bytes = b"Datum,Gebruiker,Status\n2026-09-29,Mark,Actief\n2026-09-30,Jan,Inactief"
+        doc_csv = Document(
+            organisatie_id=self.org.id,
+            bestandsnaam="export.csv",
+            type="csv",
+            mime_type="text/csv",
+            bestandsgrootte=len(csv_bytes),
+            inhoud=csv_bytes,
+            aangemaakt_door_id=self.admin_user.id
+        )
+
+        db.session.add_all([doc_word, doc_excel, doc_md, doc_csv])
+        db.session.commit()
+
+        # Test Word Viewer
+        res_word = self.client.get(f'/documenten/{doc_word.id}/bekijken')
+        self.assertEqual(res_word.status_code, 200)
+        word_html = res_word.get_data(as_text=True)
+        self.assertIn("Digidokters Verslag", word_html)
+        self.assertIn("Dit is een test paragraaf in Word formaat.", word_html)
+        self.assertIn("docx-paper", word_html)
+
+        # Test Excel Viewer
+        res_excel = self.client.get(f'/documenten/{doc_excel.id}/bekijken')
+        self.assertEqual(res_excel.status_code, 200)
+        excel_html = res_excel.get_data(as_text=True)
+        self.assertIn("Overzicht", excel_html)
+        self.assertIn("Mark", excel_html)
+        self.assertIn("excel-container", excel_html)
+
+        # Test Markdown Viewer
+        res_md = self.client.get(f'/documenten/{doc_md.id}/bekijken')
+        self.assertEqual(res_md.status_code, 200)
+        md_html = res_md.get_data(as_text=True)
+        self.assertIn("Handleiding Digidokters", md_html)
+        self.assertIn("<strong>Belangrijk:</strong>", md_html)
+        self.assertIn("markdown-paper", md_html)
+
+        # Test CSV Viewer
+        res_csv = self.client.get(f'/documenten/{doc_csv.id}/bekijken')
+        self.assertEqual(res_csv.status_code, 200)
+        csv_html = res_csv.get_data(as_text=True)
+        self.assertIn("Gebruiker", csv_html)
+        self.assertIn("Actief", csv_html)

@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+
+{% block title %}{{ doc.bestandsnaam }} – Document Viewer{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Document Viewer Algemene Styling */
+.doc-viewer-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+.doc-viewer-toolbar {
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 1rem 1.25rem;
+}
+
+.doc-viewer-canvas {
+    background: #f1f5f9;
+    padding: 1.5rem;
+    min-height: 70vh;
+    overflow-x: auto;
+}
+
+/* Word Document Styling (A4 Pagina weergave) */
+.docx-paper {
+    background: #ffffff;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 3rem 3.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #1e293b;
+    line-height: 1.65;
+}
+
+.docx-paper h1, .docx-paper h2, .docx-paper h3, .docx-paper h4 {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.docx-paper .docx-table {
+    font-size: 0.9rem;
+    border-color: #cbd5e1;
+}
+
+.docx-paper .docx-table th {
+    background-color: #f8fafc;
+    color: #334155;
+    font-weight: 600;
+}
+
+/* Excel Spreadsheet Styling */
+.excel-container {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.excel-table-wrapper {
+    max-height: 65vh;
+    overflow: auto;
+}
+
+.excel-table {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.excel-table th {
+    position: sticky;
+    top: 0;
+    background: #f1f5f9;
+    color: #475569;
+    font-weight: 600;
+    z-index: 2;
+    border-bottom: 2px solid #cbd5e1;
+    white-space: nowrap;
+}
+
+.excel-table .row-num {
+    background: #f8fafc;
+    color: #94a3b8;
+    text-align: center;
+    width: 45px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    user-select: none;
+    border-right: 1px solid #e2e8f0;
+}
+
+.excel-table td {
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-color: #f1f5f9;
+}
+
+/* Markdown Styling */
+.markdown-paper {
+    background: #ffffff;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2.5rem 3rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    line-height: 1.7;
+    color: #1e293b;
+}
+
+.markdown-paper h1, .markdown-paper h2 {
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 0.4rem;
+    margin-top: 1.8rem;
+    margin-bottom: 1rem;
+}
+
+.markdown-paper code {
+    background: #f1f5f9;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.88em;
+    color: #0f172a;
+}
+
+.markdown-paper pre {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 1.25rem;
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+.markdown-paper pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+}
+
+.markdown-paper blockquote {
+    border-left: 4px solid #3b82f6;
+    padding-left: 1rem;
+    color: #64748b;
+    margin: 1.2rem 0;
+}
+
+.markdown-paper table {
+    width: 100%;
+    margin: 1.5rem 0;
+    border-collapse: collapse;
+}
+
+.markdown-paper table th, .markdown-paper table td {
+    border: 1px solid #e2e8f0;
+    padding: 0.6rem 0.9rem;
+}
+
+.markdown-paper table th {
+    background: #f8fafc;
+}
+
+/* Code & Tekst Viewer Styling */
+.code-viewer-container {
+    background: #0f172a;
+    color: #f8fafc;
+    border-radius: 8px;
+    font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    max-height: 70vh;
+    overflow: auto;
+}
+
+.code-line {
+    display: flex;
+}
+
+.code-line-num {
+    color: #64748b;
+    user-select: none;
+    text-align: right;
+    padding: 0 1rem;
+    min-width: 50px;
+    border-right: 1px solid #334155;
+    background: #090d16;
+}
+
+.code-line-content {
+    padding-left: 1rem;
+    white-space: pre;
+}
+
+/* PDF & Image Viewers */
+.pdf-viewer-frame {
+    width: 100%;
+    height: 78vh;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.image-preview-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+    background: #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.image-preview-wrapper img {
+    max-width: 100%;
+    max-height: 75vh;
+    object-fit: contain;
+    border-radius: 4px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .doc-viewer-canvas, .doc-viewer-canvas * {
+        visibility: visible;
+    }
+    .doc-viewer-canvas {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white !important;
+        padding: 0 !important;
+    }
+    .docx-paper, .markdown-paper {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-md-4">
+    <!-- Breadcrumb & Navigatie -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            {% for crumb in breadcrumbs %}
+                {% if loop.last %}
+                    <li class="breadcrumb-item active fw-medium text-dark" aria-current="page">{{ crumb.naam }}</li>
+                {% else %}
+                    <li class="breadcrumb-item">
+                        <a href="{{ url_for(index_endpoint, map_id=crumb.id) if crumb.id else url_for(index_endpoint) }}" class="text-decoration-none">
+                            {{ crumb.naam }}
+                        </a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+            <li class="breadcrumb-item active text-truncate" style="max-width: 300px;" title="{{ doc.bestandsnaam }}">
+                {{ doc.bestandsnaam }}
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Viewer Card -->
+    <div class="card doc-viewer-card shadow-sm">
+        <!-- Toolbar Header -->
+        <div class="doc-viewer-toolbar d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <a href="{{ return_url }}" class="btn btn-outline-secondary btn-sm" title="Terug naar overzicht">
+                    <i class="bi bi-arrow-left me-1"></i>Terug
+                </a>
+
+                <!-- Type Icoon & Titel -->
+                <div class="d-flex align-items-center gap-2">
+                    {% if preview.ext in ['pdf'] %}
+                        <i class="bi bi-file-earmark-pdf-fill fs-2 text-danger"></i>
+                    {% elif preview.ext in ['doc', 'docx'] %}
+                        <i class="bi bi-file-earmark-word-fill fs-2 text-primary"></i>
+                    {% elif preview.ext in ['xls', 'xlsx', 'csv', 'tsv'] %}
+                        <i class="bi bi-file-earmark-excel-fill fs-2 text-success"></i>
+                    {% elif preview.ext in ['md', 'markdown'] %}
+                        <i class="bi bi-markdown-fill fs-2 text-info"></i>
+                    {% elif preview.ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] %}
+                        <i class="bi bi-file-earmark-image-fill fs-2 text-warning"></i>
+                    {% else %}
+                        <i class="bi bi-file-earmark-text-fill fs-2 text-secondary"></i>
+                    {% endif %}
+
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="mb-0 fw-bold text-dark text-truncate" style="max-width: 500px;" title="{{ doc.bestandsnaam }}">
+                                {{ doc.bestandsnaam }}
+                            </h5>
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" style="font-size: 0.72rem;">
+                                v{{ doc.versie }}
+                            </span>
+                        </div>
+                        <div class="text-muted small" style="font-size: 0.8rem;">
+                            {{ (doc.bestandsgrootte / 1024)|round(1) if doc.bestandsgrootte < 1024*1024 else (doc.bestandsgrootte / (1024*1024))|round(2) }} 
+                            {{ 'KB' if doc.bestandsgrootte < 1024*1024 else 'MB' }}
+                            {% if doc.aangemaakt_op %}
+                                &bull; Geüpload op {{ doc.aangemaakt_op.strftime('%d-%m-%Y %H:%M') }}
+                            {% endif %}
+                            {% if doc.aangemaakt_door %}
+                                door {{ doc.aangemaakt_door.naam }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toolbar Knoppen -->
+            <div class="d-flex align-items-center gap-2">
+                {% if preview.viewer_type in ['word', 'markdown', 'excel', 'text'] %}
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Afdrukken">
+                    <i class="bi bi-printer me-1"></i>Afdrukken
+                </button>
+                {% endif %}
+
+                {% if preview.viewer_type in ['markdown', 'text'] and preview.raw_text %}
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCopyText" onclick="copyDocumentText()" title="Kopieer alle tekst naar klembord">
+                    <i class="bi bi-clipboard me-1"></i>Kopiëren
+                </button>
+                {% endif %}
+
+                <a href="{{ download_url }}" class="btn btn-sm btn-primary" title="Download origineel bestand">
+                    <i class="bi bi-download me-1"></i>Downloaden
+                </a>
+            </div>
+        </div>
+
+        {% if doc.omschrijving %}
+        <div class="px-4 py-2 bg-light border-bottom text-muted small">
+            <i class="bi bi-info-circle me-1 text-primary"></i><strong>Omschrijving:</strong> {{ doc.omschrijving }}
+        </div>
+        {% endif %}
+
+        <!-- Canvas Inhoud -->
+        <div class="doc-viewer-canvas">
+            <!-- 1. WORD VIEWER (.docx) -->
+            {% if preview.viewer_type == 'word' %}
+                <div class="docx-paper">
+                    {{ preview.html_content|safe }}
+                </div>
+
+            <!-- 2. EXCEL & SPREADSHEET VIEWER (.xlsx, .csv, .tsv) -->
+            {% elif preview.viewer_type == 'excel' %}
+                <div class="excel-container shadow-sm p-3">
+                    <!-- Sheet Tabs / Header -->
+                    {% if preview.sheets|length > 1 %}
+                    <ul class="nav nav-tabs mb-3" id="excelSheetTabs" role="tablist">
+                        {% for sheet in preview.sheets %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link {% if loop.first %}active fw-bold{% endif %}" 
+                                    id="sheet-tab-{{ loop.index }}" 
+                                    data-bs-toggle="tab" 
+                                    data-bs-target="#sheet-pane-{{ loop.index }}" 
+                                    type="button" role="tab">
+                                <i class="bi bi-file-earmark-spreadsheet me-1 text-success"></i>{{ sheet.name }}
+                                <span class="badge bg-secondary-subtle text-secondary ms-1" style="font-size: 0.65rem;">{{ sheet.total_rows }}</span>
+                            </button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% elif preview.sheets|length == 1 and preview.sheets[0].name %}
+                    <div class="mb-3 d-flex align-items-center gap-2">
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                            <i class="bi bi-table me-1"></i>Werkblad: {{ preview.sheets[0].name }}
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Zoekbalk binnen spreadsheet -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="input-group input-group-sm" style="max-width: 320px;">
+                            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" class="form-control" id="excelSearchInput" placeholder="Filteren in spreadsheet..." onkeyup="filterExcelTable()">
+                        </div>
+                        <div class="text-muted small">
+                            <i class="bi bi-info-circle me-1"></i>{{ preview.sheets[0].total_rows }} rijen &bull; {{ preview.sheets[0].total_cols }} kolommen
+                        </div>
+                    </div>
+
+                    <!-- Tab Panes -->
+                    <div class="tab-content" id="excelSheetTabContent">
+                        {% for sheet in preview.sheets %}
+                        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                             id="sheet-pane-{{ loop.index }}" 
+                             role="tabpanel">
+                            
+                            {% if sheet.is_truncated %}
+                            <div class="alert alert-info py-1 px-3 small mb-2">
+                                <i class="bi bi-info-circle me-1"></i>Voorbeeld toont de eerste {{ sheet.max_rows }} van {{ sheet.total_rows }} rijen. Download het volledige bestand voor alle gegevens.
+                            </div>
+                            {% endif %}
+
+                            <div class="excel-table-wrapper border rounded">
+                                <table class="table table-bordered table-hover excel-table" id="table-sheet-{{ loop.index }}">
+                                    {% if sheet.headers %}
+                                    <thead>
+                                        <tr>
+                                            <th class="row-num">#</th>
+                                            {% for h in sheet.headers %}
+                                            <th>{{ h }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    {% endif %}
+                                    <tbody>
+                                        {% for row in sheet.rows %}
+                                        <tr>
+                                            <td class="row-num">{{ loop.index }}</td>
+                                            {% for cell in row %}
+                                            <td title="{{ cell }}">{{ cell }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="100%" class="text-center text-muted py-4">Geen gegevens in dit blad.</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            <!-- 3. MARKDOWN VIEWER (.md) -->
+            {% elif preview.viewer_type == 'markdown' %}
+                <div class="markdown-paper">
+                    {{ preview.html_content|safe }}
+                </div>
+
+            <!-- 4. PDF VIEWER (.pdf) -->
+            {% elif preview.viewer_type == 'pdf' %}
+                <iframe src="{{ raw_url }}" class="pdf-viewer-frame shadow-sm" title="{{ doc.bestandsnaam }}">
+                    <p>Uw browser ondersteunt geen ingesloten PDF-weergave. <a href="{{ download_url }}">Klik hier om de PDF te downloaden</a>.</p>
+                </iframe>
+
+            <!-- 5. AFBEELDING VIEWER -->
+            {% elif preview.viewer_type == 'image' %}
+                <div class="image-preview-wrapper shadow-sm">
+                    <img src="{{ raw_url }}" alt="{{ doc.bestandsnaam }}" class="img-fluid">
+                </div>
+
+            <!-- 6. PLATTE TEKST / CODE VIEWER -->
+            {% elif preview.viewer_type == 'text' %}
+                <div class="code-viewer-container shadow-sm p-2">
+                    {% for line in preview.lines %}
+                    <div class="code-line">
+                        <span class="code-line-num">{{ loop.index }}</span>
+                        <span class="code-line-content">{{ line }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            <!-- 7. FOUT OF NIET-ONDERSTEUND -->
+            {% else %}
+                <div class="card bg-white p-5 text-center shadow-sm max-w-600 mx-auto" style="max-width: 600px; margin: 2rem auto;">
+                    <div class="mb-3">
+                        <i class="bi bi-file-earmark-arrow-down fs-1 text-primary"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark">{{ doc.bestandsnaam }}</h5>
+                    <p class="text-muted">
+                        {{ preview.error_message or 'Dit documenttype kan niet direct in de browser worden bekeken.' }}
+                    </p>
+                    <div>
+                        <a href="{{ download_url }}" class="btn btn-primary px-4 py-2">
+                            <i class="bi bi-download me-1"></i>Bestand downloaden
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if preview.raw_text %}
+<textarea id="hiddenRawText" style="display:none;">{{ preview.raw_text }}</textarea>
+{% endif %}
+
+<script>
+function copyDocumentText() {
+    const rawTextElem = document.getElementById('hiddenRawText');
+    if (!rawTextElem) return;
+    
+    navigator.clipboard.writeText(rawTextElem.value).then(() => {
+        const btn = document.getElementById('btnCopyText');
+        if (btn) {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check2 me-1 text-success"></i>Gekopieerd!';
+            btn.classList.replace('btn-outline-secondary', 'btn-success');
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.replace('btn-success', 'btn-outline-secondary');
+            }, 2000);
+        }
+    }).catch(err => {
+        alert('Kopiëren mislukt: ' + err);
+    });
+}
+
+function filterExcelTable() {
+    const query = (document.getElementById('excelSearchInput')?.value || '').toLowerCase().trim();
+    const activeTab = document.querySelector('.tab-pane.active');
+    if (!activeTab) return;
+    
+    const rows = activeTab.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(query) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

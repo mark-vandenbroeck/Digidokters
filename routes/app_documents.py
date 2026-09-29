@@ -238,19 +238,51 @@ def download(doc_id):
 @login_required
 def bekijken(doc_id):
     doc = AppDocument.query.filter_by(id=doc_id).first_or_404()
-    safe_mimetypes = {'image/png', 'image/jpeg', 'image/gif', 'application/pdf'}
-    mime = doc.mime_type or 'application/octet-stream'
-    as_attachment = mime.lower().strip() not in safe_mimetypes
+    
+    # Indien raw data opgevraagd wordt (bijv. voor PDF in iframe of afbeeldingen)
+    if request.args.get('raw'):
+        safe_mimetypes = {'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf'}
+        mime = doc.mime_type or 'application/octet-stream'
+        as_attachment = mime.lower().strip() not in safe_mimetypes
 
-    response = send_file(
-        io.BytesIO(doc.inhoud),
-        mimetype=mime,
-        download_name=doc.bestandsnaam,
-        as_attachment=as_attachment
+        response = send_file(
+            io.BytesIO(doc.inhoud),
+            mimetype=mime,
+            download_name=doc.bestandsnaam,
+            as_attachment=as_attachment
+        )
+        if not as_attachment:
+            response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox;"
+        return response
+
+    # Bouw breadcrumbs op
+    breadcrumbs = [{'id': None, 'naam': 'App documentatie'}]
+    if doc.map:
+        pad = []
+        curr = doc.map
+        while curr:
+            pad.append({'id': curr.id, 'naam': curr.naam})
+            curr = curr.parent
+        pad.reverse()
+        breadcrumbs.extend(pad)
+
+    from utils.document_renderer import render_document_preview
+    preview = render_document_preview(doc.inhoud, doc.bestandsnaam, doc.mime_type)
+
+    return_url = url_for('app_docs.index', map_id=doc.map_id) if doc.map_id else url_for('app_docs.index')
+    download_url = url_for('app_docs.download', doc_id=doc.id)
+    raw_url = url_for('app_docs.bekijken', doc_id=doc.id, raw=1)
+
+    return render_template(
+        'documents/viewer.html',
+        doc=doc,
+        preview=preview,
+        breadcrumbs=breadcrumbs,
+        return_url=return_url,
+        download_url=download_url,
+        raw_url=raw_url,
+        index_endpoint='app_docs.index'
     )
-    if not as_attachment:
-        response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox;"
-    return response
 
 
 @app_docs_bp.route('/<int:doc_id>/overschrijven', methods=['POST'])

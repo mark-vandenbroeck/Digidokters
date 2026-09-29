@@ -150,10 +150,15 @@ class TestAppDocuments(BaseTestCase):
         self.assertEqual(doc.versie, 1)
         self.assertEqual(doc.map_id, folder.id)
 
-        # 4. Document inline bekijken
+        # 4. Document inline bekijken (HTML viewer) en raw data streamen
         res_view = self.client.get(f'/app-documentatie/{doc.id}/bekijken')
         self.assertEqual(res_view.status_code, 200)
-        self.assertEqual(res_view.data, b"Veiligheidscontrole geslaagd.")
+        self.assertIn("audit.txt", res_view.get_data(as_text=True))
+        self.assertIn("Veiligheidscontrole geslaagd.", res_view.get_data(as_text=True))
+
+        res_raw = self.client.get(f'/app-documentatie/{doc.id}/bekijken?raw=1')
+        self.assertEqual(res_raw.status_code, 200)
+        self.assertEqual(res_raw.data, b"Veiligheidscontrole geslaagd.")
 
         # 5. Document bewerken (naam en omschrijving)
         res_edit = self.client.post(f'/app-documentatie/{doc.id}/bewerken', data={

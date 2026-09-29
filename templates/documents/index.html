@@ -183,14 +183,18 @@
                                     <td class="text-center">
                                         {% if doc.type in ['pdf'] %}
                                             <i class="bi bi-file-earmark-pdf-fill fs-3 text-danger"></i>
-                                        {% elif doc.type in ['doc', 'docx'] %}
+                                        {% elif doc.type in ['doc', 'docx', 'docm'] %}
                                             <i class="bi bi-file-earmark-word-fill fs-3 text-primary"></i>
-                                        {% elif doc.type in ['xls', 'xlsx', 'csv'] %}
+                                        {% elif doc.type in ['xls', 'xlsx', 'xlsm', 'csv', 'tsv'] %}
                                             <i class="bi bi-file-earmark-excel-fill fs-3 text-success"></i>
-                                        {% elif doc.type in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'afbeelding'] %}
-                                            <i class="bi bi-file-earmark-image-fill fs-3 text-info"></i>
-                                        {% elif doc.type in ['zip', 'rar', '7z', 'tar'] %}
+                                        {% elif doc.type in ['md', 'markdown'] %}
+                                            <i class="bi bi-markdown-fill fs-3 text-info"></i>
+                                        {% elif doc.type in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'afbeelding'] %}
+                                            <i class="bi bi-file-earmark-image-fill fs-3 text-warning"></i>
+                                        {% elif doc.type in ['zip', 'rar', '7z', 'tar', 'gz'] %}
                                             <i class="bi bi-file-earmark-zip-fill fs-3 text-warning"></i>
+                                        {% elif doc.type in ['json', 'xml', 'html', 'sql', 'py', 'sh', 'css', 'js', 'yaml', 'yml'] %}
+                                            <i class="bi bi-file-earmark-code-fill fs-3 text-dark"></i>
                                         {% else %}
                                             <i class="bi bi-file-earmark-text-fill fs-3 text-secondary"></i>
                                         {% endif %}
@@ -245,8 +249,8 @@
                                     <!-- Acties -->
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
-                                            {% if doc.type in ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt'] %}
-                                                <a href="{{ url_for('doc.bekijken', doc_id=doc.id) }}" target="_blank" class="btn btn-outline-secondary" title="Bekijken in browser">
+                                            {% if doc.type not in ['zip', 'rar', '7z', 'tar', 'gz', 'exe', 'bin'] %}
+                                                <a href="{{ url_for('doc.bekijken', doc_id=doc.id) }}" class="btn btn-outline-secondary" title="Bekijken in browser">
                                                     <i class="bi bi-eye"></i>
                                                 </a>
                                             {% endif %}

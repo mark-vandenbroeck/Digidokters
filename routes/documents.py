@@ -253,9 +253,9 @@ def bekijken(doc_id):
     org_id = get_huidige_organisatie_id()
     doc = Document.query.filter_by(id=doc_id, organisatie_id=org_id).first_or_404()
     
-    # Indien raw data opgevraagd wordt (bijv. voor PDF in iframe of afbeeldingen)
+    # Indien raw data opgevraagd wordt (bijv. voor PDF of HTML in iframe of afbeeldingen)
     if request.args.get('raw'):
-        safe_mimetypes = {'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf'}
+        safe_mimetypes = {'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf', 'text/html'}
         mime = doc.mime_type or 'application/octet-stream'
         as_attachment = mime.lower().strip() not in safe_mimetypes
         
@@ -266,7 +266,10 @@ def bekijken(doc_id):
             as_attachment=as_attachment
         )
         if not as_attachment:
-            response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox;"
+            if mime.lower().strip() == 'text/html':
+                response.headers['Content-Security-Policy'] = "sandbox allow-scripts allow-popups allow-forms;"
+            else:
+                response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox;"
         return response
 
     # Bouw breadcrumbs op

@@ -40,6 +40,8 @@ def _bepaal_extensie(bestandsnaam: str, mime_type: str = '') -> str:
         return 'csv'
     if 'markdown' in mime or 'md' in mime:
         return 'md'
+    if 'html' in mime:
+        return 'html'
     if 'image' in mime:
         return 'png'
     return 'txt'
@@ -483,6 +485,28 @@ def _render_text_or_code(inhoud_bytes: bytes, ext: str) -> dict:
             'error_message': f'Kon tekstbestand niet inlezen: {str(e)}'
         }
 
+def _render_html(inhoud_bytes: bytes) -> dict:
+    """Rendert een HTML-document met zowel visuele weergave als broncodeweergave."""
+    try:
+        try:
+            tekst = inhoud_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            tekst = inhoud_bytes.decode('latin-1', errors='ignore')
+
+        lines = tekst.splitlines()
+        return {
+            'viewer_type': 'html',
+            'raw_text': tekst,
+            'lines': lines,
+            'line_count': len(lines),
+            'ext': 'html',
+        }
+    except Exception as e:
+        return {
+            'viewer_type': 'error',
+            'error_message': f'Kon HTML-bestand niet inlezen: {str(e)}'
+        }
+
 
 def render_document_preview(inhoud_bytes: bytes, bestandsnaam: str, mime_type: str = '') -> dict:
     """
@@ -543,13 +567,19 @@ def render_document_preview(inhoud_bytes: bytes, bestandsnaam: str, mime_type: s
         base_result.update(res)
         return base_result
 
-    # 6. Platte tekst & Broncode (.txt, .json, .xml, .html, .log, .yaml, .yml, .sql, .py, .sh, .css, .js)
-    if ext in ['txt', 'json', 'xml', 'html', 'log', 'yaml', 'yml', 'sql', 'py', 'sh', 'css', 'js', 'ini', 'env', 'conf'] or 'text/' in mime or 'json' in mime:
+    # 6. HTML documenten (.html, .htm)
+    if ext in ['html', 'htm'] or 'text/html' in mime:
+        res = _render_html(inhoud_bytes)
+        base_result.update(res)
+        return base_result
+
+    # 7. Platte tekst & Broncode (.txt, .json, .xml, .log, .yaml, .yml, .sql, .py, .sh, .css, .js)
+    if ext in ['txt', 'json', 'xml', 'log', 'yaml', 'yml', 'sql', 'py', 'sh', 'css', 'js', 'ini', 'env', 'conf'] or 'text/' in mime or 'json' in mime:
         res = _render_text_or_code(inhoud_bytes, ext)
         base_result.update(res)
         return base_result
 
-    # 7. Niet-ondersteund formaat
+    # 8. Niet-ondersteund formaat
     base_result.update({
         'viewer_type': 'unsupported',
         'error_message': f'Voor bestandstype ".{ext}" is geen directe browser-viewer beschikbaar. Download het bestand om het lokaal te openen.'

@@ -159,17 +159,17 @@ class TestDocumentsRoutes(BaseTestCase):
             inhoud=b"%PDF-1.4 test pdf content",
             aangemaakt_door_id=self.admin_user.id
         )
-        # HTML document (onveilig voor directe rendering, moet geforceerd gedownload worden)
-        doc_html = Document(
+        # Executable binary document (moet altijd geforceerd gedownload worden als attachment)
+        doc_exe = Document(
             organisatie_id=self.org.id,
-            bestandsnaam="gevaarlijk.html",
-            type="html",
-            mime_type="text/html",
+            bestandsnaam="gevaarlijk.exe",
+            type="exe",
+            mime_type="application/x-msdownload",
             bestandsgrootte=25,
-            inhoud=b"<script>alert(1)</script>",
+            inhoud=b"MZ\x90\x00\x03\x00\x00\x00",
             aangemaakt_door_id=self.admin_user.id
         )
-        db.session.add_all([doc_pdf, doc_html])
+        db.session.add_all([doc_pdf, doc_exe])
         db.session.commit()
 
         # 1. Download route
@@ -191,10 +191,10 @@ class TestDocumentsRoutes(BaseTestCase):
         self.assertIn("sandbox", res_raw_pdf.headers.get('Content-Security-Policy', ''))
         self.assertNotIn("attachment", res_raw_pdf.headers.get('Content-Disposition', ''))
 
-        # 4. Raw bekijken route voor onveilige HTML (moet attachment forceren)
-        res_raw_html = self.client.get(f'/documenten/{doc_html.id}/bekijken?raw=1')
-        self.assertEqual(res_raw_html.status_code, 200)
-        self.assertIn("attachment", res_raw_html.headers.get('Content-Disposition', ''))
+        # 4. Raw bekijken route voor onveilige EXE (moet attachment forceren)
+        res_raw_exe = self.client.get(f'/documenten/{doc_exe.id}/bekijken?raw=1')
+        self.assertEqual(res_raw_exe.status_code, 200)
+        self.assertIn("attachment", res_raw_exe.headers.get('Content-Disposition', ''))
 
     def test_document_overwrite_and_edit_and_delete(self):
         """Test overschrijven (versie bump), bewerken van metagegevens en verwijderen van documenten."""
@@ -410,7 +410,19 @@ class TestDocumentsRoutes(BaseTestCase):
             aangemaakt_door_id=self.admin_user.id
         )
 
-        db.session.add_all([doc_word, doc_excel, doc_md, doc_csv, doc_odt])
+        # 6. HTML Document (.html)
+        html_bytes = b"<!DOCTYPE html><html><head><title>Infographic</title></head><body><h1>Datastromen</h1><p>Visualisatie test</p></body></html>"
+        doc_html = Document(
+            organisatie_id=self.org.id,
+            bestandsnaam="datastromen.html",
+            type="html",
+            mime_type="text/html",
+            bestandsgrootte=len(html_bytes),
+            inhoud=html_bytes,
+            aangemaakt_door_id=self.admin_user.id
+        )
+
+        db.session.add_all([doc_word, doc_excel, doc_md, doc_csv, doc_odt, doc_html])
         db.session.commit()
 
         # Test Word Viewer
@@ -452,3 +464,19 @@ class TestDocumentsRoutes(BaseTestCase):
         self.assertIn("<strong>belangrijke</strong>", odt_html)
         self.assertIn("ODT Actiepunt 1", odt_html)
         self.assertIn("docx-paper", odt_html)
+
+        # Test HTML Viewer
+        res_html_view = self.client.get(f'/documenten/{doc_html.id}/bekijken')
+        self.assertEqual(res_html_view.status_code, 200)
+        html_page = res_html_view.get_data(as_text=True)
+        self.assertIn("datastromen.html", html_page)
+        self.assertIn("html-preview-frame", html_page)
+        self.assertIn("html-viewer-container", html_page)
+        self.assertIn("Visuele weergave", html_page)
+        self.assertIn("Broncode", html_page)
+
+        # Test HTML raw stream (sandboxed CSP)
+        res_html_raw = self.client.get(f'/documenten/{doc_html.id}/bekijken?raw=1')
+        self.assertEqual(res_html_raw.status_code, 200)
+        self.assertIn("sandbox", res_html_raw.headers.get('Content-Security-Policy', ''))
+        self.assertIn(b"Datastromen", res_html_raw.data)

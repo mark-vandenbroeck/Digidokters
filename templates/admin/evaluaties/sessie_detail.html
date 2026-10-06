@@ -47,6 +47,9 @@
                     <span class="badge bg-{{ item.type.kleur or 'blue' }}-soft text-{{ item.type.kleur or 'blue' }}">
                         {{ item.type.naam }}
                     </span>
+                    {% if item.omschrijving %}
+                    <div class="small fw-normal text-muted mt-1">{{ item.omschrijving }}</div>
+                    {% endif %}
                 </div>
             </div>
             <div class="col-12 col-md-3">

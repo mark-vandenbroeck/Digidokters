@@ -146,6 +146,7 @@
                     <tr>
                         <th class="ps-3">Datum & Tijd</th>
                         <th>Activiteit</th>
+                        <th>Omschrijving</th>
                         <th>Locatie</th>
                         <th>Aanwezige Digidokters</th>
                         <th>Reacties</th>
@@ -163,6 +164,13 @@
                             <span class="badge bg-{{ item.type.kleur or 'blue' }}-soft text-{{ item.type.kleur or 'blue' }}">
                                 {{ item.type.naam }}
                             </span>
+                        </td>
+                        <td>
+                            {% if item.omschrijving %}
+                                <span class="text-dark">{{ item.omschrijving }}</span>
+                            {% else %}
+                                <span class="text-muted fst-italic">—</span>
+                            {% endif %}
                         </td>
                         <td class="text-muted">{{ item.locatie.naam if item.locatie else '—' }}</td>
                         <td>

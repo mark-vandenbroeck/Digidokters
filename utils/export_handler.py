@@ -5,7 +5,14 @@ from sqlalchemy.orm import joinedload
 from models.registration import Registration
 from models.age_category import AgeCategory
 from models.device import Device
+from models.question_classification import QuestionClassification
 from extensions import db
+
+KOLOMMEN = [
+    'Registratienummer', 'Datum', 'Bezoeker', 'Digidokter',
+    'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp',
+    'Vraagclassificatie', 'Leeftijdscategorie', 'Toestel', 'Locatie'
+]
 
 
 def _haal_registraties(
@@ -26,6 +33,7 @@ def _haal_registraties(
             joinedload(Registration.locatie),
             joinedload(Registration.leeftijdscategorie).joinedload(AgeCategory.mapped_to),
             joinedload(Registration.toestel).joinedload(Device.mapped_to),
+            joinedload(Registration.classification).joinedload(QuestionClassification.category),
         )
         .filter(Registration.organisatie_id == org_id)
         .order_by(Registration.datum.desc(), Registration.registratienummer.desc())
@@ -55,6 +63,7 @@ def _haal_registraties(
             'Herkomst': reg.herkomst.naam if reg.herkomst else '',
             'Geslacht': reg.geslacht or '',
             'Onderwerp': reg.onderwerp,
+            'Vraagclassificatie': reg.classification.category.naam if (reg.classification and reg.classification.category) else '',
             'Leeftijdscategorie': reg.leeftijdscategorie.effectieve_naam if reg.leeftijdscategorie else '',
             'Toestel': reg.toestel.effectieve_naam if reg.toestel else '',
             'Locatie': reg.locatie.naam if reg.locatie else '',
@@ -68,10 +77,7 @@ def exporteer_csv(
 ) -> bytes:
     """Genereer CSV als bytes."""
     rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
-    df = pd.DataFrame(rijen) if rijen else pd.DataFrame(
-        columns=['Registratienummer', 'Datum', 'Bezoeker', 'Digidokter',
-                 'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel', 'Locatie']
-    )
+    df = pd.DataFrame(rijen) if rijen else pd.DataFrame(columns=KOLOMMEN)
     output = io.StringIO()
     df.to_csv(output, index=False, encoding='utf-8-sig')
     return output.getvalue().encode('utf-8-sig')
@@ -83,10 +89,7 @@ def exporteer_xlsx(
 ) -> bytes:
     """Genereer XLSX als bytes."""
     rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
-    df = pd.DataFrame(rijen) if rijen else pd.DataFrame(
-        columns=['Registratienummer', 'Datum', 'Bezoeker', 'Digidokter',
-                 'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp', 'Leeftijdscategorie', 'Toestel', 'Locatie']
-    )
+    df = pd.DataFrame(rijen) if rijen else pd.DataFrame(columns=KOLOMMEN)
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:

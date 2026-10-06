@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% block title %}Groepen & Permissies – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('admin.gebruikers') }}" class="btn btn-sm btn-outline-secondary" title="Naar Gebruikersbeheer">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h1 class="dd-page-title mb-0">
+                <i class="bi bi-shield-lock me-2 text-primary"></i>Groepen & Permissies
+            </h1>
+        </div>
+        <p class="dd-page-subtitle mb-0">Beheer groepen en fijnmazige toegangsrechten per functionaliteit voor deze organisatie</p>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <a href="{{ url_for('admin.gebruikers') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-people me-1"></i>Gebruikersoverzicht
+        </a>
+        <a href="{{ url_for('admin.groep_nieuw') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Nieuwe groep
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-0">
+        {% if groepen %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3" style="width: 220px;">Groepsnaam</th>
+                        <th>Omschrijving</th>
+                        <th class="text-center" style="width: 90px;">Leden</th>
+                        <th style="min-width: 320px;">Geconfigureerde Permissies</th>
+                        <th class="text-center" style="width: 90px;">Status</th>
+                        <th class="pe-3 text-end" style="width: 140px;">Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for grp in groepen %}
+                    <tr>
+                        <td class="ps-3">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="fw-bold text-dark">{{ grp.naam }}</span>
+                                {% if grp.is_standaard %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small" title="Standaard systeemgroep">Systeem</span>
+                                {% endif %}
+                                {% if grp.alleen_eigen_registraties %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle small" title="Leden zien uitsluitend eigen registraties">
+                                    <i class="bi bi-person-lock me-1"></i>Eigen registraties
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="text-muted small">{{ grp.beschrijving or '—' }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border px-2 py-1">
+                                <i class="bi bi-people me-1 text-primary"></i>{{ grp.users.count() }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-1">
+                                {% for feat in ALL_FEATURES %}
+                                    {% set perm_lvl = grp.get_permission(feat) %}
+                                    {% if perm_lvl == 'schrijven' %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle py-1" style="font-size: 0.72rem;" title="{{ FEATURE_LABELS[feat] }}: Lezen en Schrijven">
+                                        <i class="bi bi-pencil-square me-1"></i>{{ FEATURE_LABELS[feat] }}
+                                    </span>
+                                    {% elif perm_lvl == 'lezen' %}
+                                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle py-1" style="font-size: 0.72rem;" title="{{ FEATURE_LABELS[feat] }}: Alleen Lezen">
+                                        <i class="bi bi-eye me-1"></i>{{ FEATURE_LABELS[feat] }}
+                                    </span>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            {% if grp.actief %}
+                            <span class="badge bg-success">Actief</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactief</span>
+                            {% endif %}
+                        </td>
+                        <td class="pe-3 text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('admin.groep_bewerken', groep_id=grp.id) }}"
+                                   class="btn btn-outline-primary" title="Bewerken & Permissiematrix">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('admin.groep_toggle', groep_id=grp.id) }}"
+                                   class="btn btn-outline-secondary" title="{% if grp.actief %}Deactiveren{% else %}Activeren{% endif %}">
+                                    <i class="bi bi-{% if grp.actief %}eye-slash{% else %}eye{% endif %}"></i>
+                                </a>
+                                {% if not grp.is_standaard and grp.users.count() == 0 %}
+                                <form method="POST" action="{{ url_for('admin.groep_verwijderen', groep_id=grp.id) }}" class="d-inline"
+                                      onsubmit="return confirm('Weet u zeker dat u groep \'{{ grp.naam }}\' wilt verwijderen?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger" title="Verwijderen">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-shield-slash fs-1 d-block mb-2"></i>
+            <p>Er zijn nog geen groepen aangemaakt voor deze organisatie.</p>
+            <a href="{{ url_for('admin.groep_nieuw') }}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i>Eerste groep toevoegen
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Info Card -->
+<div class="card bg-light border-0">
+    <div class="card-body p-3">
+        <h6 class="fw-bold mb-1"><i class="bi bi-info-circle text-primary me-1"></i>Hoe werken groepspermissies?</h6>
+        <p class="text-muted small mb-0">
+            Gebruikers kunnen lid zijn van meerdere groepen. Wanneer een gebruiker tot meerdere groepen behoort, 
+            worden de rechten gecombineerd volgens het <strong>hoogste toegekende niveau</strong> 
+            (<em>Lezen en schrijven</em> heeft voorrang op <em>Alleen lezen</em>, wat voorrang heeft op <em>Geen toegang</em>).
+        </p>
+    </div>
+</div>
+{% endblock %}

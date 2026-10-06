@@ -3,10 +3,11 @@ from functools import wraps
 from flask import flash, redirect, url_for, session
 from flask_login import current_user
 from models.constants import ROLE_PLATFORMBEHEERDER, ROLE_BEHEERDER, ROLE_LEZER
+from utils.permissions import has_permission, require_permission, permission_required, can_read, can_write
 
 
 def admin_required(f):
-    """Decorator: vereist de rol 'beheerder' binnen de actieve organisatie."""
+    """Decorator: vereist de rol 'beheerder' of schrijfrechten op gebruikersbeheer binnen de actieve organisatie."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
@@ -19,6 +20,10 @@ def admin_required(f):
         if current_user.rol == ROLE_PLATFORMBEHEERDER:
             return f(*args, **kwargs)
             
+        # Dynamische check op 'gebruikers' bewerkrechten
+        if has_permission('gebruikers', 'write', user=current_user, org_id=org_id):
+            return f(*args, **kwargs)
+
         uo = next((x for x in current_user.user_organisaties if x.organisatie_id == org_id and x.actief and x.organisatie.actief), None)
         if not uo or uo.rol != ROLE_BEHEERDER:
             flash('U heeft geen toegang tot deze pagina.', 'danger')
@@ -52,7 +57,7 @@ def platform_admin_required(f):
 
 
 def writer_required(f):
-    """Decorator: vereist dat de gebruiker medewerker of beheerder is (niet lezer)."""
+    """Decorator: vereist dat de gebruiker schrijfrechten heeft (niet lezer)."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
@@ -71,3 +76,4 @@ def writer_required(f):
             return redirect(url_for('reg.lijst'))
         return f(*args, **kwargs)
     return decorated_function
+

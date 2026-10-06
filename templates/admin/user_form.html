@@ -49,7 +49,7 @@
 
                 {% set geselecteerde_rol = form_data.rol if form_data and form_data.rol is defined else (user.rol if user and user.rol == 'platformbeheerder' else (membership.rol if membership and membership.rol else (user.rol if user else 'medewerker'))) %}
                 <div class="mb-3">
-                    <label for="rol" class="form-label">Toegangsrechten / Rol <span class="text-danger">*</span></label>
+                    <label for="rol" class="form-label">Primaire Rol <span class="text-danger">*</span></label>
                     <select class="form-select" id="rol" name="rol" required>
                         <option value="lezer" {% if geselecteerde_rol == 'lezer' %}selected{% endif %}>Lezer (alleen-lezen)</option>
                         <option value="medewerker" {% if geselecteerde_rol == 'medewerker' %}selected{% endif %}>Medewerker</option>
@@ -58,6 +58,40 @@
                         <option value="platformbeheerder" {% if geselecteerde_rol == 'platformbeheerder' %}selected{% endif %}>Platformbeheerder</option>
                         {% endif %}
                     </select>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label mb-0 fw-semibold">Toegewezen Groep(en)</label>
+                        <a href="{{ url_for('admin.groepen_overzicht') }}" target="_blank" class="small text-decoration-none">
+                            <i class="bi bi-gear me-1"></i>Groepen beheren
+                        </a>
+                    </div>
+                    <div class="form-text mb-2">Selecteer de groepen waarvan deze gebruiker lid is binnen deze organisatie. Rechten worden gecombineerd op basis van het hoogste niveau.</div>
+                    {% set user_grp_ids = form_data.getlist('groep_ids') if form_data and form_data.getlist('groep_ids') else (geselecteerde_groep_ids if geselecteerde_groep_ids is defined else []) %}
+                    {% if beschikbare_groepen %}
+                    <div class="card bg-light border-0 p-3">
+                        <div class="d-flex flex-column gap-2">
+                            {% for grp in beschikbare_groepen %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="groep_ids" value="{{ grp.id }}" id="grp_{{ grp.id }}"
+                                       {% if grp.id in user_grp_ids or (grp.id|string) in user_grp_ids %}checked{% endif %}>
+                                <label class="form-check-label fw-medium d-inline-flex flex-wrap align-items-center gap-2" for="grp_{{ grp.id }}">
+                                    <span>{{ grp.naam }}</span>
+                                    {% if grp.is_standaard %}
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" style="font-size: 0.7rem;">Systeem</span>
+                                    {% endif %}
+                                    {% if grp.beschrijving %}
+                                    <span class="text-muted small fw-normal">({{ grp.beschrijving }})</span>
+                                    {% endif %}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0">Er zijn nog geen groepen gedefinieerd.</p>
+                    {% endif %}
                 </div>
 
                 <div class="mb-3">

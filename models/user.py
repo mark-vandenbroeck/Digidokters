@@ -29,11 +29,32 @@ class User(UserMixin, db.Model):
                                    foreign_keys='Registration.aangemaakt_door_id')
     user_organisaties = db.relationship('UserOrganisatie', back_populates='user', cascade='all, delete-orphan')
     functies = db.relationship('Functie', secondary='user_functies', backref=db.backref('users', lazy='dynamic'))
+    user_groepen = db.relationship('UserGroup', back_populates='user', cascade='all, delete-orphan', foreign_keys='UserGroup.user_id')
+    groepen = db.relationship(
+        'Group',
+        secondary='user_groups',
+        primaryjoin='User.id == UserGroup.user_id',
+        secondaryjoin='Group.id == UserGroup.groep_id',
+        back_populates='users',
+        lazy='dynamic',
+        overlaps='user_groepen,users'
+    )
 
     def get_functies_voor_organisatie(self, org_id):
         """Haal de toegekende functies van deze gebruiker op binnen een specifieke organisatie."""
         return [f for f in self.functies if f.organisatie_id == org_id]
 
+    def get_groepen_voor_organisatie(self, org_id):
+        """Haal de toegekende actieve groepen van deze gebruiker op binnen een specifieke organisatie."""
+        from models.group import Group, UserGroup
+        return Group.query.join(UserGroup, Group.id == UserGroup.groep_id)\
+            .filter(UserGroup.user_id == self.id, Group.organisatie_id == org_id, Group.actief == True)\
+            .order_by(Group.naam).all()
+
+    def has_permission(self, feature, required_level='read', org_id=None):
+        """Controleert of de gebruiker de vereiste permissie heeft voor een functionaliteit."""
+        from utils.permissions import has_permission
+        return has_permission(feature, required_level, user=self, org_id=org_id)
 
     def is_beheerder(self):
         if self.rol == ROLE_PLATFORMBEHEERDER:
@@ -42,6 +63,10 @@ class User(UserMixin, db.Model):
         if has_request_context():
             org_id = session.get('organisatie_id')
             if org_id:
+                # Eerst controleren via dynamische permissies (heeft write op 'gebruikers')
+                from utils.permissions import has_permission
+                if has_permission('gebruikers', 'write', user=self, org_id=org_id):
+                    return True
                 for uo in self.user_organisaties:
                     if uo.organisatie_id == org_id and uo.rol == ROLE_BEHEERDER and uo.actief:
                         return True

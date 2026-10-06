@@ -13,7 +13,19 @@ from models.herkomst import Herkomst
 from models.gender_identity import GenderIdentity
 from models.functie import Functie, user_functies
 from models.registration import Registration
-from utils.decorators import admin_required, platform_admin_required
+from models.group import Group, GroupPermission, UserGroup
+from models.constants import (
+    ALL_FEATURES, FEATURE_LABELS, FEATURE_DESCRIPTIONS,
+    ACCESS_NONE, ACCESS_READ, ACCESS_WRITE, ACCESS_LEVELS,
+    DEFAULT_GROUPS, DEFAULT_GROUP_LEZERS, DEFAULT_GROUP_MEDEWERKERS,
+    DEFAULT_GROUP_BEHEERDERS, DEFAULT_GROUP_PLATFORMBEHEERDERS
+)
+from utils.decorators import admin_required, platform_admin_required, writer_required
+from utils.permissions import (
+    has_permission, require_permission, permission_required,
+    can_read, can_write, get_default_matrix_voor_groep,
+    seed_standaard_groepen_voor_organisatie
+)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/beheer')
 
@@ -60,6 +72,15 @@ def gebruikers():
 
     memberships = query.order_by(order_col).all()
 
+    # Zorg dat de groepen voor deze organisatie geseed zijn
+    beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
+    if not beschikbare_groepen:
+        seed_standaard_groepen_voor_organisatie(org_id)
+        beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
+
+    # Mapping van gebruiker naar toegekende groepen
+    user_groepen_map = {m.user_id: m.user.get_groepen_voor_organisatie(org_id) for m in memberships}
+
     # Efficiënte SQL telling van digidokters gekoppeld aan gebruikers
     digidokter_counts = dict(
         db.session.query(Digidokter.user_id, db.func.count(Digidokter.id))
@@ -71,6 +92,7 @@ def gebruikers():
     return render_template(
         'admin/users.html',
         memberships=memberships,
+        user_groepen_map=user_groepen_map,
         digidokter_counts=digidokter_counts,
         sort_by=sort_by,
         direction=direction,
@@ -88,6 +110,10 @@ def gebruiker_nieuw():
     org_id = get_huidige_organisatie_id()
 
     beschikbare_functies = Functie.query.filter_by(organisatie_id=org_id, actief=True).order_by(Functie.volgorde).all()
+    beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
+    if not beschikbare_groepen:
+        seed_standaard_groepen_voor_organisatie(org_id)
+        beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
 
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
@@ -97,14 +123,15 @@ def gebruiker_nieuw():
         rol = request.form.get('rol', 'medewerker')
         tijdelijk_ww = request.form.get('wachtwoord', '').strip()
         functie_ids = [int(x) for x in request.form.getlist('functie_ids') if x.isdigit()]
+        groep_ids = [int(x) for x in request.form.getlist('groep_ids') if x.isdigit()]
 
         if rol == 'platformbeheerder' and current_user.rol != 'platformbeheerder':
             flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
-            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies)
+            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen)
 
         if not naam or not email or not tijdelijk_ww:
             flash('Naam, e-mailadres en wachtwoord zijn verplicht.', 'danger')
-            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies)
+            return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen)
 
         # Check of gebruiker al bestaat globally op e-mailadres
         user = User.query.filter(db.func.lower(User.email) == email).first()
@@ -112,7 +139,7 @@ def gebruiker_nieuw():
             uo_existing = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first()
             if uo_existing:
                 flash('Er bestaat al een gebruiker met dit e-mailadres in deze organisatie.', 'danger')
-                return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies)
+                return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen)
             
             uo = UserOrganisatie(
                 user_id=user.id,
@@ -130,6 +157,16 @@ def gebruiker_nieuw():
                 for fn in gekozen:
                     if fn not in user.functies:
                         user.functies.append(fn)
+
+            # Groepen toewijzen
+            if groep_ids:
+                gekozen_groepen = Group.query.filter(Group.organisatie_id == org_id, Group.id.in_(groep_ids)).all()
+                for grp in gekozen_groepen:
+                    db.session.add(UserGroup(user_id=user.id, groep_id=grp.id, toegekend_door_id=current_user.id))
+            else:
+                target_grp = Group.query.filter(Group.organisatie_id == org_id, db.func.lower(Group.naam) == (rol.lower() + 's' if not rol.endswith('s') else rol.lower())).first() or Group.query.filter_by(organisatie_id=org_id, is_standaard=True).first()
+                if target_grp:
+                    db.session.add(UserGroup(user_id=user.id, groep_id=target_grp.id, toegekend_door_id=current_user.id))
 
             # Voeg ook toe als Digidokter
             existing_dd = Digidokter.query.filter_by(organisatie_id=org_id, naam=user.naam).first()
@@ -167,6 +204,16 @@ def gebruiker_nieuw():
             actief=request.form.get('actief') == 'on' if 'actief' in request.form else True
         )
         db.session.add(uo)
+
+        # Groepen toewijzen
+        if groep_ids:
+            gekozen_groepen = Group.query.filter(Group.organisatie_id == org_id, Group.id.in_(groep_ids)).all()
+            for grp in gekozen_groepen:
+                db.session.add(UserGroup(user_id=user.id, groep_id=grp.id, toegekend_door_id=current_user.id))
+        else:
+            target_grp = Group.query.filter(Group.organisatie_id == org_id, db.func.lower(Group.naam) == (rol.lower() + 's' if not rol.endswith('s') else rol.lower())).first() or Group.query.filter_by(organisatie_id=org_id, is_standaard=True).first()
+            if target_grp:
+                db.session.add(UserGroup(user_id=user.id, groep_id=target_grp.id, toegekend_door_id=current_user.id))
         
         # Voeg ook toe als Digidokter
         existing_dd = Digidokter.query.filter_by(organisatie_id=org_id, naam=user.naam).first()
@@ -189,7 +236,7 @@ def gebruiker_nieuw():
             
         return redirect(url_for('admin.gebruikers'))
 
-    return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, beschikbare_functies=beschikbare_functies)
+    return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen)
 
 
 @admin_bp.route('/gebruikers/<int:user_id>/wijzig', methods=['GET', 'POST'])
@@ -203,32 +250,39 @@ def gebruiker_wijzigen(user_id):
     user = db.get_or_404(User, user_id)
     membership = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first_or_404()
     beschikbare_functies = Functie.query.filter_by(organisatie_id=org_id).order_by(Functie.volgorde).all()
+    beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
+    if not beschikbare_groepen:
+        seed_standaard_groepen_voor_organisatie(org_id)
+        beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
+
+    geselecteerde_groep_ids = [ug.groep_id for ug in user.user_groepen if ug.groep and ug.groep.organisatie_id == org_id]
 
     if request.method == 'POST':
         rol = request.form.get('rol', membership.rol)
         if rol == 'platformbeheerder' and current_user.rol != 'platformbeheerder':
             flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
-            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies)
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
 
         naam_in = request.form.get('naam', user.naam).strip()
         email_raw = request.form.get('email', '').strip().lower()
         email_in = email_raw if email_raw and email_raw not in ('none', 'null', 'undefined', 'n/a', '') else None
         telefoonnummer_in = request.form.get('telefoonnummer', '').strip() or None
         functie_ids = [int(x) for x in request.form.getlist('functie_ids') if x.isdigit()]
+        groep_ids = [int(x) for x in request.form.getlist('groep_ids') if x.isdigit()]
 
         # Controleer unieke naam
         if naam_in != user.naam:
             bestaande_naam = User.query.filter(db.func.lower(User.naam) == naam_in.lower(), User.id != user.id).first()
             if bestaande_naam:
                 flash(f'Gebruikersnaam {naam_in} is al in gebruik.', 'danger')
-                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies)
+                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
 
         # Controleer unieke email
         if email_in and email_in != user.email:
             bestaande_email = User.query.filter(db.func.lower(User.email) == email_in, User.id != user.id).first()
             if bestaande_email:
                 flash(f'Het e-mailadres {email_in} is al in gebruik door {bestaande_email.naam}.', 'danger')
-                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies)
+                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
 
         user.naam = naam_in
         user.email = email_in
@@ -241,6 +295,16 @@ def gebruiker_wijzigen(user_id):
         if functie_ids:
             gekozen = Functie.query.filter(Functie.organisatie_id == org_id, Functie.id.in_(functie_ids)).all()
             user.functies.extend(gekozen)
+
+        # Groepen bijwerken voor deze organisatie
+        for ug in UserGroup.query.join(Group, UserGroup.groep_id == Group.id).filter(UserGroup.user_id == user.id, Group.organisatie_id == org_id).all():
+            db.session.delete(ug)
+        db.session.flush()
+
+        if groep_ids:
+            gekozen_groepen = Group.query.filter(Group.organisatie_id == org_id, Group.id.in_(groep_ids)).all()
+            for grp in gekozen_groepen:
+                db.session.add(UserGroup(user_id=user.id, groep_id=grp.id, toegekend_door_id=current_user.id))
 
         if user.id != 1:
             membership.actief = request.form.get('actief') == 'on'
@@ -259,9 +323,166 @@ def gebruiker_wijzigen(user_id):
         except Exception as e:
             db.session.rollback()
             flash(f'Fout bij opslaan van gebruiker: {str(e)}', 'danger')
-            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies)
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
 
-    return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, beschikbare_functies=beschikbare_functies)
+    return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
+
+
+# ─── Groepen & Permissies ───────────────────────────────────────────────────
+
+@admin_bp.route('/groepen')
+@login_required
+@admin_required
+def groepen_overzicht():
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    groepen = Group.query.filter_by(organisatie_id=org_id).order_by(Group.naam.asc()).all()
+    if not groepen:
+        seed_standaard_groepen_voor_organisatie(org_id)
+        groepen = Group.query.filter_by(organisatie_id=org_id).order_by(Group.naam.asc()).all()
+
+    return render_template(
+        'admin/groepen/index.html',
+        groepen=groepen,
+        ALL_FEATURES=ALL_FEATURES,
+        FEATURE_LABELS=FEATURE_LABELS,
+        org_id=org_id
+    )
+
+
+@admin_bp.route('/groepen/nieuw', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def groep_nieuw():
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        beschrijving = request.form.get('beschrijving', '').strip() or None
+
+        if not naam:
+            flash('Groepsnaam is verplicht.', 'danger')
+            return render_template('admin/groepen/form.html', actie='Nieuwe', groep=None, form_data=request.form, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+
+        bestaande = Group.query.filter(
+            db.func.lower(Group.naam) == naam.lower(),
+            Group.organisatie_id == org_id
+        ).first()
+        if bestaande:
+            flash(f'Er bestaat binnen deze organisatie al een groep met de naam "{naam}".', 'danger')
+            return render_template('admin/groepen/form.html', actie='Nieuwe', groep=None, form_data=request.form, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+
+        alleen_eigen_registraties = request.form.get('alleen_eigen_registraties') == 'on'
+
+        nieuwe_groep = Group(
+            organisatie_id=org_id,
+            naam=naam,
+            beschrijving=beschrijving,
+            is_standaard=False,
+            alleen_eigen_registraties=alleen_eigen_registraties,
+            actief=True
+        )
+        db.session.add(nieuwe_groep)
+        db.session.flush()
+
+        for feat in ALL_FEATURES:
+            level = request.form.get(f'perm_{feat}', ACCESS_NONE)
+            if level not in ACCESS_LEVELS:
+                level = ACCESS_NONE
+            db.session.add(GroupPermission(groep_id=nieuwe_groep.id, functionaliteit=feat, toegangsniveau=level))
+
+        db.session.commit()
+        flash(f'Groep "{naam}" is succesvol aangemaakt.', 'success')
+        return redirect(url_for('admin.groepen_overzicht'))
+
+    return render_template('admin/groepen/form.html', actie='Nieuwe', groep=None, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+
+
+@admin_bp.route('/groepen/<int:groep_id>/bewerken', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def groep_bewerken(groep_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    groep = Group.query.filter_by(id=groep_id, organisatie_id=org_id).first_or_404()
+
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        beschrijving = request.form.get('beschrijving', '').strip() or None
+        actief = request.form.get('actief') == 'on' if 'actief' in request.form else True
+        alleen_eigen_registraties = request.form.get('alleen_eigen_registraties') == 'on'
+
+        if not naam:
+            flash('Groepsnaam mag niet leeg zijn.', 'danger')
+            return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, form_data=request.form, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+
+        if naam.lower() != groep.naam.lower():
+            bestaande = Group.query.filter(
+                db.func.lower(Group.naam) == naam.lower(),
+                Group.organisatie_id == org_id,
+                Group.id != groep.id
+            ).first()
+            if bestaande:
+                flash(f'Er bestaat binnen deze organisatie al een groep met de naam "{naam}".', 'danger')
+                return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, form_data=request.form, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+
+        groep.naam = naam
+        groep.beschrijving = beschrijving
+        groep.actief = actief
+        groep.alleen_eigen_registraties = alleen_eigen_registraties
+
+        # Update permissies
+        for feat in ALL_FEATURES:
+            level = request.form.get(f'perm_{feat}', ACCESS_NONE)
+            if level not in ACCESS_LEVELS:
+                level = ACCESS_NONE
+            perm = GroupPermission.query.filter_by(groep_id=groep.id, functionaliteit=feat).first()
+            if not perm:
+                db.session.add(GroupPermission(groep_id=groep.id, functionaliteit=feat, toegangsniveau=level))
+            else:
+                perm.toegangsniveau = level
+
+        db.session.commit()
+        flash(f'Groep "{groep.naam}" is succesvol bijgewerkt.', 'success')
+        return redirect(url_for('admin.groepen_overzicht'))
+
+    return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+
+
+@admin_bp.route('/groepen/<int:groep_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def groep_verwijderen(groep_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    groep = Group.query.filter_by(id=groep_id, organisatie_id=org_id).first_or_404()
+
+    if groep.is_standaard:
+        flash(f'Standaardgroep "{groep.naam}" kan niet verwijderd worden.', 'danger')
+        return redirect(url_for('admin.groepen_overzicht'))
+
+    naam = groep.naam
+    db.session.delete(groep)
+    db.session.commit()
+    flash(f'Groep "{naam}" is verwijderd.', 'success')
+    return redirect(url_for('admin.groepen_overzicht'))
+
+
+@admin_bp.route('/groepen/<int:groep_id>/toggle', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def groep_toggle(groep_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    groep = Group.query.filter_by(id=groep_id, organisatie_id=org_id).first_or_404()
+
+    groep.actief = not groep.actief
+    db.session.commit()
+    status_msg = 'geactiveerd' if groep.actief else 'gedeactiveerd'
+    flash(f'Groep "{groep.naam}" is {status_msg}.', 'info')
+    return redirect(url_for('admin.groepen_overzicht'))
+
 
 
 @admin_bp.route('/gebruikers/<int:user_id>/toggle')

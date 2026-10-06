@@ -60,19 +60,17 @@ def login():
         gebruiker.laatste_login = datetime.now(timezone.utc)
         db.session.commit()
 
-        # Verplicht wachtwoord wijzigen
-        if gebruiker.moet_wachtwoord_wijzigen:
-            flash('Welkom! Gelieve uw tijdelijk wachtwoord te wijzigen.', 'info')
-            return redirect(url_for('auth.wachtwoord_wijzigen'))
-
         # Organisatie context instellen
         if gebruiker.rol == 'platformbeheerder':
+            if gebruiker.moet_wachtwoord_wijzigen:
+                flash('Welkom! Gelieve uw tijdelijk wachtwoord te wijzigen.', 'info')
+                return redirect(url_for('auth.wachtwoord_wijzigen'))
             flash(f'Welkom, platformbeheerder {gebruiker.naam}!', 'success')
             return redirect(url_for('platform.dashboard'))
 
         active_memberships = [
             uo for uo in gebruiker.user_organisaties 
-            if uo.actief and uo.organisatie.actief and (gebruiker.rol == 'platformbeheerder' or uo.organisatie.slug != 'sjabloon')
+            if uo.actief and uo.organisatie and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon'
         ]
         if not active_memberships:
             logout_user()
@@ -81,6 +79,13 @@ def login():
 
         if len(active_memberships) == 1:
             session['organisatie_id'] = active_memberships[0].organisatie_id
+
+        # Verplicht wachtwoord wijzigen bij eerste aanmelding
+        if gebruiker.moet_wachtwoord_wijzigen:
+            flash('Welkom! Gelieve uw tijdelijk wachtwoord te wijzigen.', 'info')
+            return redirect(url_for('auth.wachtwoord_wijzigen'))
+
+        if len(active_memberships) == 1:
             flash(f'Welkom! Ingelogd bij {active_memberships[0].organisatie.naam}.', 'success')
             next_page = request.args.get('next')
             if _is_veilige_redirect(next_page):
@@ -178,10 +183,12 @@ def wachtwoord_wijzigen():
         if not session.get('organisatie_id') and current_user.rol != 'platformbeheerder':
             active_memberships = [
                 uo for uo in current_user.user_organisaties 
-                if uo.actief and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon'
+                if uo.actief and uo.organisatie and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon'
             ]
             if len(active_memberships) == 1:
                 session['organisatie_id'] = active_memberships[0].organisatie_id
+            elif len(active_memberships) > 1:
+                return redirect(url_for('auth.select_org'))
 
         if wachtwoord_gewijzigd:
             flash('Wachtwoord succesvol gewijzigd.', 'success')

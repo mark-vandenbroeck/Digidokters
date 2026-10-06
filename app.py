@@ -82,13 +82,33 @@ def create_app(config_class=Config):
 
     @app.context_processor
     def inject_global_template_vars():
-        res = {'feedback_meldingen': [], 'huidige_organisatie': None, 'is_sjabloon_org': False, 'openstaande_evaluaties_telling': 0}
+        from models.constants import (
+            FEATURE_LABELS, FEATURE_DESCRIPTIONS, ALL_FEATURES,
+            ACCESS_NONE, ACCESS_READ, ACCESS_WRITE
+        )
+        res = {
+            'feedback_meldingen': [],
+            'huidige_organisatie': None,
+            'is_sjabloon_org': False,
+            'openstaande_evaluaties_telling': 0,
+            'can_read': lambda feat: False,
+            'can_write': lambda feat: False,
+            'has_permission': lambda feat, lvl='read': False,
+            'user_permissions': {},
+            'FEATURE_LABELS': FEATURE_LABELS,
+            'FEATURE_DESCRIPTIONS': FEATURE_DESCRIPTIONS,
+            'ALL_FEATURES': ALL_FEATURES,
+            'ACCESS_NONE': ACCESS_NONE,
+            'ACCESS_READ': ACCESS_READ,
+            'ACCESS_WRITE': ACCESS_WRITE
+        }
         if not current_user.is_authenticated:
             return res
         try:
             from utils.feedback_tracker import get_feedback_meldingen
             from utils.tenant import get_huidige_organisatie
             from routes.evaluations import get_openstaande_evaluaties_telling_voor_user
+            from utils.permissions import can_read, can_write, has_permission, get_user_permissions_voor_organisatie, is_alleen_eigen_registraties
             org_id = session.get('organisatie_id')
             res['feedback_meldingen'] = get_feedback_meldingen(current_user, org_id)
             res['openstaande_evaluaties_telling'] = get_openstaande_evaluaties_telling_voor_user(current_user, org_id)
@@ -96,6 +116,11 @@ def create_app(config_class=Config):
             res['huidige_organisatie'] = huidige_org
             res['is_sjabloon_org'] = bool(huidige_org and huidige_org.slug == 'sjabloon')
             res['db_schema'] = app.config.get('DB_SCHEMA', 'public')
+            res['can_read'] = lambda feat: can_read(feat, user=current_user, org_id=org_id)
+            res['can_write'] = lambda feat: can_write(feat, user=current_user, org_id=org_id)
+            res['has_permission'] = lambda feat, lvl='read': has_permission(feat, lvl, user=current_user, org_id=org_id)
+            res['user_permissions'] = get_user_permissions_voor_organisatie(current_user, org_id)
+            res['is_alleen_eigen_registraties'] = lambda: is_alleen_eigen_registraties(user=current_user, org_id=org_id)
             return res
         except Exception:
             return res
@@ -156,6 +181,8 @@ def create_app(config_class=Config):
                         'admin.genderidentiteit_toggle', 'admin.genderidentiteit_volgorde', 'admin.genderidentiteit_verwijderen',
                         'admin.functies', 'admin.functie_nieuw', 'admin.functie_wijzigen',
                         'admin.functie_toggle', 'admin.functie_volgorde', 'admin.functie_verwijderen',
+                        'admin.groepen_overzicht', 'admin.groep_nieuw', 'admin.groep_bewerken',
+                        'admin.groep_verwijderen', 'admin.groep_toggle',
                         'eval.overzicht', 'eval.formulier_bewerken', 'eval.vraag_toevoegen', 'eval.vraag_bewerken',
                         'eval.vraag_verwijderen', 'eval.vraag_volgorde'
                     )
@@ -513,6 +540,12 @@ def create_app(config_class=Config):
 
             try:
                 db.session.execute(db.text("ALTER TABLE registrations ADD COLUMN locatie_id INTEGER REFERENCES locations(id)"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+            try:
+                db.session.execute(db.text("ALTER TABLE groups ADD COLUMN alleen_eigen_registraties BOOLEAN DEFAULT FALSE NOT NULL"))
                 db.session.commit()
             except Exception:
                 db.session.rollback()

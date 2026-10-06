@@ -152,6 +152,36 @@ def seed_organisatie_defaults(org_id):
 
     db.session.commit()
 
+    # Groepen & Permissies seeden
+    from models.group import Group, GroupPermission
+    from utils.permissions import seed_standaard_groepen_voor_organisatie
+    if not Group.query.filter_by(organisatie_id=org_id).first():
+        source_groups = []
+        if source_org_id:
+            source_groups = Group.query.filter_by(organisatie_id=source_org_id, actief=True).all()
+        
+        if source_groups:
+            for s_grp in source_groups:
+                new_grp = Group(
+                    organisatie_id=org_id,
+                    naam=s_grp.naam,
+                    beschrijving=s_grp.beschrijving,
+                    is_standaard=s_grp.is_standaard,
+                    alleen_eigen_registraties=getattr(s_grp, 'alleen_eigen_registraties', False),
+                    actief=True
+                )
+                db.session.add(new_grp)
+                db.session.flush()
+                for perm in s_grp.permissies:
+                    db.session.add(GroupPermission(
+                        groep_id=new_grp.id,
+                        functionaliteit=perm.functionaliteit,
+                        toegangsniveau=perm.toegangsniveau
+                    ))
+            db.session.commit()
+        else:
+            seed_standaard_groepen_voor_organisatie(org_id)
+
     # Evaluatieformulieren seeden voor activiteitstypes met evaluatieplicht
     from models.evaluation import EvaluationForm, EvaluationQuestion
     eval_types = ActivityType.query.filter_by(organisatie_id=org_id, heeft_evaluatie=True).all()

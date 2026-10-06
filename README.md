@@ -26,22 +26,23 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 
 ### Belangrijkste tabellen en datamodel:
 1.  **Organisaties (`organisaties`):** Beheert de verschillende tenants (bijv. Londerzeel).
-2.  **Gebruikers (`users`):** Beheert beheerders en medewerkers. Gekoppeld aan organisaties via `user_organisaties`. Tevens voorzien van contactgegevens (`telefoonnummer`, `email`) en wachtwoord-resetkolommen (`reset_code`, `reset_code_verloopt_op`).
-3.  **Functies & Gebruiker-Functies (`functies`, `user_functies`):** Beheert vrijwilligersfuncties (bijv. Digidokter, Digihelper, Lesgever) per organisatie en de toekenning (veel-op-veel) aan gebruikers.
-4.  **Genderidentiteiten (`gender_identities`):** Beheert de dynamische lijst van geslachten/genderidentiteiten (standaard 'Man', 'Vrouw') per organisatie.
-5.  **Digidokters (`digidokters`):** Vrijwilligers binnen een specifieke organisatie (gekoppeld aan registraties en agenda).
-6.  **Registraties (`registrations`):** Registratie van een bezoekerssessie met foreign keys naar digidokter, leeftijdscategorie, toestel, herkomst en geslacht.
-7.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
-8.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
-9.  **Documenten (`documenten`):** Bestanden (PDF, Word, OpenDocument Tekst, Excel, Markdown, afbeeldingen, tekst) opgeslagen als binaire data (`LargeBinary`) met versienummering en geïndexeerde tekstinhoud (`tekst_inhoud`).
-10. **Herkomst (`herkomst`):** Standaard keuzelijst met herkomstbronnen (bijv. website, mond-tot-mond) per organisatie.
-11. **Evaluatieformulieren & Vragen (`evaluatie_formulieren`, `evaluatie_vragen`):** Configureerbare evaluatievragenlijsten gekoppeld aan specifieke activiteitstypes (zoals Digicafé).
-12. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
-13. **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
-14. **Feedback & Conversatie (`feedback_items`, `feedback_votes`, `feedback_comments`):** Beheer van gebruikersfeedback ("Voorstel" of "Foutje?"), stemmen met duimpjes (+1/-1), screenshot-opslag, conversatiereacties en beheerderstatus (open/afgesloten).
-15. **Vraagcategorieën (`question_categories`):** Centrale lijst van 10 gestandaardiseerde hoofdcategorieën met AI-richtlijnen en actieve status.
-16. **Vraagclassificaties (`question_classifications`):** 1-op-1 gekoppeld aan registraties met AI-categorietoewijzing, betrouwbaarheidsscore (zekerheid %), toelichting en handmatige override-auditering.
-17. **App Mappen & App Documenten (`app_mappen`, `app_documenten`):** Centrale, platformbrede documentenopslag gedeeld door alle organisaties (zonder `organisatie_id`).
+2.  **Gebruikers (`users`):** Beheert gebruikers accounts. Gekoppeld aan organisaties via `user_organisaties` met contactgegevens (`telefoonnummer`, `email`), actieve status en verplichte wachtwoordwissel (`moet_wachtwoord_wijzigen`).
+3.  **Groepen & Rechten (`groups`, `group_permissions`, `user_groups`):** Dynamisch autorisatiemodel per organisatie. Beheert rollen/groepen, permissiematrices per functionele module (`geen`, `lezen`, `schrijven`) en meervoudige lidmaatschappen per gebruiker met "hoogste recht wint" resolutie.
+4.  **Functies & Gebruiker-Functies (`functies`, `user_functies`):** Beheert vrijwilligersfuncties (bijv. Digidokter, Digihelper, Lesgever) per organisatie en de toekenning (veel-op-veel) aan gebruikers.
+5.  **Genderidentiteiten (`gender_identities`):** Beheert de dynamische lijst van geslachten/genderidentiteiten (standaard 'Man', 'Vrouw') per organisatie.
+6.  **Digidokters (`digidokters`):** Vrijwilligers binnen een specifieke organisatie (gekoppeld aan registraties en agenda).
+7.  **Registraties (`registrations`):** Registratie van een bezoekerssessie met foreign keys naar digidokter, leeftijdscategorie, toestel, herkomst en geslacht.
+8.  **Agenda-items (`agenda_items`):** Geplande sessies met type activiteit, locatie en aanwezige digidokters.
+9.  **Mappen (`mappen`):** Hiërarchische mappenstructuur per organisatie met self-referencing `parent_id`.
+10. **Documenten (`documenten`):** Bestanden (PDF, Word, OpenDocument Tekst, Excel, Markdown, afbeeldingen, tekst) opgeslagen als binaire data (`LargeBinary`) met versienummering en geïndexeerde tekstinhoud (`tekst_inhoud`).
+11. **Herkomst (`herkomst`):** Standaard keuzelijst met herkomstbronnen (bijv. website, mond-tot-mond) per organisatie.
+12. **Evaluatieformulieren & Vragen (`evaluatie_formulieren`, `evaluatie_vragen`):** Configureerbare evaluatievragenlijsten gekoppeld aan specifieke activiteitstypes (zoals Digicafé).
+13. **Evaluatiereacties & Uitnodigingen (`evaluatie_reacties`, `evaluatie_uitnodigingen`):** Ingezonden antwoorden per sessie en digidokter, inclusief unieke token-gebaseerde e-mailuitnodigingen.
+14. **Audit Logs (`audit_logs`):** Centraal logboek voor database-wijzigingen met details over oude en nieuwe waarden.
+15. **Feedback & Conversatie (`feedback_items`, `feedback_votes`, `feedback_comments`):** Beheer van gebruikersfeedback ("Voorstel" of "Foutje?"), stemmen met duimpjes (+1/-1), screenshot-opslag, conversatiereacties en beheerderstatus (open/afgesloten).
+16. **Vraagcategorieën (`question_categories`):** Centrale lijst van 10 gestandaardiseerde hoofdcategorieën met AI-richtlijnen en actieve status.
+17. **Vraagclassificaties (`question_classifications`):** 1-op-1 gekoppeld aan registraties met AI-categorietoewijzing, betrouwbaarheidsscore (zekerheid %), toelichting en handmatige override-auditering.
+18. **App Mappen & App Documenten (`app_mappen`, `app_documenten`):** Centrale, platformbrede documentenopslag gedeeld door alle organisaties (zonder `organisatie_id`).
 
 ---
 
@@ -57,7 +58,8 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   **Dynamische Genderidentiteit:** Het geslacht van de bezoeker wordt gekozen uit de geconfigureerde genderidentiteiten van de organisatie (standaard 'Man' en 'Vrouw', uitbreidbaar via stamgegevens).
 *   **Consultatielocaties:** Indien er binnen de organisatie meerdere locaties zijn gemarkeerd als *"Gebruikt voor consultaties"*, kan de specifieke locatie direct worden geselecteerd. Bij exact één consultatielocatie wordt deze automatisch zonder extra dropdown toegekend.
 *   **Realtime Asynchrone AI-classificatie:** Zodra een consultatie wordt opgeslagen of bewerkt, wordt de vraag op de achtergrond binnen 1-2 seconden geanalyseerd via Google Gemini AI en toegekend aan de passende categorie.
-*   Vrijwilligers (digidokters) met de rol `medewerker` hebben ook de mogelijkheid om registraties te wissen bij invoerfouten.
+*   **Optionele 'Alleen eigen registraties tonen' restrictie:** Wanneer geconfigureerd via groepenbeheer, wordt de Digidokter-filterdropdown verborgen en toont het registratieoverzicht uitsluitend de consultaties van de ingelogde digidokter.
+*   Vrijwilligers (digidokters) met schrijfrechten op registraties hebben ook de mogelijkheid om registraties te wissen bij invoerfouten.
 
 ### 2. Agenda & Planning
 *   Ondersteunt eenmalige en terugkerende activiteiten (dagelijks, wekelijks, maandelijks) met een optionele einddatum.
@@ -103,11 +105,11 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 *   **Registratie:** Inzendingen registreren de specifieke digidokter, het gebruikersaccount (`user_id`), de timestamp (`ingediend_op`) en de antwoorden als JSON data, met bescherming tegen dubbele records.
 *   **Resultatenoverzicht & Filter:** Inzage in alle reacties per activiteit met filters op activiteitstype, reacties en persoonlijke openstaande formulieren, inclusief detailinzage per sessie.
 
-### 6. Wachtwoord Vergeten & Herstelprocedure
-*   Ingebouwde herstelprocedure via het inlogscherm.
-*   Gebruikers voeren hun e-mailadres in en ontvangen een 6-cijferige verificatiecode op hun e-mailadres via de Brevo HTTPS REST API.
-*   De code heeft een verlooptijd van exact 30 minuten.
-*   Bij invoer van de juiste code kan de gebruiker een nieuw wachtwoord instellen dat direct wordt gevalideerd op complexiteitseisen.
+### 6. Wachtwoordbeheer, Eerste Inlog & Herstelprocedure
+*   **Eerste Inlog & Verplichte Wachtwoordwissel:** Wanneer een beheerder een nieuw gebruikersaccount aanmaakt met een tijdelijk wachtwoord, wordt de gebruiker bij de allereerste login direct doorgestuurd naar het formulier om een persoonlijk wachtwoord in te stellen (`/wachtwoord_wijzigen`). De organisatiecontext (`organisatie_id`) wordt hierbij naadloos bewaard zodat de gebruiker direct aan de slag kan.
+*   **Wachtwoord Vergeten & Zelfherstel:** Ingebouwde herstelprocedure via het inlogscherm (`/wachtwoord-vergeten`).
+*   **Beveiligde Verificatiecode:** Gebruikers voeren hun e-mailadres in en ontvangen een 6-cijferige verificatiecode op hun e-mailadres via de Brevo HTTPS REST API met een geldigheidsduur van exact 30 minuten.
+*   **Validatie:** Bij het instellen van een nieuw wachtwoord wordt direct gecontroleerd op wachtwoordcomplexiteit en veiligheidseisen.
 
 ### 7. Database Auditing & GUI
 *   Volledige auditing van alle CRUD-acties (Create, Update, Delete) via SQLAlchemy-sessielisteners.
@@ -207,6 +209,17 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
     *   Hun e-mailadres en contacttelefoonnummer aanpassen.
     *   De functies die ze binnen de huidige organisatie opnemen direct selecteren of aanpassen via handige selectievakjes.
     *   Optioneel hun wachtwoord wijzigen.
+
+### 17. Groepen & Autorisatiebeheer (Dynamisch Multi-Tenant RBAC)
+*   **Configureerbare Groepen per Organisatie (`/beheer/groepen`):** Beheerders kunnen binnen hun organisatie flexibel autorisatiegroepen aanmaken, bewerken, activeren of deactiveren om aan te sluiten bij de lokale werking van hun bib of bestuur.
+*   **Fijnmazige Permissiematrix:** Per groep kan voor elke functionele module (`Registraties`, `Agenda`, `Evaluaties`, `Documenten`, `Statistieken`, `Export`, `Feedback`, `Stamgegevens`, `Gebruikersbeheer`, `Groepenbeheer`, `Backups`, `Auditlogs`, `App documentatie`) het toegangsniveau worden ingesteld:
+    *   `Geen toegang` (`geen`): De module is verborgen in de navigatie en afgeschermd in de backend.
+    *   `Alleen lezen` (`lezen`): Gebruiker kan gegevens raadplegen en filteren, maar niets toevoegen, wijzigen of wissen.
+    *   `Lezen en schrijven` (`schrijven`): Volledige operationele rechten binnen de module.
+*   **Preset Knoppen:** Handige snelknoppen in het formulier ("Stel in als Lezer", "Stel in als Medewerker", "Stel in als Beheerder") om de matrix in één klik volgens best practice standaarden in te stellen.
+*   **Meervoudig Groepslidmaatschap & "Hoogste Recht Wint":** Gebruikers kunnen in gebruikersbeheer (`/beheer/gebruikers`) worden gekoppeld aan meerdere groepen tegelijk. Het permissiesysteem past per module altijd de meest permissieve regel toe (`schrijven` > `lezen` > `geen`).
+*   **Speciale Restrictie: Alleen Eigen Registraties Tonen:** In te schakelen per groep. Wanneer actief, wordt de Digidokter-filterdropdown verborgen en toont het consultatieoverzicht uitsluitend registraties gekoppeld aan het eigen Digidokter-profiel.
+*   **Beschermde Standaardgroepen:** De vier basisgroepen (`Lezers`, `Medewerkers`, `Beheerders`, `Platformbeheerders`) zijn beschermd tegen hernoemen of verwijderen en worden bij het aanmaken van een nieuwe organisatie automatisch geseed vanuit de Sjabloon-organisatie.
 
 ---
 

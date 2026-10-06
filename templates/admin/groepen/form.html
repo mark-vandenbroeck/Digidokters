@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% block title %}{{ actie }} Groep – Digidokters{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-12 col-lg-10">
+
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <a href="{{ url_for('admin.groepen_overzicht') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="dd-page-title mb-0">
+            <i class="bi bi-shield-lock me-2 text-primary"></i>{{ actie }} Groep
+        </h1>
+    </div>
+    <p class="dd-page-subtitle mb-4">
+        {% if actie == 'Nieuw' %}
+        Maak een nieuwe groep aan en stel per functionaliteit de gewenste toegangsrechten in.
+        {% else %}
+        Wijzig groepsgegevens en pas de permissiematrix aan voor <strong>{{ groep.naam }}</strong>.
+        {% endif %}
+    </p>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+            <form method="POST" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <!-- Algemene Groepsgegevens -->
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-6">
+                        <label for="naam" class="form-label fw-semibold">Groepsnaam <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="naam" name="naam"
+                               placeholder="bijv. Balie Medewerkers, Digidokters Kernteam"
+                               value="{{ form_data.naam if form_data else (groep.naam if groep else '') }}" required>
+                        <div class="form-text">Duidelijke, herkenbare naam voor deze groep binnen de organisatie.</div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label for="beschrijving" class="form-label fw-semibold">Omschrijving</label>
+                        <input type="text" class="form-control" id="beschrijving" name="beschrijving"
+                               placeholder="Optionele toelichting op het doel van deze groep"
+                               value="{{ form_data.beschrijving if form_data and form_data.beschrijving is defined else (groep.beschrijving if groep and groep.beschrijving else '') }}">
+                        <div class="form-text">Optionele omschrijving van de rol of doelgroep.</div>
+                    </div>
+                </div>
+
+                {% if actie == 'Bewerken' %}
+                <div class="mb-4 form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="actief" name="actief"
+                           {% if (groep.actief if groep else True) %}checked{% endif %}>
+                    <label class="form-check-label fw-medium" for="actief">Groep actief</label>
+                    <div class="form-text">Inactieve groepen verlenen geen rechten aan hun leden.</div>
+                </div>
+                {% endif %}
+
+                <hr class="my-4">
+
+                <!-- Permissiematrix -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="fw-bold mb-1"><i class="bi bi-grid-3x3-gap text-primary me-2"></i>Permissiematrix per Functionaliteit</h5>
+                        <p class="text-muted small mb-0">Selecteer per module het toegestane toegangsniveau voor deze groep.</p>
+                    </div>
+                    <!-- Snelle preset knoppen -->
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Snelle instellingen">
+                        <button type="button" class="btn btn-outline-secondary" onclick="setAllMatrix('geen')" title="Zet alle op Geen toegang">Alles Geen</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setAllMatrix('lezen')" title="Zet alle op Alleen lezen">Alles Lezen</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setAllMatrix('schrijven')" title="Zet alle op Lezen & Schrijven">Alles Schrijven</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive border rounded mb-4">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3 py-3" style="width: 30%;">Functionaliteit / Module</th>
+                                <th class="text-center py-3" style="width: 23%;">
+                                    <span class="d-inline-flex align-items-center gap-1 text-danger">
+                                        <i class="bi bi-slash-circle"></i> Geen toegang
+                                    </span>
+                                </th>
+                                <th class="text-center py-3" style="width: 23%;">
+                                    <span class="d-inline-flex align-items-center gap-1 text-primary">
+                                        <i class="bi bi-eye"></i> Alleen lezen
+                                    </span>
+                                </th>
+                                <th class="text-center py-3" style="width: 24%;">
+                                    <span class="d-inline-flex align-items-center gap-1 text-success">
+                                        <i class="bi bi-pencil-square"></i> Lezen & Schrijven
+                                    </span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for feat in ALL_FEATURES %}
+                                {% set cur_val = form_data.get('perm_' ~ feat) if form_data else (groep.get_permission(feat) if groep else ACCESS_READ) %}
+                                <tr>
+                                    <td class="ps-3 py-3">
+                                        <div class="fw-bold text-dark">{{ FEATURE_LABELS[feat] }}</div>
+                                        <div class="text-muted small" style="font-size: 0.8rem;">
+                                            {{ FEATURE_DESCRIPTIONS[feat] }}
+                                        </div>
+                                    </td>
+                                    <!-- 1. Geen toegang -->
+                                    <td class="text-center bg-light-subtle">
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input matrix-radio matrix-geen" type="radio" 
+                                                   name="perm_{{ feat }}" id="perm_{{ feat }}_none" value="geen"
+                                                   {% if cur_val == 'geen' %}checked{% endif %}>
+                                            <label class="form-check-label d-none" for="perm_{{ feat }}_none">Geen</label>
+                                        </div>
+                                    </td>
+                                    <!-- 2. Alleen lezen -->
+                                    <td class="text-center">
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input matrix-radio matrix-lezen" type="radio" 
+                                                   name="perm_{{ feat }}" id="perm_{{ feat }}_read" value="lezen"
+                                                   {% if cur_val == 'lezen' %}checked{% endif %}>
+                                            <label class="form-check-label d-none" for="perm_{{ feat }}_read">Lezen</label>
+                                        </div>
+                                    </td>
+                                    <!-- 3. Lezen en schrijven -->
+                                    <td class="text-center bg-light-subtle">
+                                        <div class="form-check form-check-inline m-0">
+                                            <input class="form-check-input matrix-radio matrix-schrijven" type="radio" 
+                                                   name="perm_{{ feat }}" id="perm_{{ feat }}_write" value="schrijven"
+                                                   {% if cur_val == 'schrijven' %}checked{% endif %}>
+                                            <label class="form-check-label d-none" for="perm_{{ feat }}_write">Schrijven</label>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Speciale Autorisatie Opties -->
+                <div class="card bg-light border-0 p-3 mb-4 rounded-3">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="alleen_eigen_registraties" name="alleen_eigen_registraties"
+                               {% if (form_data and form_data.get('alleen_eigen_registraties') == 'on') or (not form_data and groep and groep.alleen_eigen_registraties) %}checked{% endif %}>
+                        <label class="form-check-label fw-bold text-dark" for="alleen_eigen_registraties">
+                            <i class="bi bi-person-lock text-warning me-1"></i>Alleen eigen registraties tonen (Digidokter-specifieke filter)
+                        </label>
+                        <div class="form-text text-muted">
+                            Wanneer ingeschakeld zien leden van deze groep in de registratielijst uitsluitend consultaties waarbij zijzelf als Digidokter gekoppeld zijn. Het filter op andere Digidokters wordt verborgen.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check-lg me-1"></i>Groep Opslaan
+                        </button>
+                        <a href="{{ url_for('admin.groepen_overzicht') }}" class="btn btn-outline-secondary">Annuleren</a>
+                    </div>
+                    {% if actie == 'Bewerken' and not groep.is_standaard and groep.users.count() == 0 %}
+                    <form method="POST" action="{{ url_for('admin.groep_verwijderen', groep_id=groep.id) }}" class="d-inline"
+                          onsubmit="return confirm('Weet u zeker dat u deze groep wilt verwijderen?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash me-1"></i>Groep Verwijderen
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script>
+function setAllMatrix(targetLevel) {
+    const radios = document.querySelectorAll('.matrix-' + targetLevel);
+    radios.forEach(r => {
+        r.checked = true;
+    });
+}
+</script>
+{% endblock %}

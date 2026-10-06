@@ -53,7 +53,11 @@ def lijst():
     sort_by = safe_str(request.args.get('sort_by'), default='datum') or 'datum'
     direction = safe_str(request.args.get('direction'), default='desc') or 'desc'
 
-    from utils.tenant import filter_op_organisatie
+    from utils.tenant import filter_op_organisatie, get_huidige_organisatie_id
+    from utils.permissions import is_alleen_eigen_registraties
+    org_id = get_huidige_organisatie_id()
+    alleen_eigen_registraties = is_alleen_eigen_registraties(current_user, org_id)
+
     query = (
         filter_op_organisatie(Registration.query, Registration)
         .options(
@@ -75,7 +79,26 @@ def lijst():
                 Registration.locatie.has(Location.naam.ilike(f'%{zoek}%')),
             )
         )
-    if filter_digidokter:
+
+    if alleen_eigen_registraties:
+        user_dd = Digidokter.query.filter_by(user_id=current_user.id, organisatie_id=org_id, actief=True).first()
+        if not user_dd:
+            user_dd = Digidokter.query.filter(
+                db.func.lower(Digidokter.naam) == db.func.lower(current_user.naam),
+                Digidokter.organisatie_id == org_id,
+                Digidokter.actief == True
+            ).first()
+        
+        if user_dd:
+            query = query.filter(
+                db.or_(
+                    Registration.digidokter_id == user_dd.id,
+                    Registration.aangemaakt_door_id == current_user.id
+                )
+            )
+        else:
+            query = query.filter(Registration.aangemaakt_door_id == current_user.id)
+    elif filter_digidokter:
         query = query.filter(Registration.digidokter_id == filter_digidokter)
     if filter_locatie:
         query = query.filter(Registration.locatie_id == filter_locatie)
@@ -175,6 +198,7 @@ def lijst():
         genderidentiteiten=keuzes['genderidentiteiten'],
         sort_by=sort_by,
         direction=direction,
+        alleen_eigen_registraties=alleen_eigen_registraties,
     )
 
 

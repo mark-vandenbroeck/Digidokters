@@ -9,23 +9,46 @@
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2">
         <div class="btn-group btn-group-sm" role="group" aria-label="Status filter">
-            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='alle') }}"
+            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='alle', groep_id=groep_id) }}"
                class="btn {% if status_filter == 'alle' or not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
                 Alle
             </a>
-            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='actief') }}"
+            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='actief', groep_id=groep_id) }}"
                class="btn {% if status_filter == 'actief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
                 <i class="bi bi-check-circle me-1"></i>Enkel actieve
             </a>
-            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='inactief') }}"
+            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='inactief', groep_id=groep_id) }}"
                class="btn {% if status_filter == 'inactief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
                 <i class="bi bi-eye-slash me-1"></i>Enkel gedeactiveerde
             </a>
         </div>
-        <a href="{{ url_for('admin.groepen_overzicht') }}" class="btn btn-outline-primary">
+
+        <form method="GET" action="{{ url_for('admin.gebruikers') }}" class="d-inline-flex align-items-center m-0">
+            <input type="hidden" name="sort_by" value="{{ sort_by }}">
+            <input type="hidden" name="direction" value="{{ direction }}">
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light text-muted">
+                    <i class="bi bi-funnel me-1 text-primary"></i>Groep:
+                </span>
+                <select class="form-select form-select-sm" name="groep_id" onchange="this.form.submit()" style="min-width: 150px;">
+                    <option value="">Alle groepen</option>
+                    {% for g in beschikbare_groepen %}
+                    <option value="{{ g.id }}" {% if g.id == groep_id %}selected{% endif %}>{{ g.naam }}</option>
+                    {% endfor %}
+                </select>
+                {% if groep_id %}
+                <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status=status_filter) }}" class="btn btn-outline-secondary btn-sm" title="Groepfilter wissen">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+
+        <a href="{{ url_for('admin.groepen_overzicht') }}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-shield-lock me-1"></i>Groepen & Permissies
         </a>
-        <a href="{{ url_for('admin.gebruiker_nieuw') }}" class="btn btn-primary">
+        <a href="{{ url_for('admin.gebruiker_nieuw') }}" class="btn btn-primary btn-sm">
             <i class="bi bi-person-plus me-1"></i>Nieuwe gebruiker
         </a>
     </div>
@@ -33,7 +56,7 @@
 
 {% macro sort_link(col_name, display_text) %}
     {% set target_dir = 'desc' if sort_by == col_name and direction == 'asc' else 'asc' %}
-    <a href="{{ url_for('admin.gebruikers', sort_by=col_name, direction=target_dir, status=status_filter) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+    <a href="{{ url_for('admin.gebruikers', sort_by=col_name, direction=target_dir, status=status_filter, groep_id=groep_id) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
         {{ display_text }}
         {% if sort_by == col_name %}
             {% if direction == 'asc' %}
@@ -59,7 +82,6 @@
                         <th>Telefoon</th>
                         <th>Functie(s)</th>
                         <th>Groep(en)</th>
-                        <th>{{ sort_link('rol', 'Rechten') }}</th>
                         <th>{{ sort_link('status', 'Status') }}</th>
                         <th>{{ sort_link('laatste_login', 'Laatste login') }}</th>
                         <th class="pe-3 text-end">Acties</th>
@@ -118,17 +140,6 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if u.rol == 'platformbeheerder' %}
-                            <span class="badge bg-purple-soft text-purple">Platformbeheerder</span>
-                            {% elif m.rol == 'beheerder' %}
-                            <span class="badge bg-danger">Beheerder</span>
-                            {% elif m.rol == 'lezer' %}
-                            <span class="badge bg-info text-dark">Lezer</span>
-                            {% else %}
-                            <span class="badge bg-secondary">Medewerker</span>
-                            {% endif %}
-                        </td>
-                        <td>
                             {% if m.actief %}
                             <span class="badge bg-success">Actief</span>
                             {% else %}
@@ -174,9 +185,9 @@
         {% else %}
         <div class="text-center py-5">
             <i class="bi bi-people fs-1 text-muted mb-3 d-block"></i>
-            {% if status_filter and status_filter != 'alle' %}
-            <p class="text-muted">Geen gebruikers gevonden met status "{{ status_filter }}".</p>
-            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='alle') }}" class="btn btn-sm btn-outline-secondary">Toon alle gebruikers</a>
+            {% if (status_filter and status_filter != 'alle') or groep_id %}
+            <p class="text-muted">Geen gebruikers gevonden met de huidige filters.</p>
+            <a href="{{ url_for('admin.gebruikers', sort_by=sort_by, direction=direction, status='alle') }}" class="btn btn-sm btn-outline-secondary">Filters wissen</a>
             {% else %}
             <p class="text-muted">Geen gebruikers gedefinieerd.</p>
             <a href="{{ url_for('admin.gebruiker_nieuw') }}" class="btn btn-sm btn-primary">Eerste toevoegen</a>

@@ -438,9 +438,9 @@ class TestAdminRoutes(BaseTestCase):
         html = res.get_data(as_text=True)
 
         self.assertIn("Agnes De TestLezer", html)
-        self.assertIn('<span class="badge bg-info text-dark">Lezer</span>', html)
-        self.assertIn('<span class="badge bg-danger">Beheerder</span>', html)
-        self.assertIn('<span class="badge bg-secondary">Medewerker</span>', html)
+        self.assertIn("Lezers", html)
+        self.assertIn("Beheerders", html)
+        self.assertIn("Medewerkers", html)
 
         # 2. Controleer het wijzigingsformulier
         res_edit = self.client.get(f'/beheer/gebruikers/{u_lezer.id}/wijzig')

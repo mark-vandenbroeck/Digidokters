@@ -18,10 +18,11 @@ depends_on = None
 
 def upgrade():
     connection = op.get_bind()
+    current_schema = connection.execute(sa.text("SELECT current_schema()")).scalar() if connection.dialect.name == 'postgresql' else None
     inspector = sa.inspect(connection)
-    existing_tables = inspector.get_table_names()
+    existing_tables = inspector.get_table_names(schema=current_schema)
 
-    # 1. Maak 'groups' tabel aan indien deze nog niet bestaat
+    # 1. Maak 'groups' tabel aan indien deze nog niet bestaat in current_schema
     if 'groups' not in existing_tables:
         op.create_table(
             'groups',
@@ -41,7 +42,7 @@ def upgrade():
             batch_op.create_index(batch_op.f('ix_groups_organisatie_id'), ['organisatie_id'], unique=False)
     else:
         # Als tabel al bestaat, controleer of index bestaat
-        existing_indexes = [idx['name'] for idx in inspector.get_indexes('groups')]
+        existing_indexes = [idx['name'] for idx in inspector.get_indexes('groups', schema=current_schema)]
         if 'ix_groups_organisatie_id' not in existing_indexes:
             with op.batch_alter_table('groups', schema=None) as batch_op:
                 batch_op.create_index(batch_op.f('ix_groups_organisatie_id'), ['organisatie_id'], unique=False)
@@ -61,7 +62,7 @@ def upgrade():
         with op.batch_alter_table('group_permissions', schema=None) as batch_op:
             batch_op.create_index(batch_op.f('ix_group_permissions_groep_id'), ['groep_id'], unique=False)
     else:
-        existing_indexes = [idx['name'] for idx in inspector.get_indexes('group_permissions')]
+        existing_indexes = [idx['name'] for idx in inspector.get_indexes('group_permissions', schema=current_schema)]
         if 'ix_group_permissions_groep_id' not in existing_indexes:
             with op.batch_alter_table('group_permissions', schema=None) as batch_op:
                 batch_op.create_index(batch_op.f('ix_group_permissions_groep_id'), ['groep_id'], unique=False)
@@ -85,7 +86,7 @@ def upgrade():
             batch_op.create_index(batch_op.f('ix_user_groups_groep_id'), ['groep_id'], unique=False)
             batch_op.create_index(batch_op.f('ix_user_groups_user_id'), ['user_id'], unique=False)
     else:
-        existing_indexes = [idx['name'] for idx in inspector.get_indexes('user_groups')]
+        existing_indexes = [idx['name'] for idx in inspector.get_indexes('user_groups', schema=current_schema)]
         with op.batch_alter_table('user_groups', schema=None) as batch_op:
             if 'ix_user_groups_groep_id' not in existing_indexes:
                 batch_op.create_index(batch_op.f('ix_user_groups_groep_id'), ['groep_id'], unique=False)
@@ -95,11 +96,12 @@ def upgrade():
 
 def downgrade():
     connection = op.get_bind()
+    current_schema = connection.execute(sa.text("SELECT current_schema()")).scalar() if connection.dialect.name == 'postgresql' else None
     inspector = sa.inspect(connection)
-    existing_tables = inspector.get_table_names()
+    existing_tables = inspector.get_table_names(schema=current_schema)
 
     if 'user_groups' in existing_tables:
-        existing_indexes = [idx['name'] for idx in inspector.get_indexes('user_groups')]
+        existing_indexes = [idx['name'] for idx in inspector.get_indexes('user_groups', schema=current_schema)]
         with op.batch_alter_table('user_groups', schema=None) as batch_op:
             if 'ix_user_groups_user_id' in existing_indexes:
                 batch_op.drop_index(batch_op.f('ix_user_groups_user_id'))
@@ -108,14 +110,14 @@ def downgrade():
         op.drop_table('user_groups')
 
     if 'group_permissions' in existing_tables:
-        existing_indexes = [idx['name'] for idx in inspector.get_indexes('group_permissions')]
+        existing_indexes = [idx['name'] for idx in inspector.get_indexes('group_permissions', schema=current_schema)]
         with op.batch_alter_table('group_permissions', schema=None) as batch_op:
             if 'ix_group_permissions_groep_id' in existing_indexes:
                 batch_op.drop_index(batch_op.f('ix_group_permissions_groep_id'))
         op.drop_table('group_permissions')
 
     if 'groups' in existing_tables:
-        existing_indexes = [idx['name'] for idx in inspector.get_indexes('groups')]
+        existing_indexes = [idx['name'] for idx in inspector.get_indexes('groups', schema=current_schema)]
         with op.batch_alter_table('groups', schema=None) as batch_op:
             if 'ix_groups_organisatie_id' in existing_indexes:
                 batch_op.drop_index(batch_op.f('ix_groups_organisatie_id'))

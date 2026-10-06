@@ -415,3 +415,41 @@ class TestGroupsAndPermissions(BaseTestCase):
         assert 'REG-TIM-001' in html_admin
         assert 'REG-OTHER-002' in html_admin
         assert 'name="digidokter"' in html_admin
+
+    def test_gebruikersbeheer_groepen_filter(self):
+        """Test dat het filteren op groepen in gebruikersbeheer correct werkt."""
+        groepen_map = seed_standaard_groepen_voor_organisatie(self.org.id)
+        g_beheerders = groepen_map[DEFAULT_GROUP_BEHEERDERS]
+        g_lezers = groepen_map[DEFAULT_GROUP_LEZERS]
+
+        # Koppel admin aan beheerders en lezer aan lezers
+        UserGroup.query.filter_by(user_id=self.admin_user.id).delete()
+        UserGroup.query.filter_by(user_id=self.lezer_user.id).delete()
+        db.session.add(UserGroup(user_id=self.admin_user.id, groep_id=g_beheerders.id))
+        db.session.add(UserGroup(user_id=self.lezer_user.id, groep_id=g_lezers.id))
+        db.session.commit()
+
+        self.login(self.admin_user.email, 'password123')
+
+        # 1. Ongefilterd: beide gebruikers zichtbaar in tabel
+        resp = self.client.get('/beheer/gebruikers')
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert self.admin_user.email in html
+        assert self.lezer_user.email in html
+        assert 'name="groep_id"' in html
+
+        # 2. Filter op beheerders groep: enkel admin zichtbaar in tabel
+        resp_beheerders = self.client.get(f'/beheer/gebruikers?groep_id={g_beheerders.id}')
+        assert resp_beheerders.status_code == 200
+        html_beheerders = resp_beheerders.get_data(as_text=True)
+        assert self.admin_user.email in html_beheerders
+        assert self.lezer_user.email not in html_beheerders
+
+        # 3. Filter op lezers groep: enkel lezer zichtbaar in tabel
+        resp_lezers = self.client.get(f'/beheer/gebruikers?groep_id={g_lezers.id}')
+        assert resp_lezers.status_code == 200
+        html_lezers = resp_lezers.get_data(as_text=True)
+        assert self.lezer_user.email in html_lezers
+        assert self.admin_user.email not in html_lezers
+

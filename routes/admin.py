@@ -47,6 +47,14 @@ def gebruikers():
     if status_filter not in ('actief', 'inactief', 'alle'):
         status_filter = 'alle'
 
+    groep_id = request.args.get('groep_id', type=int)
+
+    # Zorg dat de groepen voor deze organisatie geseed zijn
+    beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
+    if not beschikbare_groepen:
+        seed_standaard_groepen_voor_organisatie(org_id)
+        beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
+
     query = (
         UserOrganisatie.query
         .options(joinedload(UserOrganisatie.user))
@@ -58,6 +66,14 @@ def gebruikers():
         query = query.filter(UserOrganisatie.actief == True)
     elif status_filter == 'inactief':
         query = query.filter(UserOrganisatie.actief == False)
+
+    if groep_id:
+        geselecteerde_groep = Group.query.filter_by(id=groep_id, organisatie_id=org_id).first()
+        if geselecteerde_groep:
+            subq = db.select(UserGroup.user_id).where(UserGroup.groep_id == groep_id)
+            query = query.filter(User.id.in_(subq))
+        else:
+            groep_id = None
 
     if sort_by == 'email':
         order_col = User.email.desc() if direction == 'desc' else User.email.asc()
@@ -71,12 +87,6 @@ def gebruikers():
         order_col = User.naam.desc() if direction == 'desc' else User.naam.asc()
 
     memberships = query.order_by(order_col).all()
-
-    # Zorg dat de groepen voor deze organisatie geseed zijn
-    beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
-    if not beschikbare_groepen:
-        seed_standaard_groepen_voor_organisatie(org_id)
-        beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
 
     # Mapping van gebruiker naar toegekende groepen
     user_groepen_map = {m.user_id: m.user.get_groepen_voor_organisatie(org_id) for m in memberships}
@@ -92,6 +102,8 @@ def gebruikers():
     return render_template(
         'admin/users.html',
         memberships=memberships,
+        beschikbare_groepen=beschikbare_groepen,
+        groep_id=groep_id,
         user_groepen_map=user_groepen_map,
         digidokter_counts=digidokter_counts,
         sort_by=sort_by,

@@ -5,15 +5,12 @@
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
     <div>
         <h1 class="dd-page-title mb-0">
-            <i class="bi bi-envelope-paper me-2 text-primary"></i>Aanpasbare E-mailsjablonen
+            <i class="bi bi-envelope-paper me-2 text-primary"></i>E-mailsjablonen
         </h1>
         <p class="dd-page-subtitle mb-0">
-            Beheer de standaardteksten voor uitnodigings- en herinneringsmails over het gehele platform
+            Beheer en personaliseer de teksten van welkomst- en evaluatiemails voor jouw organisatie
         </p>
     </div>
-    <a href="{{ url_for('platform.dashboard') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Terug naar dashboard
-    </a>
 </div>
 
 <div class="row g-4">
@@ -61,7 +58,7 @@
                     <small class="text-muted">
                         <i class="bi bi-clock-history me-1"></i>Gewijzigd: {{ tpl.gewijzigd_op.strftime('%d-%m-%Y %H:%M') if tpl.gewijzigd_op else '–' }}
                     </small>
-                    <a href="{{ url_for('platform.emailsjablonen_wijzigen', template_id=tpl.id) }}" class="btn btn-primary btn-sm px-3">
+                    <a href="{{ url_for('admin.emailsjablonen_wijzigen', template_id=tpl.id) }}" class="btn btn-primary btn-sm px-3">
                         <i class="bi bi-pencil-square me-1"></i>Sjabloon aanpassen
                     </a>
                 </div>

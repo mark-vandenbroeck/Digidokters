@@ -53,12 +53,17 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
             if bijlagen:
                 payload["attachment"] = []
                 for b in bijlagen:
-                    if os.path.exists(b['path']):
+                    content_b64 = None
+                    if b.get('content_bytes'):
+                        content_b64 = base64.b64encode(b['content_bytes']).decode('utf-8')
+                    elif b.get('path') and os.path.exists(b['path']):
                         with open(b['path'], 'rb') as f:
                             content_b64 = base64.b64encode(f.read()).decode('utf-8')
+
+                    if content_b64:
                         payload["attachment"].append({
                             "content": content_b64,
-                            "name": b['naam']
+                            "name": b.get('naam', 'bijlage')
                         })
                         
             data = json.dumps(payload).encode('utf-8')
@@ -91,13 +96,20 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
         msg.attach(MIMEText(inhoud_tekst, 'plain', 'utf-8'))
         
         for b in bijlagen:
-            if os.path.exists(b['path']):
+            raw_bytes = None
+            if b.get('content_bytes'):
+                raw_bytes = b['content_bytes']
+            elif b.get('path') and os.path.exists(b['path']):
                 with open(b['path'], 'rb') as f:
-                    part = MIMEBase('application', 'octet-stream')
-                    part.set_payload(f.read())
-                    encoders.encode_base64(part)
-                    part.add_header('Content-Disposition', f'attachment; filename="{b["naam"]}"')
-                    msg.attach(part)
+                    raw_bytes = f.read()
+
+            if raw_bytes is not None:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(raw_bytes)
+                encoders.encode_base64(part)
+                filename = b.get('naam', 'bijlage')
+                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+                msg.attach(part)
     else:
         msg = MIMEText(inhoud_tekst, 'plain', 'utf-8')
         msg['Subject'] = onderwerp
@@ -183,29 +195,55 @@ Digidokters Systeem
         current_app.logger.error(f"Fout bij het genereren of verzenden van de foutmail: {str(mail_ex)}")
 
 
-def stuur_welkomst_email(gebruiker_email, gebruiker_naam, tijdelijk_wachtwoord=None):
+def stuur_welkomst_email(gebruiker_email, gebruiker_naam, tijdelijk_wachtwoord=None, organisatie_id=None):
     """
-    Stuurt een welkomstmail naar een nieuwe gebruiker met link en de handleiding als bijlage.
+    Stuurt een welkomstmail naar een nieuwe gebruiker met logininstructies en de handleiding als bijlage.
+    Gebruikt het dynamische e-mailsjabloon 'welkomstmail' van de betreffende organisatie (of platform default).
     """
     if not gebruiker_email:
         return False, "Geen e-mailadres opgegeven."
-        
-    wachtwoord_deel = ""
-    if tijdelijk_wachtwoord:
-        wachtwoord_deel = f"\nJe tijdelijke wachtwoord is: {tijdelijk_wachtwoord}\nJe dient dit wachtwoord bij de eerste login onmiddellijk te wijzigen.\n"
-    else:
-        wachtwoord_deel = "\nJe kunt inloggen met de inloggegevens die door je beheerder aan jou zijn verstrekt.\n"
 
+    if organisatie_id is None:
+        try:
+            from utils.tenant import get_huidige_organisatie_id
+            organisatie_id = get_huidige_organisatie_id()
+        except Exception:
+            organisatie_id = None
+
+    wachtwoord_blok = ""
+    if tijdelijk_wachtwoord:
+        wachtwoord_blok = f"\nJe tijdelijke wachtwoord is: {tijdelijk_wachtwoord}\nJe dient dit wachtwoord bij de eerste login onmiddellijk te wijzigen.\n"
+    else:
+        wachtwoord_blok = "\nJe kunt inloggen met de inloggegevens die door je beheerder aan jou zijn verstrekt.\n"
+
+    try:
+        from flask import request, has_request_context
+        if has_request_context():
+            login_url = request.host_url.rstrip('/')
+        else:
+            login_url = "https://digidokters.onrender.com"
+    except Exception:
+        login_url = "https://digidokters.onrender.com"
+
+    context = {
+        'naam': gebruiker_naam or 'gebruiker',
+        'email': gebruiker_email,
+        'login_url': login_url,
+        'wachtwoord_blok': wachtwoord_blok,
+        'contact_email': 'digidokters.admin@gmail.com'
+    }
+
+    onderwerp = "Welkom bij Digidokters!"
     inhoud = f"""Beste {gebruiker_naam},
 
 Welkom bij de Digidokters-applicatie!
 
 Er is een nieuw account voor jou aangemaakt. Je kunt de applicatie bereiken via onderstaande URL:
-https://digidokters.onrender.com
+{login_url}
 
 Je inloggegevens:
-Gebruikersnaam: {gebruiker_naam}
-{wachtwoord_deel}
+E-mailadres: {gebruiker_email}
+{wachtwoord_blok}
 Als bijlage sturen we je alvast de gebruikershandleiding mee. Hierin vind je een duidelijke uitleg over het gebruik van de applicatie (zoals het registreren van bezoeken, de agenda en documentbeheer).
 
 Mocht je vragen of problemen hebben, neem dan gerust contact op met de beheerder via digidokters.admin@gmail.com.
@@ -213,22 +251,62 @@ Mocht je vragen of problemen hebben, neem dan gerust contact op met de beheerder
 Met vriendelijke groet,
 Digidokters Team
 """
-    
-    # Bepaal het pad naar de handleiding
-    handleiding_pad = os.path.join(current_app.root_path, 'Digidokters_Gebruikershandleiding.docx')
+
+    try:
+        from models.email_template import EmailTemplate
+        tpl = EmailTemplate.get_template_voor_organisatie('welkomstmail', organisatie_id)
+        if tpl:
+            onderwerp, inhoud = tpl.render(context)
+    except Exception as e:
+        current_app.logger.warning(f"Kon e-mailsjabloon welkomstmail niet laden: {str(e)}")
+
+    # Haal de actuele gebruikershandleiding op uit AppDocumenten (App documentatie -> Gebruikershandleidingen)
     bijlagen = []
-    if os.path.exists(handleiding_pad):
+    handleiding_doc = None
+    try:
+        from models.app_document import AppDocument, AppFolder
+        # Zoek eerst in map 'Gebruikershandleidingen' naar Digidokters_Gebruikershandleiding.docx
+        handleiding_doc = (
+            AppDocument.query
+            .join(AppFolder, AppDocument.map_id == AppFolder.id)
+            .filter(
+                AppFolder.naam.ilike('%gebruiker%'),
+                AppDocument.bestandsnaam.ilike('%Digidokters_Gebruikershandleiding%')
+            )
+            .order_by(AppDocument.gewijzigd_op.desc())
+            .first()
+        )
+        if not handleiding_doc:
+            # Fallback op bestandsnaam binnen globale AppDocumenten
+            handleiding_doc = (
+                AppDocument.query
+                .filter(AppDocument.bestandsnaam.ilike('%Digidokters_Gebruikershandleiding%'))
+                .order_by(AppDocument.gewijzigd_op.desc())
+                .first()
+            )
+    except Exception as doc_ex:
+        current_app.logger.warning(f"Fout bij ophalen handleiding uit AppDocumenten: {str(doc_ex)}")
+
+    if handleiding_doc and handleiding_doc.inhoud:
         bijlagen.append({
-            'path': handleiding_pad,
-            'naam': 'Digidokters_Gebruikershandleiding.docx'
+            'naam': handleiding_doc.bestandsnaam,
+            'content_bytes': handleiding_doc.inhoud
         })
     else:
-        current_app.logger.warning(f"Gebruikershandleiding niet gevonden op pad: {handleiding_pad}")
-        
+        # Fallback op bestand op schijf
+        handleiding_pad = os.path.join(current_app.root_path, 'Digidokters_Gebruikershandleiding.docx')
+        if os.path.exists(handleiding_pad):
+            bijlagen.append({
+                'path': handleiding_pad,
+                'naam': 'Digidokters_Gebruikershandleiding.docx'
+            })
+        else:
+            current_app.logger.warning(f"Gebruikershandleiding niet gevonden in AppDocumenten of op pad: {handleiding_pad}")
+
     try:
         success, msg = verstuur_email(
             ontvangers=[gebruiker_email],
-            onderwerp="Welkom bij Digidokters!",
+            onderwerp=onderwerp,
             inhoud_tekst=inhoud,
             bijlagen=bijlagen
         )
@@ -236,5 +314,6 @@ Digidokters Team
     except Exception as e:
         current_app.logger.error(f"Fout bij verzenden welkomstmail: {str(e)}")
         return False, str(e)
+
 
 

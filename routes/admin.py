@@ -256,7 +256,7 @@ def gebruiker_nieuw():
         
         if user.email:
             from utils.mail import stuur_welkomst_email
-            success, msg = stuur_welkomst_email(user.email, user.naam, tijdelijk_ww)
+            success, msg = stuur_welkomst_email(user.email, user.naam, tijdelijk_ww, organisatie_id=org_id)
             if success:
                 flash(f'Gebruiker {naam} aangemaakt. Welkomstmail succesvol verzonden naar {user.email}.', 'success')
             else:
@@ -1842,3 +1842,106 @@ def audit_log_opschonen():
         flash(f'Fout bij het opschonen van audit logs: {str(e)}', 'danger')
         
     return redirect(url_for('admin.audit_log'))
+
+
+# ─── E-mailsjablonen ─────────────────────────────────────────────────────────
+
+@admin_bp.route('/emailsjablonen')
+@login_required
+@admin_required
+def emailsjablonen():
+    from utils.tenant import get_huidige_organisatie_id
+    from models.email_template import EmailTemplate, ensure_default_email_templates
+    org_id = get_huidige_organisatie_id()
+    if not org_id:
+        flash("Geen organisatie geselecteerd.", "warning")
+        return redirect(url_for('reg.lijst'))
+
+    ensure_default_email_templates(org_id)
+    templates = EmailTemplate.query.filter_by(organisatie_id=org_id).order_by(EmailTemplate.naam).all()
+    return render_template('admin/emailsjablonen.html', templates=templates)
+
+
+@admin_bp.route('/emailsjablonen/<int:template_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def emailsjablonen_wijzigen(template_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from models.email_template import EmailTemplate
+    from datetime import datetime, timezone
+
+    org_id = get_huidige_organisatie_id()
+    tpl = db.get_or_404(EmailTemplate, template_id)
+    if tpl.organisatie_id != org_id:
+        flash("Sjabloon behoort niet tot de huidige organisatie.", "danger")
+        return redirect(url_for('admin.emailsjablonen'))
+
+    if request.method == 'POST':
+        onderwerp = request.form.get('onderwerp', '').strip()
+        inhoud = request.form.get('inhoud', '').strip()
+
+        if not onderwerp or not inhoud:
+            flash('Onderwerp en inhoud zijn verplicht.', 'danger')
+            return render_template('admin/emailsjabloon_form.html', template=tpl)
+
+        tpl.onderwerp = onderwerp
+        tpl.inhoud = inhoud
+        tpl.gewijzigd_op = datetime.now(timezone.utc)
+        db.session.commit()
+        flash(f'E-mailsjabloon "{tpl.naam}" succesvol opgeslagen.', 'success')
+        return redirect(url_for('admin.emailsjablonen'))
+
+    sample_context = {
+        'naam': 'Jan Janssens',
+        'email': 'jan.janssens@example.com',
+        'login_url': request.host_url.rstrip('/'),
+        'wachtwoord_blok': '\nJe tijdelijke wachtwoord is: Welkom123!\nJe dient dit wachtwoord bij de eerste login onmiddellijk te wijzigen.\n',
+        'contact_email': 'digidokters.admin@gmail.com',
+        'activiteit': 'Digidokter Sessie',
+        'datum': datetime.now().strftime('%d-%m-%Y'),
+        'uur_van': '09:30',
+        'uur_tot': '11:30',
+        'locatie': 'Bibliotheek Hoofdfiliaal',
+        'omschrijving_blok': '\nOmschrijving: Vrije inloop voor digitale vragen en ondersteuning bij eBox en Itsme.\n',
+        'link': request.host_url.rstrip('/') + '/evaluaties/invullen/voorbeeld-token-12345'
+    }
+    preview_onderwerp, preview_inhoud = tpl.render(sample_context)
+
+    return render_template(
+        'admin/emailsjabloon_form.html',
+        template=tpl,
+        preview_onderwerp=preview_onderwerp,
+        preview_inhoud=preview_inhoud,
+        vandaag_str=sample_context['datum']
+    )
+
+
+@admin_bp.route('/emailsjablonen/<int:template_id>/herstel', methods=['POST'])
+@login_required
+@admin_required
+def emailsjablonen_herstellen(template_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from models.email_template import EmailTemplate
+    from datetime import datetime, timezone
+
+    org_id = get_huidige_organisatie_id()
+    tpl = db.get_or_404(EmailTemplate, template_id)
+    if tpl.organisatie_id != org_id:
+        flash("Sjabloon behoort niet tot de huidige organisatie.", "danger")
+        return redirect(url_for('admin.emailsjablonen'))
+
+    defaults = EmailTemplate.get_default_templates()
+    if tpl.sleutel in defaults:
+        default_data = defaults[tpl.sleutel]
+        tpl.onderwerp = default_data['onderwerp']
+        tpl.inhoud = default_data['inhoud']
+        tpl.naam = default_data['naam']
+        tpl.beschrijving = default_data['beschrijving']
+        tpl.beschikbare_variabelen = default_data['beschikbare_variabelen']
+        tpl.gewijzigd_op = datetime.now(timezone.utc)
+        db.session.commit()
+        flash(f'Sjabloon "{tpl.naam}" is hersteld naar de standaardtekst.', 'info')
+    else:
+        flash(f'Geen standaardwaarden gevonden voor sjabloon "{tpl.naam}".', 'warning')
+
+    return redirect(url_for('admin.emailsjablonen_wijzigen', template_id=tpl.id))

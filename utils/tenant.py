@@ -190,3 +190,37 @@ def seed_organisatie_defaults(org_id):
             # Kopieer van org 1 of gebruik standaard Digicafé configuratie
             from routes.evaluations import get_or_create_evaluation_form
             get_or_create_evaluation_form(at.id, org_id)
+
+    # E-mailsjablonen seeden
+    from models.email_template import EmailTemplate
+    if not EmailTemplate.query.filter_by(organisatie_id=org_id).first():
+        source_templates = []
+        if source_org_id:
+            source_templates = EmailTemplate.query.filter_by(organisatie_id=source_org_id).all()
+
+        if source_templates:
+            for s_tpl in source_templates:
+                db.session.add(EmailTemplate(
+                    organisatie_id=org_id,
+                    sleutel=s_tpl.sleutel,
+                    naam=s_tpl.naam,
+                    onderwerp=s_tpl.onderwerp,
+                    inhoud=s_tpl.inhoud,
+                    beschrijving=s_tpl.beschrijving,
+                    beschikbare_variabelen=s_tpl.beschikbare_variabelen
+                ))
+            db.session.commit()
+        else:
+            defaults = EmailTemplate.get_default_templates()
+            for sleutel, data in defaults.items():
+                db.session.add(EmailTemplate(
+                    organisatie_id=org_id,
+                    sleutel=sleutel,
+                    naam=data['naam'],
+                    onderwerp=data['onderwerp'],
+                    inhoud=data['inhoud'],
+                    beschrijving=data['beschrijving'],
+                    beschikbare_variabelen=data['beschikbare_variabelen']
+                ))
+            db.session.commit()
+

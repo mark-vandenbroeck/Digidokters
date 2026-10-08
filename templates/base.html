@@ -273,6 +273,11 @@
                     <i class="bi bi-person-badge"></i>
                     <span>Functies</span>
                 </a>
+                <a href="{{ url_for('admin.emailsjablonen') }}"
+                   class="dd-nav-link {% if request.endpoint and 'emailsjabloon' in request.endpoint and 'admin.' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-envelope-paper"></i>
+                    <span>E-mailsjablonen</span>
+                </a>
                 {% endif %}
                 {% if not is_sjabloon_org and current_user.is_beheerder() %}
                 <a href="{{ url_for('admin.backup') }}"

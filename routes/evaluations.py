@@ -198,7 +198,7 @@ def verstuur_uitnodigingen_voor_sessie(agenda_item, host_url=None):
             'link': link
         }
 
-        tpl = EmailTemplate.query.filter_by(sleutel='evaluatie_uitnodiging').first()
+        tpl = EmailTemplate.get_template_voor_organisatie('evaluatie_uitnodiging', agenda_item.organisatie_id)
         if tpl:
             onderwerp, inhoud = tpl.render(context)
         else:
@@ -248,7 +248,7 @@ def verstuur_herinneringen_voor_sessie(agenda_item, host_url=None):
     verzonden_namen = []
     fouten = []
 
-    tpl = EmailTemplate.query.filter_by(sleutel='evaluatie_herinnering').first()
+    tpl = EmailTemplate.get_template_voor_organisatie('evaluatie_herinnering', agenda_item.organisatie_id)
 
     for dd in agenda_item.digidokters:
         # Check of digidokter al heeft ingevuld

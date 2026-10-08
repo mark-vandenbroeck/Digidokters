@@ -532,7 +532,7 @@ def koppeling_verwijderen(link_id):
 @platform_admin_required
 def emailsjablonen():
     ensure_default_email_templates()
-    templates = EmailTemplate.query.order_by(EmailTemplate.naam).all()
+    templates = EmailTemplate.query.filter(EmailTemplate.organisatie_id.is_(None)).order_by(EmailTemplate.naam).all()
     return render_template('platform/emailsjablonen.html', templates=templates)
 
 
@@ -560,6 +560,10 @@ def emailsjablonen_wijzigen(template_id):
     # Voorbeeldcontext voor de live preview
     sample_context = {
         'naam': 'Jan Janssens',
+        'email': 'jan.janssens@example.com',
+        'login_url': request.host_url.rstrip('/'),
+        'wachtwoord_blok': '\nJe tijdelijke wachtwoord is: Welkom123!\nJe dient dit wachtwoord bij de eerste login onmiddellijk te wijzigen.\n',
+        'contact_email': 'digidokters.admin@gmail.com',
         'activiteit': 'Digidokter Sessie',
         'datum': datetime.now().strftime('%d-%m-%Y'),
         'uur_van': '09:30',

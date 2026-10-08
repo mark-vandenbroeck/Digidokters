@@ -129,7 +129,7 @@ class TestAdminRoutes(BaseTestCase):
         self.assertTrue(dd.actief)
 
         # Welkomstmail moet verzonden zijn
-        mock_mail.assert_called_once_with('vrijwilliger@test.com', 'Nieuwe Vrijwilliger', 'tempPass123!')
+        mock_mail.assert_called_once_with('vrijwilliger@test.com', 'Nieuwe Vrijwilliger', 'tempPass123!', organisatie_id=self.org.id)
 
     def test_gebruiker_nieuw_link_existing_global_user(self):
         """Test dat een bestaande globale gebruiker (uit andere org) gekoppeld wordt aan de huidige organisatie."""

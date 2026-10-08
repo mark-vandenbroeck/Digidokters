@@ -241,10 +241,10 @@ class TestUserDeleteAndSorting(BaseTestCase):
         db.session.add(uo)
         db.session.commit()
 
-        # GET op wijzigen pagina: controleer dat beheerder geselecteerd is en autocomplete aanwezig is
+        # GET op wijzigen pagina: controleer dat formulier rendert en autocomplete aanwezig is
         res = self.client.get(f'/beheer/gebruikers/{u.id}/wijzig')
         self.assertEqual(res.status_code, 200)
         html = res.get_data(as_text=True)
-        self.assertIn('<option value="beheerder" selected>Beheerder</option>', html)
+        self.assertIn('Toegewezen Groep(en)', html)
         self.assertIn('autocomplete="new-password"', html)
 

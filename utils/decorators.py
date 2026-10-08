@@ -13,12 +13,12 @@ def admin_required(f):
         if not current_user.is_authenticated:
             return redirect(url_for('auth.login'))
         
+        if current_user.rol == ROLE_PLATFORMBEHEERDER:
+            return f(*args, **kwargs)
+
         org_id = session.get('organisatie_id')
         if not org_id:
             return redirect(url_for('auth.select_org'))
-            
-        if current_user.rol == ROLE_PLATFORMBEHEERDER:
-            return f(*args, **kwargs)
             
         # Dynamische check op 'gebruikers' bewerkrechten
         if has_permission('gebruikers', 'write', user=current_user, org_id=org_id):
@@ -63,12 +63,12 @@ def writer_required(f):
         if not current_user.is_authenticated:
             return redirect(url_for('auth.login'))
         
+        if current_user.rol == ROLE_PLATFORMBEHEERDER:
+            return f(*args, **kwargs)
+
         org_id = session.get('organisatie_id')
         if not org_id:
             return redirect(url_for('auth.select_org'))
-            
-        if current_user.rol == ROLE_PLATFORMBEHEERDER:
-            return f(*args, **kwargs)
             
         uo = next((x for x in current_user.user_organisaties if x.organisatie_id == org_id and x.actief and x.organisatie.actief), None)
         if not uo or uo.rol == ROLE_LEZER:

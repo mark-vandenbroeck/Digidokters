@@ -82,8 +82,10 @@
                             {% endfor %}
                         {% else %}
                             {% for uo in current_user.user_organisaties if uo.actief and uo.organisatie.actief %}
+                            {% set uo_groepen = current_user.get_groepen_voor_organisatie(uo.organisatie_id) %}
+                            {% set uo_groepen_label = uo_groepen|map(attribute='naam')|join(', ') if uo_groepen else ('Beheerder' if uo.rol == 'beheerder' else ('Lezer' if uo.rol == 'lezer' else 'Medewerker')) %}
                             <option value="{{ uo.organisatie_id }}" {% if uo.organisatie_id == session.get('organisatie_id') %}selected{% endif %}>
-                                {{ uo.organisatie.naam }}
+                                {{ uo.organisatie.naam }} ({{ uo_groepen_label }})
                             </option>
                             {% endfor %}
                         {% endif %}
@@ -348,8 +350,21 @@
                     <div class="dd-user-avatar">{{ current_user.naam[0].upper() }}</div>
                     <div class="overflow-hidden">
                         <div class="fw-semibold text-white text-truncate small dd-user-name">{{ current_user.naam }}</div>
-                        <div class="text-white-50" style="font-size:0.7rem">
-                            {{ 'Platformbeheerder' if current_user.rol == 'platformbeheerder' else ('Beheerder' if current_user.is_beheerder() else ('Lezer' if current_user.is_lezer() else 'Medewerker')) }}
+                        <div class="text-white-50 text-truncate" style="font-size:0.7rem">
+                            {% if current_user.rol == 'platformbeheerder' %}
+                                Platformbeheerder
+                            {% else %}
+                                {% set user_groepen = current_user.get_groepen_voor_organisatie(session.get('organisatie_id')) if session.get('organisatie_id') else [] %}
+                                {% if user_groepen %}
+                                    {{ user_groepen|map(attribute='naam')|join(', ') }}
+                                {% elif current_user.is_beheerder() %}
+                                    Beheerder
+                                {% elif current_user.is_lezer() %}
+                                    Lezer
+                                {% else %}
+                                    Medewerker
+                                {% endif %}
+                            {% endif %}
                         </div>
                     </div>
                 </a>

@@ -152,6 +152,12 @@ def create_app(config_class=Config):
             if current_user.rol == 'platformbeheerder':
                 from models.organisatie import Organisatie
                 g.beschikbare_organisaties = Organisatie.query.filter_by(actief=True).all()
+                req_org_id = request.args.get('org_id', type=int)
+                if req_org_id:
+                    target_org = Organisatie.query.filter_by(id=req_org_id, actief=True).first()
+                    if target_org:
+                        session['organisatie_id'] = target_org.id
+                        session['organisatie_naam'] = target_org.naam
                 org_id = session.get('organisatie_id')
                 if not org_id:
                     return redirect(url_for('auth.select_org', next=request.full_path))

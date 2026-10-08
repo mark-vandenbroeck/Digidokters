@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from flask_login import login_required, current_user
 from extensions import db
 from models.organisatie import Organisatie, UserOrganisatie
 from models.user import User
@@ -352,10 +352,14 @@ def organisatie_verwijderen(org_id):
 @login_required
 @platform_admin_required
 def koppelingen():
+    from models.group import Group, UserGroup
+    from utils.permissions import seed_standaard_groepen_voor_organisatie
+
     if request.method == 'POST':
         user_id = request.form.get('user_id', type=int)
         organisatie_id = request.form.get('organisatie_id', type=int)
-        rol = request.form.get('rol', 'medewerker')
+        groep_namen = request.form.getlist('groep_namen')
+        rol = request.form.get('rol', '').strip()
         actief = request.form.get('actief') == 'on'
 
         if not user_id or not organisatie_id:
@@ -379,24 +383,89 @@ def koppelingen():
             flash(f'Gebruiker {user.naam} is al gekoppeld aan {org.naam}.', 'warning')
             return redirect(url_for('platform.koppelingen'))
 
+        seed_standaard_groepen_voor_organisatie(organisatie_id)
+
+        # Bepaal effectieve rol uit groep_namen of rol
+        if 'Beheerders' in groep_namen or rol == 'beheerder':
+            effective_rol = 'beheerder'
+        elif ('Lezers' in groep_namen and 'Medewerkers' not in groep_namen and 'Beheerders' not in groep_namen) or rol == 'lezer':
+            effective_rol = 'lezer'
+        else:
+            effective_rol = 'medewerker'
+
         uo = UserOrganisatie(
             user_id=user_id,
             organisatie_id=organisatie_id,
-            rol=rol,
+            rol=effective_rol,
             actief=actief
         )
         db.session.add(uo)
+        db.session.flush()
+
+        # Koppel geselecteerde groepen
+        if groep_namen:
+            for gnaam in groep_namen:
+                grp = Group.query.filter_by(organisatie_id=organisatie_id, naam=gnaam, actief=True).first()
+                if grp:
+                    db.session.add(UserGroup(user_id=user_id, groep_id=grp.id, toegekend_door_id=current_user.id))
+        else:
+            std_naam = 'Beheerders' if effective_rol == 'beheerder' else ('Lezers' if effective_rol == 'lezer' else 'Medewerkers')
+            grp = Group.query.filter_by(organisatie_id=organisatie_id, naam=std_naam, actief=True).first()
+            if grp:
+                db.session.add(UserGroup(user_id=user_id, groep_id=grp.id, toegekend_door_id=current_user.id))
+
         db.session.commit()
         flash(f'Gebruiker {user.naam} succesvol gekoppeld aan {org.naam}.', 'success')
         return redirect(url_for('platform.koppelingen'))
 
     sort_by = request.args.get('sort_by', 'gebruiker').strip()
     direction = request.args.get('direction', 'asc').strip()
+    filter_gebruiker = request.args.get('gebruiker', '').strip()
+    filter_organisatie_id = request.args.get('organisatie_id', '').strip()
+    filter_groep = request.args.get('groep', '').strip()
+    filter_rol = request.args.get('rol', '').strip()
+    filter_status = request.args.get('status', '').strip()
 
     query = UserOrganisatie.query.join(User, UserOrganisatie.user_id == User.id).join(Organisatie, UserOrganisatie.organisatie_id == Organisatie.id)
 
+    # Filter op gebruiker (met wildcard ondersteuning: * en ? worden omgezet naar % en _)
+    if filter_gebruiker:
+        has_wildcard = any(c in filter_gebruiker for c in ['*', '?', '%', '_'])
+        pattern = filter_gebruiker.replace('*', '%').replace('?', '_')
+        if not has_wildcard:
+            pattern = f"%{pattern}%"
+        query = query.filter(db.or_(User.naam.ilike(pattern), User.email.ilike(pattern)))
+
+    # Filter op organisatie
+    if filter_organisatie_id and filter_organisatie_id.isdigit():
+        query = query.filter(UserOrganisatie.organisatie_id == int(filter_organisatie_id))
+
+    # Filter op groep
+    if filter_groep:
+        query = query.filter(
+            UserOrganisatie.user_id.in_(
+                db.session.query(UserGroup.user_id)
+                .join(Group, UserGroup.groep_id == Group.id)
+                .filter(
+                    Group.organisatie_id == UserOrganisatie.organisatie_id,
+                    Group.actief == True,
+                    Group.naam == filter_groep
+                )
+            )
+        )
+    elif filter_rol in ['medewerker', 'beheerder', 'lezer']:
+        query = query.filter(UserOrganisatie.rol == filter_rol)
+
+    # Filter op status
+    if filter_status == 'actief':
+        query = query.filter(UserOrganisatie.actief == True)
+    elif filter_status == 'inactief':
+        query = query.filter(UserOrganisatie.actief == False)
+
     if sort_by == 'organisatie':
         order_col = Organisatie.naam.desc() if direction == 'desc' else Organisatie.naam.asc()
+    elif sort_by == 'email':
+        order_col = User.email.desc() if direction == 'desc' else User.email.asc()
     elif sort_by == 'rol':
         order_col = UserOrganisatie.rol.desc() if direction == 'desc' else UserOrganisatie.rol.asc()
     elif sort_by == 'status':
@@ -407,13 +476,22 @@ def koppelingen():
     links = query.order_by(order_col).all()
     all_users = User.query.order_by(User.naam).all()
     all_orgs = Organisatie.query.filter(Organisatie.slug != 'sjabloon').order_by(Organisatie.naam).all()
+    available_group_names = [r[0] for r in db.session.query(Group.naam).filter(Group.actief == True).distinct().order_by(Group.naam).all()]
+    if not available_group_names:
+        available_group_names = ['Beheerders', 'Medewerkers', 'Lezers']
+
     return render_template(
         'platform/koppelingen.html',
         links=links,
         users=all_users,
         organisaties=all_orgs,
         sort_by=sort_by,
-        direction=direction
+        direction=direction,
+        filter_gebruiker=filter_gebruiker,
+        filter_organisatie_id=filter_organisatie_id,
+        filter_groep=filter_groep,
+        filter_status=filter_status,
+        available_group_names=available_group_names
     )
 
 @platform_bp.route('/koppelingen/<int:link_id>/toggle')

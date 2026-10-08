@@ -446,6 +446,41 @@ class TestAdminRoutes(BaseTestCase):
         res_edit = self.client.get(f'/beheer/gebruikers/{u_lezer.id}/wijzig')
         self.assertEqual(res_edit.status_code, 200)
         edit_html = res_edit.get_data(as_text=True)
+        self.assertIn('Agnes De TestLezer', edit_html)
+        self.assertIn('Toegewezen Groep(en)', edit_html)
 
-        self.assertIn('<option value="lezer" selected>Lezer (alleen-lezen)</option>', edit_html)
+    def test_gebruiker_nieuw_and_wijzig_derive_role_strictly_from_groups(self):
+        """Test dat het aanmaken en wijzigen van gebruikers zonder rol-parameter de rol correct afleidt uit de geselecteerde groepen."""
+        from models.group import Group
+        from utils.permissions import seed_standaard_groepen_voor_organisatie
+        groepen = seed_standaard_groepen_voor_organisatie(self.org.id)
+
+        self.login_admin()
+
+        # 1. Nieuwe gebruiker aanmaken met uitsluitend groep_ids (zonder 'rol' veld)
+        res_post = self.client.post('/beheer/gebruikers/nieuw', data={
+            'naam': 'GroepOnlyUser',
+            'email': 'groeponly@test.com',
+            'wachtwoord': 'Password123!',
+            'groep_ids': [str(groepen['lezers'].id)]
+        }, follow_redirects=True)
+        self.assertEqual(res_post.status_code, 200)
+
+        created_user = User.query.filter_by(email='groeponly@test.com').first()
+        self.assertIsNotNone(created_user)
+        uo = UserOrganisatie.query.filter_by(user_id=created_user.id, organisatie_id=self.org.id).first()
+        self.assertEqual(uo.rol, 'lezer')
+        self.assertEqual(created_user.get_groepen_voor_organisatie(self.org.id)[0].naam, 'Lezers')
+
+        # 2. Gebruiker bijwerken naar Beheerders groep zonder 'rol' veld
+        res_edit_post = self.client.post(f'/beheer/gebruikers/{created_user.id}/wijzig', data={
+            'naam': 'GroepOnlyUser',
+            'email': 'groeponly@test.com',
+            'groep_ids': [str(groepen['beheerders'].id)]
+        }, follow_redirects=True)
+        self.assertEqual(res_edit_post.status_code, 200)
+
+        db.session.refresh(uo)
+        self.assertEqual(uo.rol, 'beheerder')
+        self.assertEqual(created_user.get_groepen_voor_organisatie(self.org.id)[0].naam, 'Beheerders')
 

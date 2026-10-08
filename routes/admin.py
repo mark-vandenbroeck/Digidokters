@@ -137,13 +137,31 @@ def gebruiker_nieuw():
         functie_ids = [int(x) for x in request.form.getlist('functie_ids') if x.isdigit()]
         groep_ids = [int(x) for x in request.form.getlist('groep_ids') if x.isdigit()]
 
-        if rol == 'platformbeheerder' and current_user.rol != 'platformbeheerder':
+        is_pb = request.form.get('is_platformbeheerder') == 'on' or request.form.get('rol') == 'platformbeheerder'
+        if is_pb and current_user.rol != 'platformbeheerder':
             flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
             return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen)
 
         if not naam or not email or not tijdelijk_ww:
             flash('Naam, e-mailadres en wachtwoord zijn verplicht.', 'danger')
             return render_template('admin/user_form.html', actie='Nieuw', user=None, membership=None, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen)
+
+        # Bepaal effectieve organisatie rol
+        rol_in = request.form.get('rol')
+        if is_pb:
+            effective_rol = 'beheerder'
+        elif groep_ids:
+            gekozen_groepen = Group.query.filter(Group.organisatie_id == org_id, Group.id.in_(groep_ids)).all()
+            if any(g.get_permission('gebruikers') == 'schrijven' or g.naam.lower() in ('beheerders', 'beheerder') for g in gekozen_groepen):
+                effective_rol = 'beheerder'
+            elif all(not any(p.toegangsniveau == 'schrijven' for p in g.permissies) for g in gekozen_groepen):
+                effective_rol = 'lezer'
+            else:
+                effective_rol = 'medewerker'
+        elif rol_in:
+            effective_rol = 'beheerder' if rol_in == 'platformbeheerder' else rol_in
+        else:
+            effective_rol = 'medewerker'
 
         # Check of gebruiker al bestaat globally op e-mailadres
         user = User.query.filter(db.func.lower(User.email) == email).first()
@@ -156,7 +174,7 @@ def gebruiker_nieuw():
             uo = UserOrganisatie(
                 user_id=user.id,
                 organisatie_id=org_id,
-                rol='beheerder' if rol == 'platformbeheerder' else rol,
+                rol=effective_rol,
                 actief=request.form.get('actief') == 'on' if 'actief' in request.form else True
             )
             db.session.add(uo)
@@ -196,7 +214,7 @@ def gebruiker_nieuw():
             email=email,
             telefoonnummer=telefoonnummer,
             wachtwoord_hash=generate_password_hash(tijdelijk_ww),
-            rol=rol,
+            rol='platformbeheerder' if is_pb else effective_rol,
             actief=True,
             moet_wachtwoord_wijzigen=True,
         )
@@ -212,7 +230,7 @@ def gebruiker_nieuw():
         uo = UserOrganisatie(
             user_id=user.id,
             organisatie_id=org_id,
-            rol='beheerder' if rol == 'platformbeheerder' else rol,
+            rol=effective_rol,
             actief=request.form.get('actief') == 'on' if 'actief' in request.form else True
         )
         db.session.add(uo)
@@ -255,12 +273,24 @@ def gebruiker_nieuw():
 @login_required
 @admin_required
 def gebruiker_wijzigen(user_id):
+    from flask import abort
     from utils.tenant import get_huidige_organisatie_id
     from models.organisatie import UserOrganisatie
-    org_id = get_huidige_organisatie_id()
+
+    req_org_id = request.args.get('org_id', type=int)
+    if current_user.rol == 'platformbeheerder' and req_org_id:
+        org_id = req_org_id
+    else:
+        org_id = get_huidige_organisatie_id()
     
     user = db.get_or_404(User, user_id)
-    membership = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first_or_404()
+    membership = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first()
+    if not membership and current_user.rol == 'platformbeheerder':
+        membership = UserOrganisatie.query.filter_by(user_id=user.id).first()
+        if membership:
+            org_id = membership.organisatie_id
+    if not membership:
+        abort(404)
     beschikbare_functies = Functie.query.filter_by(organisatie_id=org_id).order_by(Functie.volgorde).all()
     beschikbare_groepen = Group.query.filter_by(organisatie_id=org_id, actief=True).order_by(Group.naam).all()
     if not beschikbare_groepen:
@@ -270,17 +300,40 @@ def gebruiker_wijzigen(user_id):
     geselecteerde_groep_ids = [ug.groep_id for ug in user.user_groepen if ug.groep and ug.groep.organisatie_id == org_id]
 
     if request.method == 'POST':
-        rol = request.form.get('rol', membership.rol)
-        if rol == 'platformbeheerder' and current_user.rol != 'platformbeheerder':
-            flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
-            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
-
         naam_in = request.form.get('naam', user.naam).strip()
         email_raw = request.form.get('email', '').strip().lower()
         email_in = email_raw if email_raw and email_raw not in ('none', 'null', 'undefined', 'n/a', '') else None
         telefoonnummer_in = request.form.get('telefoonnummer', '').strip() or None
         functie_ids = [int(x) for x in request.form.getlist('functie_ids') if x.isdigit()]
         groep_ids = [int(x) for x in request.form.getlist('groep_ids') if x.isdigit()]
+
+        is_pb = request.form.get('is_platformbeheerder') == 'on' or request.form.get('rol') == 'platformbeheerder'
+        if is_pb and current_user.rol != 'platformbeheerder':
+            flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
+
+        rol_in = request.form.get('rol')
+        if is_pb:
+            effective_rol = 'beheerder'
+            user_global_rol = 'platformbeheerder'
+        elif groep_ids:
+            gekozen_groepen = Group.query.filter(Group.organisatie_id == org_id, Group.id.in_(groep_ids)).all()
+            if any(g.get_permission('gebruikers') == 'schrijven' or g.naam.lower() in ('beheerders', 'beheerder') for g in gekozen_groepen):
+                effective_rol = 'beheerder'
+            elif all(not any(p.toegangsniveau == 'schrijven' for p in g.permissies) for g in gekozen_groepen):
+                effective_rol = 'lezer'
+            else:
+                effective_rol = 'medewerker'
+            user_global_rol = user.rol if user.rol == 'platformbeheerder' and not ('is_platformbeheerder' in request.form and not is_pb) else effective_rol
+        elif rol_in:
+            effective_rol = 'beheerder' if rol_in == 'platformbeheerder' else rol_in
+            user_global_rol = rol_in
+        else:
+            effective_rol = membership.rol
+            user_global_rol = user.rol
+
+        if 'is_platformbeheerder' in request.form and not is_pb and current_user.rol == 'platformbeheerder':
+            user_global_rol = effective_rol
 
         # Controleer unieke naam
         if naam_in != user.naam:
@@ -299,8 +352,8 @@ def gebruiker_wijzigen(user_id):
         user.naam = naam_in
         user.email = email_in
         user.telefoonnummer = telefoonnummer_in
-        user.rol = rol
-        membership.rol = 'beheerder' if rol == 'platformbeheerder' else rol
+        user.rol = user_global_rol
+        membership.rol = effective_rol
         
         # Functies bijwerken voor deze organisatie
         user.functies = [f for f in user.functies if f.organisatie_id != org_id]
@@ -418,6 +471,7 @@ def groep_bewerken(groep_id):
     from utils.tenant import get_huidige_organisatie_id
     org_id = get_huidige_organisatie_id()
     groep = Group.query.filter_by(id=groep_id, organisatie_id=org_id).first_or_404()
+    is_platform_grp = groep.naam.lower() in ('platformbeheerders', 'platformbeheerder')
 
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
@@ -427,9 +481,9 @@ def groep_bewerken(groep_id):
 
         if not naam:
             flash('Groepsnaam mag niet leeg zijn.', 'danger')
-            return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, form_data=request.form, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+            return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, form_data=request.form, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE, is_platform_grp=is_platform_grp)
 
-        if naam.lower() != groep.naam.lower():
+        if not is_platform_grp and naam.lower() != groep.naam.lower():
             bestaande = Group.query.filter(
                 db.func.lower(Group.naam) == naam.lower(),
                 Group.organisatie_id == org_id,
@@ -437,18 +491,26 @@ def groep_bewerken(groep_id):
             ).first()
             if bestaande:
                 flash(f'Er bestaat binnen deze organisatie al een groep met de naam "{naam}".', 'danger')
-                return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, form_data=request.form, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+                return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, form_data=request.form, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE, is_platform_grp=is_platform_grp)
 
-        groep.naam = naam
-        groep.beschrijving = beschrijving
-        groep.actief = actief
-        groep.alleen_eigen_registraties = alleen_eigen_registraties
+        if is_platform_grp:
+            groep.actief = True
+            groep.alleen_eigen_registraties = False
+            groep.beschrijving = beschrijving
+        else:
+            groep.naam = naam
+            groep.beschrijving = beschrijving
+            groep.actief = actief
+            groep.alleen_eigen_registraties = alleen_eigen_registraties
 
         # Update permissies
         for feat in ALL_FEATURES:
-            level = request.form.get(f'perm_{feat}', ACCESS_NONE)
-            if level not in ACCESS_LEVELS:
-                level = ACCESS_NONE
+            if is_platform_grp:
+                level = ACCESS_WRITE
+            else:
+                level = request.form.get(f'perm_{feat}', ACCESS_NONE)
+                if level not in ACCESS_LEVELS:
+                    level = ACCESS_NONE
             perm = GroupPermission.query.filter_by(groep_id=groep.id, functionaliteit=feat).first()
             if not perm:
                 db.session.add(GroupPermission(groep_id=groep.id, functionaliteit=feat, toegangsniveau=level))
@@ -459,7 +521,7 @@ def groep_bewerken(groep_id):
         flash(f'Groep "{groep.naam}" is succesvol bijgewerkt.', 'success')
         return redirect(url_for('admin.groepen_overzicht'))
 
-    return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE)
+    return render_template('admin/groepen/form.html', actie='Bewerken', groep=groep, ALL_FEATURES=ALL_FEATURES, FEATURE_LABELS=FEATURE_LABELS, FEATURE_DESCRIPTIONS=FEATURE_DESCRIPTIONS, ACCESS_NONE=ACCESS_NONE, ACCESS_READ=ACCESS_READ, ACCESS_WRITE=ACCESS_WRITE, is_platform_grp=is_platform_grp)
 
 
 @admin_bp.route('/groepen/<int:groep_id>/verwijderen', methods=['POST'])
@@ -470,7 +532,7 @@ def groep_verwijderen(groep_id):
     org_id = get_huidige_organisatie_id()
     groep = Group.query.filter_by(id=groep_id, organisatie_id=org_id).first_or_404()
 
-    if groep.is_standaard:
+    if groep.is_standaard or groep.naam.lower() in ('platformbeheerders', 'platformbeheerder'):
         flash(f'Standaardgroep "{groep.naam}" kan niet verwijderd worden.', 'danger')
         return redirect(url_for('admin.groepen_overzicht'))
 
@@ -488,6 +550,10 @@ def groep_toggle(groep_id):
     from utils.tenant import get_huidige_organisatie_id
     org_id = get_huidige_organisatie_id()
     groep = Group.query.filter_by(id=groep_id, organisatie_id=org_id).first_or_404()
+
+    if groep.naam.lower() in ('platformbeheerders', 'platformbeheerder'):
+        flash('De groep "Platformbeheerders" kan niet worden gedeactiveerd om te voorkomen dat platformbeheerders zichzelf buitensluiten.', 'warning')
+        return redirect(url_for('admin.groepen_overzicht'))
 
     groep.actief = not groep.actief
     db.session.commit()

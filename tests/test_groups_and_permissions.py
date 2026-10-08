@@ -13,7 +13,8 @@ from models.constants import (
     DEFAULT_GROUP_BEHEERDERS, DEFAULT_GROUP_PLATFORMBEHEERDERS,
     FEATURE_REGISTRATIES, FEATURE_AGENDA, FEATURE_STATISTIEKEN,
     FEATURE_DOCUMENTEN, FEATURE_EVALUATIES, FEATURE_GEBRUIKERS,
-    FEATURE_STAMGEGEVENS, FEATURE_IMPORT_EXPORT, FEATURE_FEEDBACK
+    FEATURE_STAMGEGEVENS, FEATURE_IMPORT_EXPORT, FEATURE_FEEDBACK,
+    ALL_FEATURES
 )
 from utils.permissions import (
     has_permission, can_read, can_write,
@@ -452,4 +453,124 @@ class TestGroupsAndPermissions(BaseTestCase):
         html_lezers = resp_lezers.get_data(as_text=True)
         assert self.lezer_user.email in html_lezers
         assert self.admin_user.email not in html_lezers
+
+    def test_user_different_groups_in_multiple_organisaties(self):
+        """Test dat een gebruiker verschillende groepen/rechten heeft per organisatie."""
+        # 1. Maak tweede organisatie met groepen
+        org_b = Organisatie(naam="Organisatie B", slug="org-b", actief=True)
+        db.session.add(org_b)
+        db.session.commit()
+
+        groepen_a = seed_standaard_groepen_voor_organisatie(self.org.id)
+        groepen_b = seed_standaard_groepen_voor_organisatie(org_b.id)
+
+        # 2. Koppel een multi-tenant gebruiker aan beide organisaties
+        multi_user = User(
+            naam="MultiOrgUser",
+            email="multi@test.com",
+            wachtwoord_hash=generate_password_hash("pw"),
+            rol=ROLE_MEDEWERKER,
+            actief=True
+        )
+        db.session.add(multi_user)
+        db.session.commit()
+
+        uo_a = UserOrganisatie(user_id=multi_user.id, organisatie_id=self.org.id, rol="beheerder", actief=True)
+        uo_b = UserOrganisatie(user_id=multi_user.id, organisatie_id=org_b.id, rol="medewerker", actief=True)
+        db.session.add_all([uo_a, uo_b])
+        db.session.commit()
+
+        # In Org A: lid van Beheerders groep
+        # In Org B: lid van Medewerkers groep
+        ug_a = UserGroup(user_id=multi_user.id, groep_id=groepen_a[DEFAULT_GROUP_BEHEERDERS].id)
+        ug_b = UserGroup(user_id=multi_user.id, groep_id=groepen_b[DEFAULT_GROUP_MEDEWERKERS].id)
+        db.session.add_all([ug_a, ug_b])
+        db.session.commit()
+
+        # 3. Controleer dat get_groepen_voor_organisatie strikt per organisatie filtert
+        groups_in_a = multi_user.get_groepen_voor_organisatie(self.org.id)
+        assert len(groups_in_a) == 1
+        assert groups_in_a[0].naam == groepen_a[DEFAULT_GROUP_BEHEERDERS].naam
+
+        groups_in_b = multi_user.get_groepen_voor_organisatie(org_b.id)
+        assert len(groups_in_b) == 1
+        assert groups_in_b[0].naam == groepen_b[DEFAULT_GROUP_MEDEWERKERS].naam
+
+        # 4. Controleer dat permissies verschillen per organisatie
+        perms_a = get_user_permissions_voor_organisatie(multi_user, self.org.id)
+        perms_b = get_user_permissions_voor_organisatie(multi_user, org_b.id)
+
+        assert perms_a[FEATURE_GEBRUIKERS] == ACCESS_WRITE  # Beheerder in Org A
+        assert perms_b[FEATURE_GEBRUIKERS] == ACCESS_NONE   # Medewerker in Org B
+
+        # 5. Controleer dat wijzigen van groepen in Org A geen invloed heeft op Org B
+        self.login(self.admin_user.email, "password123")
+        data = {
+            'naam': multi_user.naam,
+            'email': multi_user.email,
+            'rol': 'beheerder',
+            'groep_ids': [str(groepen_a[DEFAULT_GROUP_LEZERS].id)]
+        }
+        res = self.client.post(f'/beheer/gebruikers/{multi_user.id}/wijzig', data=data, follow_redirects=True)
+        assert res.status_code == 200
+
+        # Groep in Org A is nu Lezers
+        assert multi_user.get_groepen_voor_organisatie(self.org.id)[0].naam == groepen_a[DEFAULT_GROUP_LEZERS].naam
+        # Groep in Org B is onaangetast en nog steeds Medewerkers
+        assert multi_user.get_groepen_voor_organisatie(org_b.id)[0].naam == groepen_b[DEFAULT_GROUP_MEDEWERKERS].naam
+
+    def test_platformbeheerders_groep_protections(self):
+        """Test dat voor de groep 'Platformbeheerders' geen permissies kunnen worden afgenomen en dat de groep niet kan worden gedeactiveerd of verwijderd."""
+        self.login(self.admin_user.email, "password123")
+        groepen_map = seed_standaard_groepen_voor_organisatie(self.org.id)
+        pb_grp = groepen_map[DEFAULT_GROUP_PLATFORMBEHEERDERS]
+
+        # 1. Bekijk bewerkformulier: banner moet aanwezig zijn
+        res_get = self.client.get(f'/beheer/groepen/{pb_grp.id}/bewerken')
+        assert res_get.status_code == 200
+        html_get = res_get.get_data(as_text=True)
+        assert 'Beschermde Systeemgroep: Platformbeheerders' in html_get
+
+        # 2. Probeer de groep te deactiveren via /toggle
+        res_toggle = self.client.post(f'/beheer/groepen/{pb_grp.id}/toggle', follow_redirects=True)
+        assert res_toggle.status_code == 200
+        assert 'kan niet worden gedeactiveerd' in res_toggle.get_data(as_text=True)
+        db.session.refresh(pb_grp)
+        assert pb_grp.actief is True
+
+        # 3. Probeer de groep te verwijderen via /verwijderen
+        res_del = self.client.post(f'/beheer/groepen/{pb_grp.id}/verwijderen', follow_redirects=True)
+        assert res_del.status_code == 200
+        assert 'kan niet verwijderd worden' in res_del.get_data(as_text=True)
+        assert Group.query.get(pb_grp.id) is not None
+
+        # 4. Probeer permissies in te perken naar 'geen' en actief uit te schakelen via /bewerken
+        reduced_data = {
+            'naam': 'NieuweNaam',
+            'beschrijving': 'Aangepaste omschrijving',
+            'perm_registraties': 'geen',
+            'perm_agenda': 'geen',
+            'perm_statistieken': 'lezen',
+            'perm_documenten': 'geen',
+            'perm_evaluaties': 'geen',
+            'perm_feedback': 'geen',
+            'perm_stamgegevens': 'geen',
+            'perm_gebruikers': 'geen',
+            'perm_import_export': 'geen',
+            'alleen_eigen_registraties': 'on'
+        }
+        res_edit = self.client.post(f'/beheer/groepen/{pb_grp.id}/bewerken', data=reduced_data, follow_redirects=True)
+        assert res_edit.status_code == 200
+
+        db.session.refresh(pb_grp)
+        # Status blijft actief, eigen registraties blijft False
+        assert pb_grp.actief is True
+        assert pb_grp.alleen_eigen_registraties is False
+        assert pb_grp.beschrijving == 'Aangepaste omschrijving'
+
+        # Alle permissies moeten onveranderd ACCESS_WRITE blijven
+        for feat in ALL_FEATURES:
+            assert pb_grp.get_permission(feat) == ACCESS_WRITE
+
+
 

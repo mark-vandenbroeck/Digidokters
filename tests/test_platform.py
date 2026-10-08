@@ -343,4 +343,109 @@ class TestPlatformOrganizationDelete(BaseTestCase):
         self.assertEqual(res_stats.status_code, 200)
         self.assertIn('kunnen enkel stamgegevens worden beheerd', res_stats.get_data(as_text=True))
 
+    def test_koppelingen_filters_and_wildcards(self):
+        from models.organisatie import UserOrganisatie
+        from models.user import User
+        from werkzeug.security import generate_password_hash
+
+        self.login("superplatform@test.be", "password123")
+
+        # Create test users and orgs
+        org2 = Organisatie(naam="Tweede Organisatie", slug="tweede-org", actief=True)
+        db.session.add(org2)
+        db.session.commit()
+
+        u1 = User(naam="Annelies Janssens", email="annelies@test.be", wachtwoord_hash=generate_password_hash("pw"), rol="medewerker")
+        u2 = User(naam="Bart De Smet", email="bart.desmet@test.be", wachtwoord_hash=generate_password_hash("pw"), rol="medewerker")
+        db.session.add_all([u1, u2])
+        db.session.commit()
+
+        from models.group import Group, UserGroup
+        from utils.permissions import seed_standaard_groepen_voor_organisatie
+        groepen2 = seed_standaard_groepen_voor_organisatie(org2.id)
+
+        link1 = UserOrganisatie(user_id=u1.id, organisatie_id=org2.id, rol="medewerker", actief=True)
+        link2 = UserOrganisatie(user_id=u2.id, organisatie_id=org2.id, rol="beheerder", actief=False)
+        db.session.add_all([link1, link2])
+        db.session.commit()
+
+        # Link groepen
+        db.session.add_all([
+            UserGroup(user_id=u1.id, groep_id=groepen2['medewerkers'].id),
+            UserGroup(user_id=u2.id, groep_id=groepen2['beheerders'].id),
+        ])
+        db.session.commit()
+
+        # 1. Filter by Organisatie
+        res = self.client.get(f'/platform/koppelingen?organisatie_id={org2.id}')
+        self.assertEqual(res.status_code, 200)
+        content = res.get_data(as_text=True)
+        self.assertIn('<td class="ps-3 fw-semibold">Annelies Janssens</td>', content)
+        self.assertIn('<td class="ps-3 fw-semibold">Bart De Smet</td>', content)
+
+        # 2. Filter by Groep
+        res = self.client.get(f'/platform/koppelingen?organisatie_id={org2.id}&groep=Beheerders')
+        content = res.get_data(as_text=True)
+        self.assertIn('<td class="ps-3 fw-semibold">Bart De Smet</td>', content)
+        self.assertNotIn('<td class="ps-3 fw-semibold">Annelies Janssens</td>', content)
+
+        # 3. Filter by Status (inactief)
+        res = self.client.get(f'/platform/koppelingen?organisatie_id={org2.id}&status=inactief')
+        content = res.get_data(as_text=True)
+        self.assertIn('<td class="ps-3 fw-semibold">Bart De Smet</td>', content)
+        self.assertNotIn('<td class="ps-3 fw-semibold">Annelies Janssens</td>', content)
+
+        # 4. Filter by Status (actief)
+        res = self.client.get(f'/platform/koppelingen?organisatie_id={org2.id}&status=actief')
+        content = res.get_data(as_text=True)
+        self.assertIn('<td class="ps-3 fw-semibold">Annelies Janssens</td>', content)
+        self.assertNotIn('<td class="ps-3 fw-semibold">Bart De Smet</td>', content)
+
+        # 5. Wildcard search with '*'
+        res = self.client.get('/platform/koppelingen?gebruiker=Ann*')
+        content = res.get_data(as_text=True)
+        self.assertIn('<td class="ps-3 fw-semibold">Annelies Janssens</td>', content)
+        self.assertNotIn('<td class="ps-3 fw-semibold">Bart De Smet</td>', content)
+
+        # 6. Wildcard search with '?'
+        res = self.client.get('/platform/koppelingen?gebruiker=B?rt*')
+        content = res.get_data(as_text=True)
+        self.assertIn('<td class="ps-3 fw-semibold">Bart De Smet</td>', content)
+        self.assertNotIn('<td class="ps-3 fw-semibold">Annelies Janssens</td>', content)
+
+        # 7. Wildcard search on email
+        res = self.client.get('/platform/koppelingen?gebruiker=*@test.be')
+        content = res.get_data(as_text=True)
+        self.assertIn('<td class="ps-3 fw-semibold">Annelies Janssens</td>', content)
+        self.assertIn('<td class="ps-3 fw-semibold">Bart De Smet</td>', content)
+        self.assertIn('GROEP(EN)', content)
+        self.assertIn(f'/beheer/gebruikers/{u1.id}/wijzig', content)
+
+        # 8. Filter yielding no results
+        res = self.client.get('/platform/koppelingen?gebruiker=NietBestaand12345')
+        content = res.get_data(as_text=True)
+        self.assertIn('Geen koppelingen gevonden die voldoen aan de gekozen filters.', content)
+
+        # 9. Verify clicking user edit fiche as platformbeheerder for a different organization
+        res_edit = self.client.get(f'/beheer/gebruikers/{u1.id}/wijzig?org_id={org2.id}')
+        self.assertEqual(res_edit.status_code, 200)
+        self.assertIn('Annelies Janssens', res_edit.get_data(as_text=True))
+
+        # 10. Test creating a new link with group checkboxes
+        u3 = User(naam="Cynthia Claes", email="cynthia@test.be", wachtwoord_hash=generate_password_hash("pw"), rol="medewerker")
+        db.session.add(u3)
+        db.session.commit()
+
+        res_post = self.client.post('/platform/koppelingen', data={
+            'user_id': u3.id,
+            'organisatie_id': org2.id,
+            'groep_namen': ['Beheerders'],
+            'actief': 'on'
+        }, follow_redirects=True)
+        self.assertEqual(res_post.status_code, 200)
+        self.assertIn('succesvol gekoppeld aan Tweede Organisatie', res_post.get_data(as_text=True))
+        cynthia_groepen = u3.get_groepen_voor_organisatie(org2.id)
+        self.assertEqual(len(cynthia_groepen), 1)
+        self.assertEqual(cynthia_groepen[0].naam, 'Beheerders')
+
 

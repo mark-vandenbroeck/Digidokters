@@ -92,10 +92,16 @@
                                    class="btn btn-outline-primary" title="Bewerken & Permissiematrix">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                {% if grp.naam|lower in ['platformbeheerders', 'platformbeheerder'] %}
+                                <button class="btn btn-outline-secondary" disabled title="De groep Platformbeheerders kan niet worden gedeactiveerd">
+                                    <i class="bi bi-shield-fill-check text-success"></i>
+                                </button>
+                                {% else %}
                                 <a href="{{ url_for('admin.groep_toggle', groep_id=grp.id) }}"
                                    class="btn btn-outline-secondary" title="{% if grp.actief %}Deactiveren{% else %}Activeren{% endif %}">
                                     <i class="bi bi-{% if grp.actief %}eye-slash{% else %}eye{% endif %}"></i>
                                 </a>
+                                {% endif %}
                                 {% if not grp.is_standaard and grp.users.count() == 0 %}
                                 <form method="POST" action="{{ url_for('admin.groep_verwijderen', groep_id=grp.id) }}" class="d-inline"
                                       onsubmit="return confirm('Weet u zeker dat u groep \'{{ grp.naam }}\' wilt verwijderen?');">

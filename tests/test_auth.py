@@ -179,3 +179,29 @@ class TestAuth(BaseTestCase):
         # Controleer dat moet_wachtwoord_wijzigen nu False is
         db.session.refresh(self.medewerker_user)
         self.assertFalse(self.medewerker_user.moet_wachtwoord_wijzigen)
+
+    def test_select_org_and_header_displays_groepen_instead_of_rol(self):
+        """Test dat select_org en de header de toegekende groepen tonen i.p.v. statische rol."""
+        from extensions import db
+        from models.group import Group, UserGroup
+        from utils.permissions import seed_standaard_groepen_voor_organisatie
+
+        groepen = seed_standaard_groepen_voor_organisatie(self.org.id)
+        existing_ug = UserGroup.query.filter_by(user_id=self.admin_user.id, groep_id=groepen['beheerders'].id).first()
+        if not existing_ug:
+            ug = UserGroup(user_id=self.admin_user.id, groep_id=groepen['beheerders'].id)
+            db.session.add(ug)
+            db.session.commit()
+
+        # 1. Bekijk /select-organisatie
+        self.login("admin@test.com", "password123")
+        res_sel = self.client.get('/select-organisatie')
+        self.assertEqual(res_sel.status_code, 200)
+        html_sel = res_sel.get_data(as_text=True)
+        self.assertIn("Beheerders", html_sel)
+
+        # 2. Selecteer organisatie en bekijk header/sidebar
+        res_main = self.select_organisatie(self.org.id)
+        self.assertEqual(res_main.status_code, 200)
+        html_main = res_main.get_data(as_text=True)
+        self.assertIn("Beheerders", html_main)

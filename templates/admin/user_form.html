@@ -47,18 +47,18 @@
                     <div class="form-text">Optioneel. Contactnummer voor interne communicatie of permanentie.</div>
                 </div>
 
-                {% set geselecteerde_rol = form_data.rol if form_data and form_data.rol is defined else (user.rol if user and user.rol == 'platformbeheerder' else (membership.rol if membership and membership.rol else (user.rol if user else 'medewerker'))) %}
-                <div class="mb-3">
-                    <label for="rol" class="form-label">Primaire Rol <span class="text-danger">*</span></label>
-                    <select class="form-select" id="rol" name="rol" required>
-                        <option value="lezer" {% if geselecteerde_rol == 'lezer' %}selected{% endif %}>Lezer (alleen-lezen)</option>
-                        <option value="medewerker" {% if geselecteerde_rol == 'medewerker' %}selected{% endif %}>Medewerker</option>
-                        <option value="beheerder" {% if geselecteerde_rol == 'beheerder' %}selected{% endif %}>Beheerder</option>
-                        {% if current_user.rol == 'platformbeheerder' %}
-                        <option value="platformbeheerder" {% if geselecteerde_rol == 'platformbeheerder' %}selected{% endif %}>Platformbeheerder</option>
-                        {% endif %}
-                    </select>
+                {% if current_user.rol == 'platformbeheerder' %}
+                <div class="mb-3 p-3 bg-light rounded border">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="is_platformbeheerder" name="is_platformbeheerder"
+                               {% if (form_data and (form_data.is_platformbeheerder == 'on' or form_data.rol == 'platformbeheerder')) or (user and user.rol == 'platformbeheerder') %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold text-dark" for="is_platformbeheerder">
+                            <i class="bi bi-shield-shaded text-danger me-1"></i>Platformbeheerder (globaal)
+                        </label>
+                        <div class="form-text mt-1">Superuser met volledige beheerrechten over alle organisaties en platforminstellingen heen.</div>
+                    </div>
                 </div>
+                {% endif %}
 
                 <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-1">

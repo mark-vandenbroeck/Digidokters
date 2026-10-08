@@ -9,7 +9,7 @@
 
 {% macro sort_link(col_name, display_text) %}
     {% set target_dir = 'desc' if sort_by == col_name and direction == 'asc' else 'asc' %}
-    <a href="{{ url_for('platform.koppelingen', sort_by=col_name, direction=target_dir) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+    <a href="{{ url_for('platform.koppelingen', sort_by=col_name, direction=target_dir, gebruiker=filter_gebruiker, organisatie_id=filter_organisatie_id, groep=filter_groep, status=filter_status) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
         {{ display_text }}
         {% if sort_by == col_name %}
             {% if direction == 'asc' %}
@@ -23,6 +23,69 @@
     </a>
 {% endmacro %}
 
+<!-- Filter Kaart -->
+<div class="card mb-4">
+    <div class="card-body p-3">
+        <form method="GET" action="{{ url_for('platform.koppelingen') }}" class="row g-2 align-items-end">
+            <input type="hidden" name="sort_by" value="{{ sort_by }}">
+            <input type="hidden" name="direction" value="{{ direction }}">
+
+            <!-- Gebruiker filter (wildcards toegestaan) -->
+            <div class="col-12 col-sm-6 col-md-3">
+                <label for="filter_gebruiker" class="form-label small fw-semibold text-muted mb-1">
+                    Gebruiker <span class="fw-normal text-muted" style="font-size: 0.8em;">(* of ?)</span>
+                </label>
+                <input type="text" class="form-control form-control-sm" id="filter_gebruiker" name="gebruiker"
+                       value="{{ filter_gebruiker }}" placeholder="Zoek op naam of e-mail...">
+            </div>
+
+            <!-- Organisatie filter -->
+            <div class="col-12 col-sm-6 col-md-3">
+                <label for="filter_organisatie_id" class="form-label small fw-semibold text-muted mb-1">Organisatie</label>
+                <select class="form-select form-select-sm" id="filter_organisatie_id" name="organisatie_id">
+                    <option value="">Alle organisaties</option>
+                    {% for o in organisaties %}
+                    <option value="{{ o.id }}" {% if filter_organisatie_id == o.id|string or filter_organisatie_id == o.id %}selected{% endif %}>{{ o.naam }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Groep filter -->
+            <div class="col-6 col-sm-4 col-md-2">
+                <label for="filter_groep" class="form-label small fw-semibold text-muted mb-1">Groep</label>
+                <select class="form-select form-select-sm" id="filter_groep" name="groep">
+                    <option value="">Alle groepen</option>
+                    {% for gnaam in available_group_names %}
+                    <option value="{{ gnaam }}" {% if filter_groep == gnaam %}selected{% endif %}>{{ gnaam }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Status filter -->
+            <div class="col-6 col-sm-4 col-md-2">
+                <label for="filter_status" class="form-label small fw-semibold text-muted mb-1">Status</label>
+                <select class="form-select form-select-sm" id="filter_status" name="status">
+                    <option value="">Alle statussen</option>
+                    <option value="actief" {% if filter_status == 'actief' %}selected{% endif %}>Actief</option>
+                    <option value="inactief" {% if filter_status == 'inactief' %}selected{% endif %}>Gedeactiveerd</option>
+                </select>
+            </div>
+
+            <!-- Knoppen -->
+            <div class="col-12 col-sm-4 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
+                    <i class="bi bi-funnel me-1"></i>Filteren
+                </button>
+                {% if filter_gebruiker or filter_organisatie_id or filter_groep or filter_status %}
+                <a href="{{ url_for('platform.koppelingen') }}" class="btn btn-sm btn-outline-secondary" title="Filters wissen">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="row g-4">
     <!-- Lijst van koppelingen -->
     <div class="col-12 col-lg-8">
@@ -35,8 +98,9 @@
                         <thead>
                             <tr>
                                 <th class="ps-3">{{ sort_link('gebruiker', 'Gebruiker') }}</th>
+                                <th>{{ sort_link('email', 'E-mailadres') }}</th>
                                 <th>{{ sort_link('organisatie', 'Organisatie') }}</th>
-                                <th>{{ sort_link('rol', 'Rol') }}</th>
+                                <th>GROEP(EN)</th>
                                 <th>{{ sort_link('status', 'Status') }}</th>
                                 <th class="pe-3 text-end">Acties</th>
                             </tr>
@@ -45,14 +109,30 @@
                             {% for link in links %}
                             <tr>
                                 <td class="ps-3 fw-semibold">{{ link.user.naam }}</td>
+                                <td>
+                                    {% if link.user.email %}
+                                    <a href="{{ url_for('admin.gebruiker_wijzigen', user_id=link.user.id, org_id=link.organisatie_id) }}" class="text-decoration-none text-primary" title="Fiche van {{ link.user.naam }} bewerken">
+                                        <i class="bi bi-envelope me-1 text-muted"></i>{{ link.user.email }}
+                                    </a>
+                                    {% else %}
+                                    <a href="{{ url_for('admin.gebruiker_wijzigen', user_id=link.user.id, org_id=link.organisatie_id) }}" class="text-muted fst-italic text-decoration-none" title="Fiche van {{ link.user.naam }} bewerken">
+                                        —
+                                    </a>
+                                    {% endif %}
+                                </td>
                                 <td>{{ link.organisatie.naam }}</td>
                                 <td>
-                                    {% if link.rol == 'beheerder' %}
-                                    <span class="badge bg-danger">Beheerder</span>
-                                    {% elif link.rol == 'lezer' %}
-                                    <span class="badge bg-info text-dark">Lezer</span>
+                                    {% set u_groepen = link.user.get_groepen_voor_organisatie(link.organisatie_id) %}
+                                    {% if u_groepen %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for grp in u_groepen %}
+                                        <span class="badge bg-info-subtle text-dark border border-info-subtle" style="font-size: 0.75rem;">
+                                            <i class="bi bi-people me-1 text-primary"></i>{{ grp.naam }}
+                                        </span>
+                                        {% endfor %}
+                                    </div>
                                     {% else %}
-                                    <span class="badge bg-secondary">Medewerker</span>
+                                    <span class="text-muted fst-italic">—</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -83,7 +163,13 @@
                     </table>
                 </div>
                 {% else %}
-                <p class="text-muted text-center py-4 mb-0">Geen koppelingen gevonden.</p>
+                <p class="text-muted text-center py-4 mb-0">
+                    {% if filter_gebruiker or filter_organisatie_id or filter_groep or filter_status %}
+                    Geen koppelingen gevonden die voldoen aan de gekozen filters.
+                    {% else %}
+                    Geen koppelingen gevonden.
+                    {% endif %}
+                </p>
                 {% endif %}
             </div>
         </div>
@@ -118,11 +204,30 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="rol" class="form-label">Rol binnen de organisatie <span class="text-danger">*</span></label>
-                        <select class="form-select" id="rol" name="rol" required>
-                            <option value="medewerker" selected>Medewerker</option>
-                            <option value="beheerder">Beheerder</option>
-                        </select>
+                        <label class="form-label d-block mb-1">Toegewezen Groep(en) <span class="text-danger">*</span></label>
+                        <div class="form-text mb-2">Vink de groep(en) aan voor deze gebruiker binnen de organisatie.</div>
+                        <div class="card bg-light border-0 p-3">
+                            <div class="d-flex flex-column gap-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="groep_namen" value="Medewerkers" id="new_grp_medewerkers" checked>
+                                    <label class="form-check-label fw-medium" for="new_grp_medewerkers">
+                                        Medewerkers <span class="text-muted small fw-normal">(standaard)</span>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="groep_namen" value="Beheerders" id="new_grp_beheerders">
+                                    <label class="form-check-label fw-medium" for="new_grp_beheerders">
+                                        Beheerders <span class="text-muted small fw-normal">(volledig beheer)</span>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="groep_namen" value="Lezers" id="new_grp_lezers">
+                                    <label class="form-check-label fw-medium" for="new_grp_lezers">
+                                        Lezers <span class="text-muted small fw-normal">(alleen-lezen)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mb-4 form-check form-switch">

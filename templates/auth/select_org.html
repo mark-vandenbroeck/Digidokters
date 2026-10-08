@@ -37,7 +37,9 @@
                     </span>
                     <select class="form-select border-start-0 ps-2" id="organisatie_id" name="organisatie_id" required>
                         {% for membership in memberships %}
-                        <option value="{{ membership.organisatie_id }}">{{ membership.organisatie.naam }} ({{ 'Beheerder' if membership.rol == 'beheerder' else ('Lezer' if membership.rol == 'lezer' else 'Medewerker') }})</option>
+                        {% set user_groepen = current_user.get_groepen_voor_organisatie(membership.organisatie_id) %}
+                        {% set groepen_tekst = user_groepen|map(attribute='naam')|join(', ') if user_groepen else ('Beheerder' if membership.rol == 'beheerder' else ('Lezer' if membership.rol == 'lezer' else 'Medewerker')) %}
+                        <option value="{{ membership.organisatie_id }}">{{ membership.organisatie.naam }} ({{ groepen_tekst }})</option>
                         {% endfor %}
                     </select>
                 </div>

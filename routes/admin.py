@@ -300,6 +300,9 @@ def gebruiker_wijzigen(user_id):
 
     geselecteerde_groep_ids = [ug.groep_id for ug in user.user_groepen if ug.groep and ug.groep.organisatie_id == org_id]
 
+    active_pb_count = User.query.filter(User.rol == 'platformbeheerder', User.actief == True).count()
+    is_laatste_pb = (user.rol == 'platformbeheerder' and user.actief and active_pb_count <= 1)
+
     if request.method == 'POST':
         naam_in = request.form.get('naam', user.naam).strip()
         email_raw = request.form.get('email', '').strip().lower()
@@ -311,7 +314,11 @@ def gebruiker_wijzigen(user_id):
         is_pb = request.form.get('is_platformbeheerder') == 'on' or request.form.get('rol') == 'platformbeheerder'
         if is_pb and current_user.rol != 'platformbeheerder':
             flash('U bent niet gemachtigd om de platformbeheerder rol toe te kennen.', 'danger')
-            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids, is_laatste_pb=is_laatste_pb)
+
+        if user.rol == 'platformbeheerder' and not is_pb and is_laatste_pb:
+            flash('De laatste actieve platformbeheerder kan niet worden ontdaan van de platformbeheerdersrol om te voorkomen dat het platform onbeheerd raakt.', 'danger')
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids, is_laatste_pb=is_laatste_pb)
 
         rol_in = request.form.get('rol')
         if is_pb:
@@ -339,14 +346,14 @@ def gebruiker_wijzigen(user_id):
             bestaande_naam = User.query.filter(db.func.lower(User.naam) == naam_in.lower(), User.id != user.id).first()
             if bestaande_naam:
                 flash(f'Gebruikersnaam {naam_in} is al in gebruik.', 'danger')
-                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
+                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids, is_laatste_pb=is_laatste_pb)
 
         # Controleer unieke email
         if email_in and email_in != user.email:
             bestaande_email = User.query.filter(db.func.lower(User.email) == email_in, User.id != user.id).first()
             if bestaande_email:
                 flash(f'Het e-mailadres {email_in} is al in gebruik door {bestaande_email.naam}.', 'danger')
-                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
+                return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids, is_laatste_pb=is_laatste_pb)
 
         user.naam = naam_in
         user.email = email_in
@@ -387,9 +394,9 @@ def gebruiker_wijzigen(user_id):
         except Exception as e:
             db.session.rollback()
             flash(f'Fout bij opslaan van gebruiker: {str(e)}', 'danger')
-            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
+            return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, form_data=request.form, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids, is_laatste_pb=is_laatste_pb)
 
-    return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids)
+    return render_template('admin/user_form.html', actie='Wijzigen', user=user, membership=membership, beschikbare_functies=beschikbare_functies, beschikbare_groepen=beschikbare_groepen, geselecteerde_groep_ids=geselecteerde_groep_ids, is_laatste_pb=is_laatste_pb)
 
 
 # ─── Groepen & Permissies ───────────────────────────────────────────────────
@@ -600,6 +607,12 @@ def gebruiker_verwijderen(user_id):
     if user.id == 1:
         flash('De hoofdbeheerder kan niet worden verwijderd.', 'danger')
         return redirect(url_for('admin.gebruikers'))
+
+    if user.rol == 'platformbeheerder':
+        active_pb_count = User.query.filter(User.rol == 'platformbeheerder', User.actief == True).count()
+        if active_pb_count <= 1:
+            flash('De laatste actieve platformbeheerder kan niet worden verwijderd om te voorkomen dat het platform onbeheerd raakt.', 'danger')
+            return redirect(url_for('admin.gebruikers'))
 
     # GDPR-01: Controleer of de gebruiker behoort tot de huidige organisatie
     membership = UserOrganisatie.query.filter_by(user_id=user.id, organisatie_id=org_id).first_or_404()

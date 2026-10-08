@@ -51,11 +51,19 @@
                 <div class="mb-3 p-3 bg-light rounded border">
                     <div class="form-check form-switch mb-0">
                         <input class="form-check-input" type="checkbox" id="is_platformbeheerder" name="is_platformbeheerder"
-                               {% if (form_data and (form_data.is_platformbeheerder == 'on' or form_data.rol == 'platformbeheerder')) or (user and user.rol == 'platformbeheerder') %}checked{% endif %}>
+                               {% if (form_data and (form_data.is_platformbeheerder == 'on' or form_data.rol == 'platformbeheerder')) or (user and user.rol == 'platformbeheerder') %}checked{% endif %}
+                               {% if is_laatste_pb %}disabled{% endif %}>
                         <label class="form-check-label fw-semibold text-dark" for="is_platformbeheerder">
                             <i class="bi bi-shield-shaded text-danger me-1"></i>Platformbeheerder (globaal)
                         </label>
+                        {% if is_laatste_pb %}
+                        <div class="form-text text-warning mt-1">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Dit is de enige actieve platformbeheerder en kan niet worden uitgeschakeld om het platformbeheer te waarborgen.
+                        </div>
+                        <input type="hidden" name="is_platformbeheerder" value="on">
+                        {% else %}
                         <div class="form-text mt-1">Superuser met volledige beheerrechten over alle organisaties en platforminstellingen heen.</div>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}

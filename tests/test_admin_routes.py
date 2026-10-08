@@ -540,4 +540,47 @@ class TestAdminRoutes(BaseTestCase):
         db.session.refresh(target_user)
         self.assertEqual(target_user.rol, 'platformbeheerder')
 
+    def test_laatste_platformbeheerder_kan_niet_worden_uitgeschakeld_of_verwijderd(self):
+        """Test dat de allerlaatste actieve platformbeheerder beschermd is tegen uitschakelen of verwijderen."""
+        # Enige platformbeheerder in het systeem
+        solo_pb = User(
+            naam="SoloSuperAdmin",
+            email="solosuper@test.com",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="platformbeheerder",
+            actief=True,
+            moet_wachtwoord_wijzigen=False
+        )
+        db.session.add(solo_pb)
+        db.session.commit()
+        db.session.add(UserOrganisatie(user_id=solo_pb.id, organisatie_id=self.org.id, rol="beheerder", actief=True))
+        db.session.commit()
+
+        self.login("solosuper@test.com", "password123")
+        self.select_organisatie(self.org.id)
+
+        # GET op wijzig-pagina toont waarschuwing en disabled switch
+        res_get = self.client.get(f'/beheer/gebruikers/{solo_pb.id}/wijzig')
+        self.assertEqual(res_get.status_code, 200)
+        self.assertIn('Dit is de enige actieve platformbeheerder', res_get.get_data(as_text=True))
+
+        # POST poging om platformbeheerder uit te schakelen
+        res_post = self.client.post(f'/beheer/gebruikers/{solo_pb.id}/wijzig', data={
+            'naam': 'SoloSuperAdmin',
+            'email': 'solosuper@test.com',
+            # 'is_platformbeheerder' weggelaten
+        }, follow_redirects=True)
+        self.assertEqual(res_post.status_code, 200)
+        self.assertIn('De laatste actieve platformbeheerder kan niet worden ontdaan van de platformbeheerdersrol', res_post.get_data(as_text=True))
+
+        # Verifieer dat solo_pb nog steeds platformbeheerder is
+        db.session.refresh(solo_pb)
+        self.assertEqual(solo_pb.rol, 'platformbeheerder')
+
+        # Poging om solo_pb te verwijderen wordt eveneens geweigerd
+        res_del = self.client.post(f'/beheer/gebruikers/{solo_pb.id}/verwijderen', follow_redirects=True)
+        self.assertEqual(res_del.status_code, 200)
+        self.assertIn('eigen account niet verwijderen', res_del.get_data(as_text=True))
+
+
 

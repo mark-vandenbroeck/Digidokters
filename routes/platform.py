@@ -1022,7 +1022,7 @@ def communicatie():
         email_adressen = [r['email'] for r in ontvangers_lijst]
 
         try:
-            success, msg = verstuur_email(email_adressen, onderwerp, bericht)
+            success, msg = verstuur_email(email_adressen, onderwerp, bericht, als_bcc=True)
             
             # Bewaar in communicatie_logs met volledige metadata
             log_entry = CommunicatieLog(

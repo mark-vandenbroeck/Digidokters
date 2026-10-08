@@ -8,16 +8,22 @@ from email.mime.text import MIMEText
 from flask import current_app, request
 from flask_login import current_user
 
-def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
+def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None, bcc=None, als_bcc=False):
     """
     Verstuurt een e-mail naar één of meerdere ontvangers.
-    Ondersteunt optionele bijlagen (lijst van dicts met {'path': str, 'naam': str}).
+    Als `als_bcc=True` (of `bcc=True`), worden alle geadresseerden in BCC geplaatst om hun e-mailadressen
+    af te schermen voor elkaar (privacy).
+    Ondersteunt optionele bijlagen (lijst van dicts met {'path': str, 'naam': str} of {'content_bytes': bytes, 'naam': str}).
     Ondersteunt zowel de Brevo HTTPS REST API (werkt op Render.com poort 443) als SMTP fallback.
     """
     import base64
     from email.mime.multipart import MIMEMultipart
     from email.mime.base import MIMEBase
     from email import encoders
+
+    if bcc is True:
+        als_bcc = True
+        bcc = None
 
     if isinstance(ontvangers, str):
         ontvangers = [ontvangers]
@@ -32,6 +38,8 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
         onderwerp = f"[TEST OVERRIDE: {mail_override} | Oorspronkelijk: {orig_recipients_str}] {onderwerp}"
         inhoud_tekst = f"[TEST / DEV OVERRIDE ACTIEF]\nDit bericht was oorspronkelijk bestemd voor: {orig_recipients_str}\n------------------------------------------------------------\n\n{inhoud_tekst}"
         ontvangers = [mail_override]
+        als_bcc = False
+        bcc = None
 
     smtp_sender = os.environ.get('SMTP_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER', 'digidokters@gmail.com')
     brevo_api_key = os.environ.get('BREVO_API_KEY') or os.environ.get('BREVO_KEY')
@@ -54,12 +62,26 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
                 "api-key": brevo_api_key,
                 "content-type": "application/json"
             }
-            payload = {
-                "sender": {"email": smtp_sender, "name": "Digidokters"},
-                "to": [{"email": r} for r in ontvangers],
-                "subject": onderwerp,
-                "textContent": inhoud_tekst
-            }
+            
+            if als_bcc:
+                payload = {
+                    "sender": {"email": smtp_sender, "name": "Digidokters"},
+                    "to": [{"email": smtp_sender, "name": "Digidokters"}],
+                    "bcc": [{"email": r} for r in ontvangers],
+                    "subject": onderwerp,
+                    "textContent": inhoud_tekst
+                }
+            else:
+                payload = {
+                    "sender": {"email": smtp_sender, "name": "Digidokters"},
+                    "to": [{"email": r} for r in ontvangers],
+                    "subject": onderwerp,
+                    "textContent": inhoud_tekst
+                }
+                if bcc:
+                    if isinstance(bcc, str):
+                        bcc = [bcc]
+                    payload["bcc"] = [{"email": r} for r in bcc]
             
             if bijlagen:
                 payload["attachment"] = []
@@ -98,11 +120,13 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
     if not smtp_username or not smtp_password:
         raise Exception(f"Geen SMTP of Brevo API instellingen geconfigureerd (Server: {smtp_server}). Stel BREVO_API_KEY of SMTP_USERNAME/SMTP_PASSWORD in.")
 
+    to_header = f"Digidokters <{smtp_sender}>" if als_bcc else ", ".join(ontvangers)
+
     if bijlagen:
         msg = MIMEMultipart()
         msg['Subject'] = onderwerp
         msg['From'] = smtp_sender
-        msg['To'] = ", ".join(ontvangers)
+        msg['To'] = to_header
         
         msg.attach(MIMEText(inhoud_tekst, 'plain', 'utf-8'))
         
@@ -125,7 +149,14 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
         msg = MIMEText(inhoud_tekst, 'plain', 'utf-8')
         msg['Subject'] = onderwerp
         msg['From'] = smtp_sender
-        msg['To'] = ", ".join(ontvangers)
+        msg['To'] = to_header
+
+    envelope_recipients = list(ontvangers)
+    if bcc and not als_bcc:
+        if isinstance(bcc, str):
+            envelope_recipients.append(bcc)
+        else:
+            envelope_recipients.extend(bcc)
 
     if smtp_port == 465:
         server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
@@ -134,7 +165,7 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
         server.starttls()
 
     server.login(smtp_username, smtp_password)
-    server.sendmail(smtp_sender, ontvangers, msg.as_string())
+    server.sendmail(smtp_sender, envelope_recipients, msg.as_string())
     server.quit()
     return True, f"Succesvol verzonden via SMTP ({smtp_server}:{smtp_port})!"
 
@@ -200,7 +231,7 @@ Met vriendelijke groet,
 Digidokters Systeem
 """
         
-        success, msg = verstuur_email(ontvangers, f"[Digidokters Alert] Fout {error_code} opgetreden", mail_body)
+        success, msg = verstuur_email(ontvangers, f"[Digidokters Alert] Fout {error_code} opgetreden", mail_body, als_bcc=True)
         current_app.logger.info(f"Foutmail: {msg} (naar {ontvangers})")
     except Exception as mail_ex:
         current_app.logger.error(f"Fout bij het genereren of verzenden van de foutmail: {str(mail_ex)}")

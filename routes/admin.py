@@ -2145,7 +2145,7 @@ def communicatie():
         email_adressen = list({g['email'] for g in geselecteerde_gebruikers})
 
         try:
-            success, msg = verstuur_email(email_adressen, onderwerp, bericht)
+            success, msg = verstuur_email(email_adressen, onderwerp, bericht, als_bcc=True)
 
             # Bewaar in communicatie_logs met metadata
             log_entry = CommunicatieLog(

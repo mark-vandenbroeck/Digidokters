@@ -502,3 +502,71 @@ class TestCommunicatieRoutes(BaseTestCase):
                 assert 'beheerder1@antwerpen.be' in payload['subject']
                 assert 'beheerder1@antwerpen.be' in payload['textContent']
 
+    def test_verstuur_email_als_bcc_brevo(self):
+        """
+        Test dat verstuur_email met als_bcc=True in Brevo API de ontvangers in 'bcc' plaatst
+        en 'to' instelt op de afzender voor privacy.
+        """
+        import os
+        import json
+        import io
+        from utils.mail import verstuur_email
+
+        with patch.dict(os.environ, {
+            'BREVO_API_KEY': 'test-fake-key',
+            'SMTP_SENDER': 'digidokters@test.org'
+        }, clear=False):
+            # Zorg dat override leeg is
+            os.environ.pop('MAIL_OVERRIDE_RECIPIENT', None)
+            with patch('urllib.request.urlopen') as mock_urlopen:
+                mock_resp = io.BytesIO(b'{"messageId": "msg-bcc-123"}')
+                mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+                ontvangers = ['admin.org_a@test.be', 'admin.org_b@test.be']
+                succes, msg = verstuur_email(ontvangers, "Privacy Bericht", "Inhoud", als_bcc=True)
+
+                assert succes is True
+                req = mock_urlopen.call_args[0][0]
+                payload = json.loads(req.data.decode('utf-8'))
+
+                # 'to' moet de afzender/Digidokters zijn
+                assert payload['to'] == [{'email': 'digidokters@test.org', 'name': 'Digidokters'}]
+                # 'bcc' moet alle individuele bestemmelingen bevatten
+                assert payload['bcc'] == [{'email': 'admin.org_a@test.be'}, {'email': 'admin.org_b@test.be'}]
+
+    def test_verstuur_email_als_bcc_smtp(self):
+        """
+        Test dat verstuur_email met als_bcc=True in SMTP de 'To' header instelt op de afzender
+        en alle ontvangers in de SMTP envelope recipients plaatst.
+        """
+        import os
+        from utils.mail import verstuur_email
+
+        with patch.dict(os.environ, {
+            'BREVO_API_KEY': '',
+            'BREVO_KEY': '',
+            'SMTP_SERVER': 'smtp.test.org',
+            'SMTP_PORT': '587',
+            'SMTP_USERNAME': 'user@test.org',
+            'SMTP_PASSWORD': 'password',
+            'SMTP_SENDER': 'digidokters@test.org'
+        }, clear=False):
+            os.environ.pop('MAIL_OVERRIDE_RECIPIENT', None)
+            with patch('smtplib.SMTP') as mock_smtp_class:
+                mock_server = mock_smtp_class.return_value
+                
+                ontvangers = ['admin.org_a@test.be', 'admin.org_b@test.be']
+                succes, msg = verstuur_email(ontvangers, "Privacy Bericht SMTP", "Inhoud", als_bcc=True)
+
+                assert succes is True
+                mock_server.sendmail.assert_called_once()
+                from_addr, to_addrs, msg_str = mock_server.sendmail.call_args[0]
+                
+                assert from_addr == 'digidokters@test.org'
+                # Envelope bevat alle ontvangers
+                assert to_addrs == ['admin.org_a@test.be', 'admin.org_b@test.be']
+                # MIME To header toont alleen Digidokters afzender (geen andere ontvangers zichtbaar)
+                assert 'To: Digidokters <digidokters@test.org>' in msg_str
+                assert 'admin.org_a@test.be' not in msg_str.split('\n\n')[0] # Niet in headers!
+
+

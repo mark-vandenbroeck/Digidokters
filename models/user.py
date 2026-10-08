@@ -56,35 +56,31 @@ class User(UserMixin, db.Model):
         from utils.permissions import has_permission
         return has_permission(feature, required_level, user=self, org_id=org_id)
 
-    def is_beheerder(self):
+    def is_beheerder(self, org_id=None):
         if self.rol == ROLE_PLATFORMBEHEERDER:
             return True
-        from flask import session, has_request_context
-        if has_request_context():
-            org_id = session.get('organisatie_id')
-            if org_id:
-                # Eerst controleren via dynamische permissies (heeft write op 'gebruikers')
-                from utils.permissions import has_permission
-                if has_permission('gebruikers', 'write', user=self, org_id=org_id):
-                    return True
-                for uo in self.user_organisaties:
-                    if uo.organisatie_id == org_id and uo.rol == ROLE_BEHEERDER and uo.actief:
-                        return True
-                return False
-        return self.rol == ROLE_BEHEERDER
+        if org_id is None:
+            from flask import session, has_request_context
+            if has_request_context():
+                org_id = session.get('organisatie_id')
+        if org_id:
+            from utils.permissions import has_permission
+            return has_permission('gebruikers', 'write', user=self, org_id=org_id)
+        return False
 
-    def is_lezer(self):
+    def is_lezer(self, org_id=None):
         if self.rol == ROLE_PLATFORMBEHEERDER:
             return False
-        from flask import session, has_request_context
-        if has_request_context():
-            org_id = session.get('organisatie_id')
-            if org_id:
-                for uo in self.user_organisaties:
-                    if uo.organisatie_id == org_id and uo.actief:
-                        return uo.rol == ROLE_LEZER
-                return False
-        return self.rol == ROLE_LEZER
+        if org_id is None:
+            from flask import session, has_request_context
+            if has_request_context():
+                org_id = session.get('organisatie_id')
+        if org_id:
+            from utils.permissions import get_user_permissions_voor_organisatie
+            from models.constants import ACCESS_WRITE
+            perms = get_user_permissions_voor_organisatie(self, org_id)
+            return not any(lvl == ACCESS_WRITE for lvl in perms.values())
+        return False
 
     def __repr__(self):
         return f'<User {self.naam}>'

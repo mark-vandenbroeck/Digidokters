@@ -8,6 +8,8 @@ from models.activity_type import ActivityType
 from models.location import Location
 from models.digidokter import Digidokter
 from utils.decorators import writer_required
+from utils.permissions import can_write
+from models.constants import FEATURE_AGENDA
 from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model, filter_op_organisatie
 from utils.helpers import safe_int, safe_date, safe_str
 
@@ -114,11 +116,7 @@ def lijst():
     # Keuzelijsten voor de filters
     keuzes = _keuzelijsten()
     
-    kan_schrijven = True
-    if current_user.rol != 'platformbeheerder':
-        uo = next((x for x in current_user.user_organisaties if x.organisatie_id == org_id and x.actief and x.organisatie.actief), None)
-        if not uo or uo.rol == 'lezer':
-            kan_schrijven = False
+    kan_schrijven = can_write(FEATURE_AGENDA, user=current_user, org_id=org_id)
 
     # Evaluatiestatus ophalen voor ingelogde gebruiker
     from routes.evaluations import get_openstaande_evaluaties_voor_user, get_huidige_digidokter_voor_user

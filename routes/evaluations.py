@@ -771,7 +771,7 @@ def kan_evaluatie_bewerken(user, reactie, org_id):
         return False
     if getattr(user, 'rol', None) == ROLE_PLATFORMBEHEERDER:
         return True
-    if hasattr(user, 'is_beheerder') and user.is_beheerder():
+    if hasattr(user, 'is_beheerder') and user.is_beheerder(org_id):
         return True
     if reactie.user_id and reactie.user_id == user.id:
         return True

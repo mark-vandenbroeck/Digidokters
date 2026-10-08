@@ -92,8 +92,6 @@
                                         {% for org in r.organisaties %}
                                         <span class="badge bg-secondary-subtle text-secondary border mb-1">{{ org }}</span>
                                         {% endfor %}
-                                    {% elif r is mapping and r.rol %}
-                                        <span class="badge bg-light text-muted border">{{ r.rol }}</span>
                                     {% else %}
                                         <span class="badge bg-success-subtle text-success">Verzonden</span>
                                     {% endif %}

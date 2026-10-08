@@ -95,10 +95,10 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if r is mapping and r.is_beheerder %}
+                                    {% if r is mapping and r.groepen %}
+                                        <span class="badge bg-secondary-subtle text-secondary border">{{ r.groepen|join(', ') if r.groepen is iterable and r.groepen is not string else r.groepen }}</span>
+                                    {% elif r is mapping and r.is_beheerder %}
                                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Beheerder</span>
-                                    {% elif r is mapping and r.rol %}
-                                        <span class="badge bg-secondary-subtle text-secondary border">{{ r.rol }}</span>
                                     {% else %}
                                         <span class="badge bg-success-subtle text-success">Verzonden</span>
                                     {% endif %}

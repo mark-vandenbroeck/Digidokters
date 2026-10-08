@@ -2021,7 +2021,6 @@ def communicatie():
             'user': uo.user,
             'email': email,
             'naam': uo.user.naam or email,
-            'rol': uo.rol,
             'groepen': g_names,
             'is_beheerder': is_beh
         })

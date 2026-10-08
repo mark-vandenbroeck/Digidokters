@@ -230,6 +230,22 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
 *   **Directe Navigatie:** Het e-mailadres van de gebruiker is een klikbare link die direct de bewerkfiche van de desbetreffende gebruiker opent.
 *   **Groepenselectie via Checkboxen:** Bij het toevoegen van een nieuwe koppeling kunnen gewenste groepen (`Medewerkers`, `Beheerders`, `Lezers`) direct worden aangevinkt.
 
+### 19. Interne & Platform Communicatie (Broadcast E-mails & Historiek)
+*   **Lokale Organisatiecommunicatie (`/beheer/communicatie`):**
+    *   *Doelgroepselectie:* Beheerders kunnen gerichte mededelingen sturen naar *Alle actieve gebruikers*, *Enkel beheerders* of *Enkel medewerkers & digidokters*.
+    *   *Dynamische Validatie per Doelgroep:* De interface toont automatisch realtime welke accounts binnen de geselecteerde doelgroep geen e-mailadres hebben geconfigureerd. Indien alle geselecteerde gebruikers een e-mailadres hebben, wordt de waarschuwing automatisch verborgen.
+    *   *Veilige Proefmail-functie:* Met de knop **"Testmail naar mezelf"** kan de beheerder het bericht eerst uitsluitend naar zijn/haar eigen e-mailadres sturen ter controle (voorzien van het herkenbare voorvoegsel `[PROEFMAIL]`), zonder de officiële verzendhistoriek te vervuilen.
+    *   *Uitgebreide Verzendhistoriek & Audit:* Alle verzonden mededelingen worden opgeslagen in `communicatie_logs` met tijdstip, afzender, onderwerp, berichttekst en een JSON-snapshot van alle geadresseerden (inclusief naam, e-mailadres en groepen).
+    *   *Strikte Tenant-Isolatie:* Lokale beheerders hebben uitsluitend inzage in de verzendhistoriek van hun eigen organisatie.
+    *   *Veiligheidsvangnet voor Ontwikkeling:* Ondersteuning voor de omgevingsvariabele `MAIL_OVERRIDE_RECIPIENT` om tijdens lokale ontwikkeling of tests te garanderen dat testmails nooit naar echte gebruikers gaan.
+*   **Platformbrede Aankondigingen (`/platform/communicatie`):**
+    *   Platformbeheerders kunnen centrale aankondigingen of belangrijke software-updates in één keer versturen naar alle actieve beheerders van alle aangesloten gemeenten.
+    *   Centraal platform-overzicht van alle verzonden mededelingen en platformbrede historiek.
+
+### 20. Autorisatiemodel & Veiligheid (Uitfaseren Organisatierol & Beheerdersbescherming)
+*   **Volledig Uitfaseren van Legacy Organisatierollen:** Alle autorisatiecontroles (zoals `@admin_required`, `@writer_required`, inschrijfbevoegdheden in de Agenda, en gebruikershelpers `user.is_beheerder()`, `user.is_lezer()`) zijn 100% losgekoppeld van het verouderde `UserOrganisatie.rol` veld en draaien uitsluitend op basis van de dynamische Groepen & Rechten permissiematrix.
+*   **Bescherming Laatste Platformbeheerder:** De allerlaatste actieve platformbeheerder in het systeem is strikt beschermd tegen uitschakelen of verwijderen via zowel UI-vergrendeling (`disabled` switch met duidelijke waarschuwing) als waterdichte server-side validatie om de continuïteit van het platformbeheer te allen tijde te waarborgen.
+
 ---
 
 ## 💻 Lokale Installatie & Setup
@@ -303,7 +319,7 @@ Zie de volledige [Handleiding: Agenda Import Script](file:///Users/mark/Python/D
 
 ## 🧪 Unit Tests Uitvoeren
 
-Het platform is uitgerust met een geautomatiseerde test-suite van **201 tests** verdeeld over 29 testbestanden die draaien op een in-memory SQLite database.
+Het platform is uitgerust met een geautomatiseerde test-suite van **224 tests** verdeeld over 30 testbestanden die draaien op een in-memory SQLite database.
 
 **Met pytest (aanbevolen):**
 ```bash
@@ -315,40 +331,42 @@ Het platform is uitgerust met een geautomatiseerde test-suite van **201 tests** 
 python -m unittest discover -s tests
 ```
 
-### 📋 Overzicht van de Unit Test Suite (201 tests)
+### 📋 Overzicht van de Unit Test Suite (224 tests)
 
 | # | Testbestand | Aantal Tests | Dekkingsgebied / Beschrijving |
 |---|---|:---:|---|
-| 1 | `tests/test_admin_routes.py` | 13 | Gebruikersbeheer CRUD, automatische rol-afleiding uit groepen, wachtwoordwijzigingen, multi-tenant isolatie, audit logs & backup/restore |
+| 1 | `tests/test_admin_routes.py` | 15 | Gebruikersbeheer CRUD, automatische rol-afleiding uit groepen, platformbeheerder in/uitschakelen & bescherming laatste superadmin, wachtwoordwijzigingen, multi-tenant isolatie, audit logs & backup/restore |
 | 2 | `tests/test_agenda_routes.py` | 7 | Agenda items toevoegen/wijzigen/verwijderen, activiteitstypes, datumbereik en sortering |
 | 3 | `tests/test_agenda_view.py` | 3 | Weergave van agenda items, attentiebanners voor openstaande evaluaties van aanwezige digidokters |
 | 4 | `tests/test_app_documents.py` | 4 | Centrale, gedeelde platformdocumenten en globale mappenstructuur |
 | 5 | `tests/test_audit.py` | 2 | Logging van mutaties op database-entiteiten en filteren op datum/gebruiker |
 | 6 | `tests/test_auth.py` | 12 | Authenticatie, inloggen, logout, wachtwoordreset, wachtwoordwissel-dwang, organisatieselectie & groepsnaamweergave in UI |
-| 7 | `tests/test_consultatie_locaties.py` | 7 | Consultatielocaties markeren, sticky sessiekeuze bij balieformulier "Nieuw bezoek" |
-| 8 | `tests/test_digidokter_email.py` | 7 | E-mailvalidatie, duplicatiecontroles en uniekheid voor digidokters |
-| 9 | `tests/test_document_search.py` | 3 | Full-text content search binnen documenten (PDF, DOCX, ODT, XLSX, TXT) en context-snippets |
-| 10 | `tests/test_documents_routes.py` | 7 | Mappen- en documentbeheer per organisatie, versiebeheer (v1, v2...), uploaden/downloaden |
-| 11 | `tests/test_evaluations.py` | 13 | Evaluatieformulieren, dynamische vragenlijsteditor, token uitnodigingen en herinneringsmails |
-| 12 | `tests/test_evaluations_extended.py` | 10 | In-app evaluaties invullen, validatie tegen dubbele inzendingen en statusoverzichten |
-| 13 | `tests/test_feedback.py` | 9 | Gebruikersfeedback ("Voorstel"/"Foutje?"), stemmen met duimpjes (+1/-1), reacties en schermafbeeldingen |
-| 14 | `tests/test_feedback_notifications.py` | 7 | Notificatiestromen bij nieuwe feedbackitems en reacties |
-| 15 | `tests/test_functies.py` | 5 | Vrijwilligersfuncties (Digidokter, Digihelper, Lesgever) CRUD, rangschikking en toekenning |
-| 16 | `tests/test_gender_identity.py` | 5 | Dynamische genderidentiteiten CRUD en selectie bij bezoekenregistratie |
-| 17 | `tests/test_groups_and_permissions.py` | 14 | Dynamisch RBAC, fijnmazige permissiematrix per module, multi-groep resolutie, multi-tenant isolatie & bescherming Platformbeheerders |
-| 18 | `tests/test_herkomst.py` | 3 | Herkomst stamgegevens lifecycle en toegangscontrole |
-| 19 | `tests/test_import_export.py` | 2 | Data-export (Excel/CSV) met AI-vraagclassificaties en toegang tot importlogs |
-| 20 | `tests/test_ping.py` | 2 | Healthcheck en connectivity endpoints voor monitoring |
-| 21 | `tests/test_platform.py` | 8 | Platformbeheer, koppelingen beheren met filters & wildcards, centrale sjabloonorganisatie, cascade delete |
-| 22 | `tests/test_platform_dashboard_and_templates.py` | 5 | Platformdashboard metrieken, aanpasbare e-mailsjablonen met dynamische tags en live preview |
-| 23 | `tests/test_quick_registration.py` | 6 | Touch balieformulier "Nieuw bezoek", sessie-context, sneltags, validatie en lezersblokkering |
-| 24 | `tests/test_registrations.py` | 5 | Consultatieregistraties overzicht, filtering, detailweergave met AI-resultaten en registraties wissen |
-| 25 | `tests/test_stamgegevens_delete.py` | 6 | Veilige verwijdering van stamgegevens met integriteitscontroles |
-| 26 | `tests/test_stamgegevens_filter.py` | 10 | Statusfilters (alle/actief/inactief) op alle 9 stamgegevenstabellen |
-| 27 | `tests/test_stamgegevens_mapping.py` | 7 | Alias mapping van legacy leeftijdscategorieën en toestellen naar standaardcategorieën |
-| 28 | `tests/test_user_delete_and_sorting.py` | 10 | Gebruikers veilig verwijderen/ontkoppelen, multi-tenant bescherming en tabel-sorteringen |
-| 29 | `tests/test_vraagcategorieen.py` | 9 | 10 gestandaardiseerde vraagcategorieën, asynchrone AI-classificaties (Gemini), batch-analyse en statistieken |
-| **Totaal** | **29 testsuites** | **201 tests** | **100% geslaagd** |
+| 7 | `tests/test_communicatie.py` | 14 | Interne & platform communicatie, broadcast e-mails, doelgroepfiltering op groepen, proefmail naar mezelf, JSON-snapshots van ontvangers & strikte tenant-isolatie |
+| 8 | `tests/test_consultatie_locaties.py` | 7 | Consultatielocaties markeren, sticky sessiekeuze bij balieformulier "Nieuw bezoek" |
+| 9 | `tests/test_digidokter_email.py` | 7 | E-mailvalidatie, duplicatiecontroles en uniekheid voor digidokters |
+| 10 | `tests/test_document_search.py` | 3 | Full-text content search binnen documenten (PDF, DOCX, ODT, XLSX, TXT) en context-snippets |
+| 11 | `tests/test_documents_routes.py` | 7 | Mappen- en documentbeheer per organisatie, versiebeheer (v1, v2...), uploaden/downloaden |
+| 12 | `tests/test_email_templates_multitenant.py` | 7 | Meertalige e-mailsjablonen per tenant, custom overrides en fallback naar fabrieksinstellingen |
+| 13 | `tests/test_evaluations.py` | 13 | Evaluatieformulieren, dynamische vragenlijsteditor, token uitnodigingen en herinneringsmails |
+| 14 | `tests/test_evaluations_extended.py` | 10 | In-app evaluaties invullen, validatie tegen dubbele inzendingen en statusoverzichten |
+| 15 | `tests/test_feedback.py` | 9 | Gebruikersfeedback ("Voorstel"/"Foutje?"), stemmen met duimpjes (+1/-1), reacties en schermafbeeldingen |
+| 16 | `tests/test_feedback_notifications.py` | 7 | Notificatiestromen bij nieuwe feedbackitems en reacties |
+| 17 | `tests/test_functies.py` | 5 | Vrijwilligersfuncties (Digidokter, Digihelper, Lesgever) CRUD, rangschikking en toekenning |
+| 18 | `tests/test_gender_identity.py` | 5 | Dynamische genderidentiteiten CRUD en selectie bij bezoekenregistratie |
+| 19 | `tests/test_groups_and_permissions.py` | 14 | Dynamisch RBAC, fijnmazige permissiematrix per module, multi-groep resolutie, multi-tenant isolatie & bescherming Platformbeheerders |
+| 20 | `tests/test_herkomst.py` | 3 | Herkomst stamgegevens lifecycle en toegangscontrole |
+| 21 | `tests/test_import_export.py` | 2 | Data-export (Excel/CSV) met AI-vraagclassificaties en toegang tot importlogs |
+| 22 | `tests/test_ping.py` | 2 | Healthcheck en connectivity endpoints voor monitoring |
+| 23 | `tests/test_platform.py` | 8 | Platformbeheer, koppelingen beheren met filters & wildcards, centrale sjabloonorganisatie, cascade delete |
+| 24 | `tests/test_platform_dashboard_and_templates.py` | 5 | Platformdashboard metrieken, aanpasbare e-mailsjablonen met dynamische tags en live preview |
+| 25 | `tests/test_quick_registration.py` | 6 | Touch balieformulier "Nieuw bezoek", sessie-context, sneltags, validatie en lezersblokkering |
+| 26 | `tests/test_registrations.py` | 5 | Consultatieregistraties overzicht, filtering, detailweergave met AI-resultaten en registraties wissen |
+| 27 | `tests/test_stamgegevens_delete.py` | 6 | Veilige verwijdering van stamgegevens met integriteitscontroles |
+| 28 | `tests/test_stamgegevens_filter.py` | 10 | Statusfilters (alle/actief/inactief) op alle 9 stamgegevenstabellen |
+| 29 | `tests/test_stamgegevens_mapping.py` | 7 | Alias mapping van legacy leeftijdscategorieën en toestellen naar standaardcategorieën |
+| 30 | `tests/test_user_delete_and_sorting.py` | 10 | Gebruikers veilig verwijderen/ontkoppelen, multi-tenant bescherming en tabel-sorteringen |
+| 31 | `tests/test_vraagcategorieen.py` | 9 | 10 gestandaardiseerde vraagcategorieën, asynchrone AI-classificaties (Gemini), batch-analyse en statistieken |
+| **Totaal** | **31 testsuites** | **224 tests** | **100% geslaagd** |
 
 ---
 

@@ -22,6 +22,17 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None):
     if isinstance(ontvangers, str):
         ontvangers = [ontvangers]
 
+    mail_override = (os.environ.get('MAIL_OVERRIDE_RECIPIENT') or '').strip()
+    if mail_override:
+        orig_recipients_str = ", ".join(ontvangers)
+        try:
+            current_app.logger.info(f"[MAIL_OVERRIDE] Ontvangers {orig_recipients_str} omgeleid naar {mail_override}")
+        except Exception:
+            pass
+        onderwerp = f"[TEST OVERRIDE: {mail_override} | Oorspronkelijk: {orig_recipients_str}] {onderwerp}"
+        inhoud_tekst = f"[TEST / DEV OVERRIDE ACTIEF]\nDit bericht was oorspronkelijk bestemd voor: {orig_recipients_str}\n------------------------------------------------------------\n\n{inhoud_tekst}"
+        ontvangers = [mail_override]
+
     smtp_sender = os.environ.get('SMTP_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER', 'digidokters@gmail.com')
     brevo_api_key = os.environ.get('BREVO_API_KEY') or os.environ.get('BREVO_KEY')
     

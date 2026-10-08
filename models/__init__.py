@@ -20,6 +20,7 @@ from .question_classification import QuestionClassification
 from .gender_identity import GenderIdentity
 from .functie import Functie, user_functies
 from .group import Group, GroupPermission, UserGroup
+from .communicatie import CommunicatieLog
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
@@ -28,7 +29,7 @@ __all__ = [
     'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation',
     'EmailTemplate', 'FeedbackItem', 'FeedbackVote', 'FeedbackComment', 'FeedbackView',
     'QuestionCategory', 'QuestionClassification', 'GenderIdentity', 'Functie', 'user_functies',
-    'Group', 'GroupPermission', 'UserGroup'
+    'Group', 'GroupPermission', 'UserGroup', 'CommunicatieLog'
 ]
 
 

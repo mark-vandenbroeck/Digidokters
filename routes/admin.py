@@ -15,10 +15,11 @@ from models.functie import Functie, user_functies
 from models.registration import Registration
 from models.group import Group, GroupPermission, UserGroup
 from models.constants import (
-    ALL_FEATURES, FEATURE_LABELS, FEATURE_DESCRIPTIONS,
+    ALL_FEATURES, FEATURE_LABELS, FEATURE_DESCRIPTIONS, FEATURE_COMMUNICATIE,
     ACCESS_NONE, ACCESS_READ, ACCESS_WRITE, ACCESS_LEVELS,
     DEFAULT_GROUPS, DEFAULT_GROUP_LEZERS, DEFAULT_GROUP_MEDEWERKERS,
-    DEFAULT_GROUP_BEHEERDERS, DEFAULT_GROUP_PLATFORMBEHEERDERS
+    DEFAULT_GROUP_BEHEERDERS, DEFAULT_GROUP_PLATFORMBEHEERDERS,
+    ROLE_BEHEERDER, ROLE_PLATFORMBEHEERDER, ROLE_MEDEWERKER, ROLE_LEZER
 )
 from utils.decorators import admin_required, platform_admin_required, writer_required
 from utils.permissions import (
@@ -1945,3 +1946,276 @@ def emailsjablonen_herstellen(template_id):
         flash(f'Geen standaardwaarden gevonden voor sjabloon "{tpl.naam}".', 'warning')
 
     return redirect(url_for('admin.emailsjablonen_wijzigen', template_id=tpl.id))
+
+
+# ─── Communicatie & Mededelingen ─────────────────────────────────────────────
+
+@admin_bp.route('/communicatie', methods=['GET', 'POST'])
+@login_required
+@permission_required(FEATURE_COMMUNICATIE, ACCESS_WRITE)
+def communicatie():
+    """
+    Beheerders kunnen een aankondiging of e-mail versturen naar alle actieve gebruikers
+    van hun eigen organisatie.
+    """
+    from utils.mail import verstuur_email
+    from utils.tenant import get_huidige_organisatie_id
+    from models.organisatie import Organisatie, UserOrganisatie
+    from models.group import Group, UserGroup
+
+    org_id = get_huidige_organisatie_id()
+    if not org_id:
+        flash('Geen actieve organisatie geselecteerd.', 'warning')
+        return redirect(url_for('reg.lijst'))
+
+    organisatie = db.get_or_404(Organisatie, org_id)
+
+    # Haal alle actieve gebruikers van deze organisatie op
+    uos = (
+        UserOrganisatie.query
+        .join(User, UserOrganisatie.user_id == User.id)
+        .filter(
+            UserOrganisatie.organisatie_id == org_id,
+            UserOrganisatie.actief == True,
+            User.actief == True
+        )
+        .all()
+    )
+
+    user_ids = [uo.user_id for uo in uos]
+    user_groups_map = {}
+    if user_ids:
+        group_links = (
+            db.session.query(UserGroup.user_id, Group.naam)
+            .join(Group, UserGroup.groep_id == Group.id)
+            .filter(
+                Group.organisatie_id == org_id,
+                Group.actief == True,
+                UserGroup.user_id.in_(user_ids)
+            )
+            .all()
+        )
+        for uid, gnaam in group_links:
+            if uid not in user_groups_map:
+                user_groups_map[uid] = []
+            user_groups_map[uid].append(gnaam)
+
+    gebruikers_lijst = []
+    gebruikers_zonder_email = []
+    for uo in uos:
+        email = (uo.user.email or '').strip().lower()
+        g_names = user_groups_map.get(uo.user_id, [])
+        # Bepaal beheerderstatus puur en alleen op basis van actief groepslidmaatschap
+        is_beh = any(g.lower() in ('beheerders', 'platformbeheerders') for g in g_names)
+
+        if not email:
+            gebruikers_zonder_email.append({
+                'user': uo.user,
+                'naam': uo.user.naam or uo.user.gebruikersnaam or 'Geen naam',
+                'groepen': g_names,
+                'is_beheerder': is_beh
+            })
+            continue
+
+        gebruikers_lijst.append({
+            'user': uo.user,
+            'email': email,
+            'naam': uo.user.naam or email,
+            'rol': uo.rol,
+            'groepen': g_names,
+            'is_beheerder': is_beh
+        })
+    gebruikers_lijst.sort(key=lambda x: (x['naam'] or '').lower())
+    gebruikers_zonder_email.sort(key=lambda x: (x['naam'] or '').lower())
+
+    from models.communicatie import CommunicatieLog
+    from datetime import datetime, timezone
+    import json
+    historiek = CommunicatieLog.query.filter_by(organisatie_id=org_id).order_by(CommunicatieLog.verzonden_op.desc()).all()
+
+    doelgroep = request.form.get('doelgroep', 'alle') if request.method == 'POST' else request.args.get('doelgroep', 'alle')
+
+    if request.method == 'POST':
+        onderwerp = (request.form.get('onderwerp') or '').strip()
+        bericht = (request.form.get('bericht') or '').strip()
+        actie = (request.form.get('actie') or 'verzenden').strip()
+
+        # Filter op basis van geselecteerde doelgroep
+        if doelgroep == 'beheerders':
+            geselecteerde_gebruikers = [g for g in gebruikers_lijst if g['is_beheerder']]
+        elif doelgroep == 'medewerkers':
+            geselecteerde_gebruikers = [g for g in gebruikers_lijst if not g['is_beheerder']]
+        else:
+            geselecteerde_gebruikers = gebruikers_lijst
+
+        if not onderwerp:
+            flash('Onderwerp is verplicht.', 'danger')
+            return render_template(
+                'admin/communicatie.html',
+                organisatie=organisatie,
+                gebruikers=gebruikers_lijst,
+                gebruikers_zonder_email=gebruikers_zonder_email,
+                historiek=historiek,
+                doelgroep=doelgroep,
+                onderwerp=onderwerp,
+                bericht=bericht
+            )
+
+        if not bericht:
+            flash('Berichttekst is verplicht.', 'danger')
+            return render_template(
+                'admin/communicatie.html',
+                organisatie=organisatie,
+                gebruikers=gebruikers_lijst,
+                gebruikers_zonder_email=gebruikers_zonder_email,
+                historiek=historiek,
+                doelgroep=doelgroep,
+                onderwerp=onderwerp,
+                bericht=bericht
+            )
+
+        if actie == 'test':
+            test_email = current_user.email if (current_user and current_user.is_authenticated) else None
+            if not test_email:
+                flash('Uw gebruikersaccount heeft geen e-mailadres geconfigureerd om een testmail naar te sturen.', 'warning')
+                return render_template(
+                    'admin/communicatie.html',
+                    organisatie=organisatie,
+                    gebruikers=gebruikers_lijst,
+                    gebruikers_zonder_email=gebruikers_zonder_email,
+                    historiek=historiek,
+                    doelgroep=doelgroep,
+                    onderwerp=onderwerp,
+                    bericht=bericht
+                )
+            try:
+                doelgroep_labels = {
+                    'alle': f'Alle actieve gebruikers ({len(gebruikers_lijst)} personen)',
+                    'beheerders': f'Enkel beheerders ({len([g for g in gebruikers_lijst if g["is_beheerder"]])} personen)',
+                    'medewerkers': f'Enkel medewerkers/lezers ({len([g for g in gebruikers_lijst if not g["is_beheerder"]])} personen)'
+                }
+                doelgroep_tekst = doelgroep_labels.get(doelgroep, doelgroep)
+                test_onderwerp = f"[PROEFMAIL] {onderwerp}"
+                test_inhoud = (
+                    f"--- DIT IS EEN TEST- / PROEFMAIL ---\n"
+                    f"Afzender: {current_user.naam or test_email} ({test_email})\n"
+                    f"Organisatie: {organisatie.naam}\n"
+                    f"Doelgroep bij definitieve verzending: {doelgroep_tekst}\n"
+                    f"------------------------------------------------------------\n\n"
+                    f"{bericht}"
+                )
+                verstuur_email([test_email], test_onderwerp, test_inhoud)
+                flash(f'Proefmail succesvol verzonden naar uw eigen e-mailadres ({test_email}). Controleer uw inbox.', 'info')
+            except Exception as e:
+                flash(f'Fout bij versturen van test-e-mail: {str(e)}', 'danger')
+            return render_template(
+                'admin/communicatie.html',
+                organisatie=organisatie,
+                gebruikers=gebruikers_lijst,
+                gebruikers_zonder_email=gebruikers_zonder_email,
+                historiek=historiek,
+                doelgroep=doelgroep,
+                onderwerp=onderwerp,
+                bericht=bericht
+            )
+
+        if not geselecteerde_gebruikers:
+            flash('Er zijn geen actieve gebruikers gevonden binnen de gekozen doelgroep.', 'warning')
+            return render_template(
+                'admin/communicatie.html',
+                organisatie=organisatie,
+                gebruikers=gebruikers_lijst,
+                gebruikers_zonder_email=gebruikers_zonder_email,
+                historiek=historiek,
+                doelgroep=doelgroep,
+                onderwerp=onderwerp,
+                bericht=bericht
+            )
+
+        email_adressen = list({g['email'] for g in geselecteerde_gebruikers})
+
+        try:
+            success, msg = verstuur_email(email_adressen, onderwerp, bericht)
+
+            # Bewaar in communicatie_logs met metadata
+            log_entry = CommunicatieLog(
+                organisatie_id=org_id,
+                afzender_id=current_user.id if current_user.is_authenticated else None,
+                afzender_naam=current_user.naam or current_user.email,
+                afzender_email=current_user.email,
+                type='organisatie',
+                doelgroep=doelgroep,
+                onderwerp=onderwerp,
+                inhoud=bericht,
+                ontvangers_json=json.dumps([{
+                    'naam': g['naam'],
+                    'email': g['email'],
+                    'rol': g.get('rol'),
+                    'groepen': g.get('groepen', []),
+                    'is_beheerder': g['is_beheerder']
+                } for g in geselecteerde_gebruikers]),
+                aantal_ontvangers=len(email_adressen),
+                status='verzonden',
+                verzonden_op=datetime.now(timezone.utc)
+            )
+            db.session.add(log_entry)
+            db.session.commit()
+
+            flash(f'E-mail succesvol verzonden naar {len(email_adressen)} gebruiker(s) van {organisatie.naam}.', 'success')
+            return redirect(url_for('admin.communicatie'))
+        except Exception as e:
+            flash(f'Fout bij versturen van e-mail: {str(e)}', 'danger')
+            return render_template(
+                'admin/communicatie.html',
+                organisatie=organisatie,
+                gebruikers=gebruikers_lijst,
+                gebruikers_zonder_email=gebruikers_zonder_email,
+                historiek=historiek,
+                doelgroep=doelgroep,
+                onderwerp=onderwerp,
+                bericht=bericht
+            )
+
+    return render_template(
+        'admin/communicatie.html',
+        organisatie=organisatie,
+        gebruikers=gebruikers_lijst,
+        gebruikers_zonder_email=gebruikers_zonder_email,
+        historiek=historiek,
+        doelgroep=doelgroep,
+        onderwerp='',
+        bericht=''
+    )
+
+
+@admin_bp.route('/communicatie/log/<int:log_id>')
+@login_required
+@permission_required(FEATURE_COMMUNICATIE, ACCESS_READ)
+def communicatie_log_detail(log_id):
+    """Detailweergave van een verzonden communicatiebericht voor organisatiebeheerders."""
+    from models.communicatie import CommunicatieLog
+    from utils.tenant import get_huidige_organisatie_id
+    from flask import jsonify
+    org_id = get_huidige_organisatie_id()
+    log = CommunicatieLog.query.get_or_404(log_id)
+
+    # Beheerders mogen enkel de historiek van hun eigen organisatie zien (tenzij platformbeheerder)
+    if current_user.rol != ROLE_PLATFORMBEHEERDER and log.organisatie_id != org_id:
+        flash("U heeft geen toegang tot dit communicatiebericht.", "danger")
+        return redirect(url_for('admin.communicatie'))
+
+    if request.is_json or request.args.get('format') == 'json':
+        return jsonify({
+            'id': log.id,
+            'onderwerp': log.onderwerp,
+            'inhoud': log.inhoud,
+            'afzender_naam': log.afzender_naam,
+            'afzender_email': log.afzender_email,
+            'type': log.type,
+            'doelgroep': log.doelgroep,
+            'organisatie': log.organisatie.naam if log.organisatie else 'Eigen organisatie',
+            'aantal_ontvangers': log.aantal_ontvangers,
+            'verzonden_op': log.geformatteerde_datum,
+            'ontvangers': log.ontvangers_lijst
+        })
+    return render_template('admin/communicatie_detail.html', log=log)

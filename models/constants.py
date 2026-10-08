@@ -26,6 +26,7 @@ FEATURE_EVALUATIES = 'evaluaties'
 FEATURE_FEEDBACK = 'feedback'
 FEATURE_STAMGEGEVENS = 'stamgegevens'
 FEATURE_GEBRUIKERS = 'gebruikers'
+FEATURE_COMMUNICATIE = 'communicatie'
 FEATURE_IMPORT_EXPORT = 'import_export'
 
 ALL_FEATURES = (
@@ -37,6 +38,7 @@ ALL_FEATURES = (
     FEATURE_FEEDBACK,
     FEATURE_STAMGEGEVENS,
     FEATURE_GEBRUIKERS,
+    FEATURE_COMMUNICATIE,
     FEATURE_IMPORT_EXPORT,
 )
 
@@ -49,6 +51,7 @@ FEATURE_LABELS = {
     FEATURE_FEEDBACK: 'Feedback & Verbeterpunten',
     FEATURE_STAMGEGEVENS: 'Stamgegevens & Beheertabellen',
     FEATURE_GEBRUIKERS: 'Gebruikers- & Groepsbeheer',
+    FEATURE_COMMUNICATIE: 'Berichten & Communicatie',
     FEATURE_IMPORT_EXPORT: 'Data Importeren & Exporteren',
 }
 
@@ -61,6 +64,7 @@ FEATURE_DESCRIPTIONS = {
     FEATURE_FEEDBACK: 'Feedback en ideeën bekijken (lezen) of indienen, stemmen, reageren en statussen wijzigen (schrijven).',
     FEATURE_STAMGEGEVENS: 'Stamgegevens zoals locaties, toestellen en categorieën raadplegen (lezen) of beheren (schrijven).',
     FEATURE_GEBRUIKERS: 'Gebruikerslijsten inzien (lezen) of gebruikers toevoegen, groepen en rechten toewijzen (schrijven).',
+    FEATURE_COMMUNICATIE: 'Belangrijke mededelingen en e-mails versturen naar gebruikers of beheerders.',
     FEATURE_IMPORT_EXPORT: 'Gegevens exporteren naar Excel/CSV (lezen) of historische bestanden importeren (schrijven).',
 }
 

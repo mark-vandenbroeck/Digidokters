@@ -130,6 +130,11 @@
                     <i class="bi bi-envelope-paper"></i>
                     <span>E-mailsjablonen</span>
                 </a>
+                <a href="{{ url_for('platform.communicatie') }}"
+                   class="dd-nav-link {% if request.endpoint == 'platform.communicatie' %}active{% endif %}">
+                    <i class="bi bi-megaphone"></i>
+                    <span>Communicatie</span>
+                </a>
                 <a href="{{ url_for('platform.vraagcategorieen') }}"
                    class="dd-nav-link {% if request.endpoint and 'vraagcategorie' in request.endpoint %}active{% endif %}">
                     <i class="bi bi-tags"></i>
@@ -202,7 +207,7 @@
             {% endif %}
             {% endif %}
 
-            {% if (current_user.is_beheerder() or can_write('stamgegevens') or can_write('gebruikers')) and session.get('organisatie_id') %}
+            {% if (current_user.is_beheerder() or can_write('stamgegevens') or can_write('gebruikers') or can_write('communicatie')) and session.get('organisatie_id') %}
             <!-- Beheer -->
             <div class="dd-nav-section mt-3" data-bs-toggle="collapse" data-bs-target="#nav-beheer" role="button" aria-expanded="true" aria-controls="nav-beheer">
                 <span>{% if is_sjabloon_org %}Stamgegevens Sjabloon{% else %}Beheer{% endif %}</span>
@@ -230,6 +235,13 @@
                    class="dd-nav-link {% if request.endpoint and 'groep' in request.endpoint %}active{% endif %}">
                     <i class="bi bi-shield-lock"></i>
                     <span>Sjabloon Groepen</span>
+                </a>
+                {% endif %}
+                {% if not is_sjabloon_org and can_write('communicatie') %}
+                <a href="{{ url_for('admin.communicatie') }}"
+                   class="dd-nav-link {% if request.endpoint == 'admin.communicatie' %}active{% endif %}">
+                    <i class="bi bi-broadcast"></i>
+                    <span>Communicatie</span>
                 </a>
                 {% endif %}
                 {% if can_read('stamgegevens') %}

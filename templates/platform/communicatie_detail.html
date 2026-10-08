@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Communicatiebericht Details – Platformbeheer – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <a href="{{ url_for('platform.communicatie') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h1 class="dd-page-title mb-0">
+                <i class="bi bi-envelope-open me-2 text-primary"></i>Berichtdetails
+            </h1>
+        </div>
+        <p class="dd-page-subtitle mb-0">
+            Verzonden op {{ log.geformatteerde_datum }} door <strong>{{ log.afzender_naam }}</strong> ({{ log.afzender_email }})
+        </p>
+    </div>
+    <a href="{{ url_for('platform.communicatie') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Terug naar overzicht
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- Linker kolom: Inhoud van het bericht -->
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <div class="fw-semibold text-dark fs-5">
+                    {{ log.onderwerp }}
+                </div>
+                <span class="badge {% if log.type == 'platform' %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-info-subtle text-info-emphasis border border-info-subtle{% endif %} px-3 py-2">
+                    <i class="bi {% if log.type == 'platform' %}bi-megaphone{% else %}bi-building{% endif %} me-1"></i>
+                    {% if log.type == 'platform' %}Platformaankondiging{% else %}Organisatiebericht{% endif %}
+                </span>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3 mb-4 pb-3 border-bottom text-muted small">
+                    <div class="col-12 col-md-6">
+                        <strong><i class="bi bi-person me-1"></i>Afzender:</strong> {{ log.afzender_naam }} &lt;{{ log.afzender_email }}&gt;
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <strong><i class="bi bi-clock-history me-1"></i>Tijdstip:</strong> {{ log.geformatteerde_datum }}
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <strong><i class="bi bi-building me-1"></i>Organisatie:</strong> {{ log.organisatie.naam if log.organisatie else 'Alle aangesloten gemeenten' }}
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <strong><i class="bi bi-bullseye me-1"></i>Doelgroep:</strong> {{ log.doelgroep or 'Alle' }}
+                    </div>
+                </div>
+
+                <div class="mb-2 fw-semibold text-secondary">Inhoud:</div>
+                <div class="p-4 bg-light rounded-3 border text-dark font-sans-serif" style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.6;">{{ log.inhoud }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechter kolom: Ontvangerslijst -->
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 fw-semibold">
+                    <i class="bi bi-people-fill me-2 text-primary"></i>Ontvangers
+                </h5>
+                <span class="badge bg-primary rounded-pill px-3 py-1">
+                    {{ log.aantal_ontvangers }}
+                </span>
+            </div>
+            <div class="card-body p-3">
+                <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Naam & E-mail</th>
+                                <th>Detail</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in log.ontvangers_lijst %}
+                            <tr>
+                                <td>
+                                    {% if r is mapping %}
+                                    <div class="fw-semibold text-dark">{{ r.naam or r.email }}</div>
+                                    <div class="text-muted font-monospace" style="font-size: 0.8rem;">{{ r.email }}</div>
+                                    {% else %}
+                                    <div class="font-monospace">{{ r }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if r is mapping and r.organisaties %}
+                                        {% for org in r.organisaties %}
+                                        <span class="badge bg-secondary-subtle text-secondary border mb-1">{{ org }}</span>
+                                        {% endfor %}
+                                    {% elif r is mapping and r.rol %}
+                                        <span class="badge bg-light text-muted border">{{ r.rol }}</span>
+                                    {% else %}
+                                        <span class="badge bg-success-subtle text-success">Verzonden</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -13,7 +13,7 @@ from models.constants import (
     ACCESS_NONE, ACCESS_READ, ACCESS_WRITE, ACCESS_LEVELS, ACCESS_LEVEL_ORDER,
     ALL_FEATURES, FEATURE_REGISTRATIES, FEATURE_AGENDA, FEATURE_STATISTIEKEN,
     FEATURE_DOCUMENTEN, FEATURE_EVALUATIES, FEATURE_FEEDBACK, FEATURE_STAMGEGEVENS,
-    FEATURE_GEBRUIKERS, FEATURE_IMPORT_EXPORT,
+    FEATURE_GEBRUIKERS, FEATURE_COMMUNICATIE, FEATURE_IMPORT_EXPORT,
     ROLE_PLATFORMBEHEERDER, ROLE_BEHEERDER, ROLE_MEDEWERKER, ROLE_LEZER,
     DEFAULT_GROUP_LEZERS, DEFAULT_GROUP_MEDEWERKERS, DEFAULT_GROUP_BEHEERDERS, DEFAULT_GROUP_PLATFORMBEHEERDERS
 )
@@ -28,7 +28,7 @@ def get_default_matrix_voor_groep(groep_naam: str) -> dict:
         return {f: ACCESS_WRITE for f in ALL_FEATURES}
     
     elif naam in (DEFAULT_GROUP_MEDEWERKERS, ROLE_MEDEWERKER):
-        # Medewerkers: Schrijven op dagelijkse operaties, lezen op stats/stam/export, geen toegang tot gebruikersbeheer
+        # Medewerkers: Schrijven op dagelijkse operaties, lezen op stats/stam/export, geen toegang tot gebruikersbeheer of communicatie
         return {
             FEATURE_REGISTRATIES: ACCESS_WRITE,
             FEATURE_AGENDA: ACCESS_WRITE,
@@ -38,11 +38,12 @@ def get_default_matrix_voor_groep(groep_naam: str) -> dict:
             FEATURE_FEEDBACK: ACCESS_WRITE,
             FEATURE_STAMGEGEVENS: ACCESS_READ,
             FEATURE_GEBRUIKERS: ACCESS_NONE,
+            FEATURE_COMMUNICATIE: ACCESS_NONE,
             FEATURE_IMPORT_EXPORT: ACCESS_READ,
         }
     
     elif naam in (DEFAULT_GROUP_LEZERS, ROLE_LEZER):
-        # Lezers: Alleen-lezen op alle inhoudelijke modules, geen toegang tot gebruikersbeheer
+        # Lezers: Alleen-lezen op alle inhoudelijke modules, geen toegang tot gebruikersbeheer of communicatie
         return {
             FEATURE_REGISTRATIES: ACCESS_READ,
             FEATURE_AGENDA: ACCESS_READ,
@@ -52,6 +53,7 @@ def get_default_matrix_voor_groep(groep_naam: str) -> dict:
             FEATURE_FEEDBACK: ACCESS_READ,
             FEATURE_STAMGEGEVENS: ACCESS_READ,
             FEATURE_GEBRUIKERS: ACCESS_NONE,
+            FEATURE_COMMUNICATIE: ACCESS_NONE,
             FEATURE_IMPORT_EXPORT: ACCESS_READ,
         }
     

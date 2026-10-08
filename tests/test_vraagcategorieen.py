@@ -24,23 +24,67 @@ class TestVraagcategorieen(BaseTestCase):
         db.session.commit()
 
     def test_vraagcategorieen_access_control(self):
+        cat = QuestionCategory(naam="Dummy Cat", omschrijving="Dummy desc", volgorde=1, actief=True)
+        db.session.add(cat)
+        db.session.commit()
+
         # 1. Niet ingelogd -> redirect login
         res = self.client.get('/platform/vraagcategorieen')
         self.assertEqual(res.status_code, 302)
         self.assertIn('/login', res.headers['Location'])
 
-        # 2. Ingelogd als gewone medewerker -> denied
+        # 2. Ingelogd als gewone medewerker -> denied op alle GET en POST endpoints
         self.login("UserTim", "password123")
         self.select_organisatie(self.org.id)
+
+        # GET overzicht
         res = self.client.get('/platform/vraagcategorieen')
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        # POST nieuw
+        res = self.client.post('/platform/vraagcategorieen/nieuw', data={'naam': 'Hacker', 'omschrijving': 'Hacked'})
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        # POST wijzig
+        res = self.client.post(f'/platform/vraagcategorieen/{cat.id}/wijzig', data={'naam': 'Hacker', 'omschrijving': 'Hacked'})
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        # POST toggle
+        res = self.client.post(f'/platform/vraagcategorieen/{cat.id}/toggle')
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        # POST verwijderen
+        res = self.client.post(f'/platform/vraagcategorieen/{cat.id}/verwijderen')
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        # GET volgorde
+        res = self.client.get(f'/platform/vraagcategorieen/{cat.id}/volgorde/omhoog')
         self.assertEqual(res.status_code, 302)
         self.assertIn('/registraties', res.headers['Location'])
         self.logout()
 
-        # 3. Ingelogd als gewone lokale beheerder -> denied
+        # 3. Ingelogd als gewone lokale beheerder -> eveneens denied op alle mutaties
         self.login("AdminMark", "password123")
         self.select_organisatie(self.org.id)
+
         res = self.client.get('/platform/vraagcategorieen')
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        res = self.client.post('/platform/vraagcategorieen/nieuw', data={'naam': 'Hacker', 'omschrijving': 'Hacked'})
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        res = self.client.post(f'/platform/vraagcategorieen/{cat.id}/toggle')
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        res = self.client.post(f'/platform/vraagcategorieen/{cat.id}/verwijderen')
         self.assertEqual(res.status_code, 302)
         self.assertIn('/registraties', res.headers['Location'])
         self.logout()

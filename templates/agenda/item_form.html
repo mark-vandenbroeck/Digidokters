@@ -102,21 +102,23 @@
                 <!-- Terugkerende activiteit opties -->
                 <div class="card bg-light border mb-4">
                     <div class="card-body">
-                        <div class="form-check mb-3">
+                        <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" name="is_terugkerend" id="is_terugkerend"
                                    {% if form_data and form_data.get('is_terugkerend') == 'on' %}checked{% endif %}>
                             <label class="form-check-label fw-semibold" for="is_terugkerend">
-                                Terugkerende activiteit
+                                <i class="bi bi-arrow-repeat me-1 text-primary"></i>Terugkerende activiteit
                             </label>
                         </div>
-                        
+                        <div class="small text-muted mb-3">Maak automatisch een reeks herhalende sessies aan tot een bepaalde einddatum.</div>
+
                         <div id="recurrence_fields" style="display: none;">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="interval" class="form-label">Herhaal-interval <span class="text-danger">*</span></label>
                                     <select class="form-select" id="interval" name="interval">
-                                        <option value="wekelijks" {% if form_data and form_data.get('interval') == 'wekelijks' %}selected{% endif %}>Wekelijks</option>
                                         <option value="dagelijks" {% if form_data and form_data.get('interval') == 'dagelijks' %}selected{% endif %}>Dagelijks</option>
+                                        <option value="wekelijks" {% if not form_data or not form_data.get('interval') or form_data.get('interval') == 'wekelijks' %}selected{% endif %}>Wekelijks (op dezelfde weekdag)</option>
+                                        <option value="tweewekelijks" {% if form_data and form_data.get('interval') == 'tweewekelijks' %}selected{% endif %}>Tweewekelijks (om de 2 weken op dezelfde weekdag)</option>
                                         <option value="maandelijks" {% if form_data and form_data.get('interval') == 'maandelijks' %}selected{% endif %}>Maandelijks</option>
                                     </select>
                                 </div>
@@ -125,6 +127,9 @@
                                     <input type="date" class="form-control" id="einddatum" name="einddatum"
                                            value="{{ form_data.einddatum if form_data else '' }}">
                                 </div>
+                            </div>
+                            <div id="recurrence_summary" class="alert alert-info py-2 px-3 small mb-0 d-none">
+                                <i class="bi bi-info-circle me-1"></i><span id="recurrence_summary_text"></span>
                             </div>
                         </div>
                     </div>
@@ -136,21 +141,78 @@
                     const recurrenceFields = document.getElementById('recurrence_fields');
                     const intervalSelect = document.getElementById('interval');
                     const einddatumInput = document.getElementById('einddatum');
+                    const datumInput = document.getElementById('datum');
+                    const summaryAlert = document.getElementById('recurrence_summary');
+                    const summaryText = document.getElementById('recurrence_summary_text');
+
+                    const dagen = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+
+                    function updateSummary() {
+                        if (!isTerugkerendCheckbox.checked || !datumInput.value || !einddatumInput.value) {
+                            summaryAlert.classList.add('d-none');
+                            return;
+                        }
+
+                        const dStart = new Date(datumInput.value + 'T00:00:00');
+                        const dEnd = new Date(einddatumInput.value + 'T00:00:00');
+
+                        if (isNaN(dStart.getTime()) || isNaN(dEnd.getTime()) || dEnd < dStart) {
+                            summaryAlert.classList.add('d-none');
+                            return;
+                        }
+
+                        const interval = intervalSelect.value;
+                        const weekdag = dagen[dStart.getDay()];
+                        let count = 0;
+                        let cur = new Date(dStart);
+
+                        while (cur <= dEnd && count < 400) {
+                            count++;
+                            if (interval === 'dagelijks') {
+                                cur.setDate(cur.getDate() + 1);
+                            } else if (interval === 'wekelijks') {
+                                cur.setDate(cur.getDate() + 7);
+                            } else if (interval === 'tweewekelijks') {
+                                cur.setDate(cur.getDate() + 14);
+                            } else if (interval === 'maandelijks') {
+                                cur.setMonth(cur.getMonth() + 1);
+                            }
+                        }
+
+                        let desc = '';
+                        if (interval === 'dagelijks') {
+                            desc = `Elke dag (${count} activiteit${count > 1 ? 'en' : ''})`;
+                        } else if (interval === 'wekelijks') {
+                            desc = `Elke week op ${weekdag} (${count} activiteit${count > 1 ? 'en' : ''})`;
+                        } else if (interval === 'tweewekelijks') {
+                            desc = `Om de 2 weken op ${weekdag} (${count} activiteit${count > 1 ? 'en' : ''})`;
+                        } else {
+                            desc = `Elke maand (${count} activiteit${count > 1 ? 'en' : ''})`;
+                        }
+
+                        summaryText.textContent = `Reeks: ${desc} van ${datumInput.value} t.e.m. ${einddatumInput.value}.`;
+                        summaryAlert.classList.remove('d-none');
+                    }
 
                     function toggleRecurrence() {
                         if (isTerugkerendCheckbox.checked) {
                             recurrenceFields.style.display = 'block';
                             intervalSelect.setAttribute('required', 'required');
                             einddatumInput.setAttribute('required', 'required');
+                            updateSummary();
                         } else {
                             recurrenceFields.style.display = 'none';
                             intervalSelect.removeAttribute('required');
                             einddatumInput.removeAttribute('required');
+                            summaryAlert.classList.add('d-none');
                         }
                     }
 
                     isTerugkerendCheckbox.addEventListener('change', toggleRecurrence);
-                    toggleRecurrence(); // initial state
+                    intervalSelect.addEventListener('change', updateSummary);
+                    datumInput.addEventListener('change', updateSummary);
+                    einddatumInput.addEventListener('change', updateSummary);
+                    toggleRecurrence();
                 });
                 </script>
                 {% endif %}

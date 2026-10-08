@@ -228,7 +228,7 @@ def nieuw():
 
         einddatum = None
         if is_terugkerend:
-            if interval not in ['dagelijks', 'wekelijks', 'maandelijks']:
+            if interval not in ['dagelijks', 'wekelijks', 'tweewekelijks', 'maandelijks']:
                 fouten.append('Selecteer een geldig herhalingsinterval.')
             if not einddatum_str:
                 fouten.append('Einddatum is verplicht bij een terugkerende activiteit.')
@@ -269,13 +269,15 @@ def nieuw():
                     current_date += timedelta(days=1)
                 elif interval == 'wekelijks':
                     current_date += timedelta(weeks=1)
+                elif interval == 'tweewekelijks':
+                    current_date += timedelta(weeks=2)
                 elif interval == 'maandelijks':
                     current_date = add_month(current_date)
                 
                 if current_date > einddatum:
                     break
                 items_to_save.append(current_date)
-                if len(items_to_save) >= 100:
+                if len(items_to_save) >= 366:
                     break
 
         try:

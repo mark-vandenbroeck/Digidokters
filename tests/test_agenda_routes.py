@@ -237,6 +237,60 @@ class TestAgendaRoutes(BaseTestCase):
         self.assertEqual(len(items), 4)
         self.assertTrue(all(it.reeks_id is not None for it in items))
         self.assertEqual(len({it.reeks_id for it in items}), 1)
+        # Controleer dat alle items op dezelfde weekdag vallen
+        weekdagen = {it.datum.weekday() for it in items}
+        self.assertEqual(len(weekdagen), 1)
+
+        # 4. Dagelijkse reeks voor 5 dagen aanmaken (startdatum + 4 dagen = 5 sessies)
+        eind_datum_daily = start_datum + timedelta(days=4)
+        res_daily = self.client.post('/agenda/nieuw', data={
+            'datum': start_datum.isoformat(),
+            'uur_van': '14:00',
+            'uur_tot': '16:00',
+            'type_id': self.type_workshop.id,
+            'locatie_id': self.locatie2.id,
+            'omschrijving': 'Dagelijkse Cursus',
+            'is_terugkerend': 'on',
+            'interval': 'dagelijks',
+            'einddatum': eind_datum_daily.isoformat()
+        }, follow_redirects=True)
+        self.assertEqual(res_daily.status_code, 200)
+        self.assertIn("succesvol toegevoegd aan de reeks", res_daily.get_data(as_text=True).lower())
+
+        daily_items = AgendaItem.query.filter_by(omschrijving='Dagelijkse Cursus', organisatie_id=self.org.id).order_by(AgendaItem.datum).all()
+        self.assertEqual(len(daily_items), 5)
+        for idx, it in enumerate(daily_items):
+            self.assertEqual(it.datum, start_datum + timedelta(days=idx))
+            self.assertEqual(it.interval, 'dagelijks')
+            self.assertTrue(it.is_terugkerend)
+            self.assertEqual(it.einddatum, eind_datum_daily)
+
+        # 5. Tweewekelijkse reeks voor 6 weken aanmaken (startdatum + 6 weken = 4 sessies met stap van 14 dagen: 0, 2, 4, 6)
+        eind_datum_biweekly = start_datum + timedelta(weeks=6)
+        res_biweekly = self.client.post('/agenda/nieuw', data={
+            'datum': start_datum.isoformat(),
+            'uur_van': '10:00',
+            'uur_tot': '12:00',
+            'type_id': self.type_digicafe.id,
+            'locatie_id': self.locatie1.id,
+            'omschrijving': 'Tweewekelijks Digicafé',
+            'is_terugkerend': 'on',
+            'interval': 'tweewekelijks',
+            'einddatum': eind_datum_biweekly.isoformat()
+        }, follow_redirects=True)
+        self.assertEqual(res_biweekly.status_code, 200)
+        self.assertIn("succesvol toegevoegd aan de reeks", res_biweekly.get_data(as_text=True).lower())
+
+        biweekly_items = AgendaItem.query.filter_by(omschrijving='Tweewekelijks Digicafé', organisatie_id=self.org.id).order_by(AgendaItem.datum).all()
+        self.assertEqual(len(biweekly_items), 4)
+        for idx, it in enumerate(biweekly_items):
+            self.assertEqual(it.datum, start_datum + timedelta(weeks=idx*2))
+            self.assertEqual(it.interval, 'tweewekelijks')
+            self.assertTrue(it.is_terugkerend)
+            self.assertEqual(it.einddatum, eind_datum_biweekly)
+        # Controleer dat ook tweewekelijks op dezelfde weekdag valt
+        bi_weekdagen = {it.datum.weekday() for it in biweekly_items}
+        self.assertEqual(len(bi_weekdagen), 1)
 
     def test_agenda_wijzigen_and_validation(self):
         """Test wijzigen van een bestaand agenda-item en validatiefouten."""

@@ -316,7 +316,6 @@ def gebruiker_wijzigen(user_id):
         rol_in = request.form.get('rol')
         if is_pb:
             effective_rol = 'beheerder'
-            user_global_rol = 'platformbeheerder'
         elif groep_ids:
             gekozen_groepen = Group.query.filter(Group.organisatie_id == org_id, Group.id.in_(groep_ids)).all()
             if any(g.get_permission('gebruikers') == 'schrijven' or g.naam.lower() in ('beheerders', 'beheerder') for g in gekozen_groepen):
@@ -325,16 +324,15 @@ def gebruiker_wijzigen(user_id):
                 effective_rol = 'lezer'
             else:
                 effective_rol = 'medewerker'
-            user_global_rol = user.rol if user.rol == 'platformbeheerder' and not ('is_platformbeheerder' in request.form and not is_pb) else effective_rol
         elif rol_in:
             effective_rol = 'beheerder' if rol_in == 'platformbeheerder' else rol_in
-            user_global_rol = rol_in
         else:
             effective_rol = membership.rol
-            user_global_rol = user.rol
 
-        if 'is_platformbeheerder' in request.form and not is_pb and current_user.rol == 'platformbeheerder':
-            user_global_rol = effective_rol
+        if current_user.rol == 'platformbeheerder':
+            user_global_rol = 'platformbeheerder' if is_pb else effective_rol
+        else:
+            user_global_rol = user.rol if user.rol == 'platformbeheerder' else effective_rol
 
         # Controleer unieke naam
         if naam_in != user.naam:

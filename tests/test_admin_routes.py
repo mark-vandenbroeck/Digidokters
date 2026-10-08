@@ -484,3 +484,60 @@ class TestAdminRoutes(BaseTestCase):
         self.assertEqual(uo.rol, 'beheerder')
         self.assertEqual(created_user.get_groepen_voor_organisatie(self.org.id)[0].naam, 'Beheerders')
 
+    def test_platformbeheerder_toggle_on_and_off(self):
+        """Test dat een platformbeheerder de globale superuser status van een gebruiker aan en uit kan zetten via het wijzig-formulier."""
+        # Maak platform admin aan
+        pb_user = User(
+            naam="SuperAdmin",
+            email="superadmin@test.com",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="platformbeheerder",
+            actief=True,
+            moet_wachtwoord_wijzigen=False
+        )
+        db.session.add(pb_user)
+        db.session.commit()
+        db.session.add(UserOrganisatie(user_id=pb_user.id, organisatie_id=self.org.id, rol="beheerder", actief=True))
+        db.session.commit()
+
+        # Login als platformbeheerder
+        self.login("superadmin@test.com", "password123")
+        self.select_organisatie(self.org.id)
+
+        # Doelgebruiker is initieel platformbeheerder
+        target_user = User(
+            naam="TargetUser",
+            email="target@test.com",
+            wachtwoord_hash=generate_password_hash("password123"),
+            rol="platformbeheerder",
+            actief=True,
+            moet_wachtwoord_wijzigen=False
+        )
+        db.session.add(target_user)
+        db.session.commit()
+        db.session.add(UserOrganisatie(user_id=target_user.id, organisatie_id=self.org.id, rol="beheerder", actief=True))
+        db.session.commit()
+
+        # 1. Schakel platformbeheerder UIT (checkbox niet meegeleverd in POST body)
+        res = self.client.post(f'/beheer/gebruikers/{target_user.id}/wijzig', data={
+            'naam': 'TargetUser',
+            'email': 'target@test.com',
+            # 'is_platformbeheerder' wordt weggelaten (ongecheckte checkbox)
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        db.session.refresh(target_user)
+        self.assertNotEqual(target_user.rol, 'platformbeheerder')
+
+        # 2. Schakel platformbeheerder opnieuw IN ('is_platformbeheerder': 'on')
+        res2 = self.client.post(f'/beheer/gebruikers/{target_user.id}/wijzig', data={
+            'naam': 'TargetUser',
+            'email': 'target@test.com',
+            'is_platformbeheerder': 'on'
+        }, follow_redirects=True)
+        self.assertEqual(res2.status_code, 200)
+
+        db.session.refresh(target_user)
+        self.assertEqual(target_user.rol, 'platformbeheerder')
+
+

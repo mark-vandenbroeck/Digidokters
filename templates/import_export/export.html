@@ -48,7 +48,7 @@
                         <input type="date" class="form-control" id="datum_tot" name="datum_tot">
                     </div>
 
-                    <div class="col-12 col-sm-4">
+                    <div class="col-12 {% if resultaten %}col-sm-6 col-md-3{% else %}col-sm-4{% endif %}">
                         <label for="digidokter_id" class="form-label">Digidokter</label>
                         <select class="form-select" id="digidokter_id" name="digidokter_id">
                             <option value="0">— Alle digidokters —</option>
@@ -58,7 +58,7 @@
                         </select>
                     </div>
 
-                    <div class="col-12 col-sm-4">
+                    <div class="col-12 {% if resultaten %}col-sm-6 col-md-3{% else %}col-sm-4{% endif %}">
                         <label for="leeftijdscategorie_id" class="form-label">Leeftijdscategorie</label>
                         <select class="form-select" id="leeftijdscategorie_id" name="leeftijdscategorie_id">
                             <option value="0">— Alle categorieën —</option>
@@ -68,7 +68,7 @@
                         </select>
                     </div>
 
-                    <div class="col-12 col-sm-4">
+                    <div class="col-12 {% if resultaten %}col-sm-6 col-md-3{% else %}col-sm-4{% endif %}">
                         <label for="toestel_id" class="form-label">Toestel</label>
                         <select class="form-select" id="toestel_id" name="toestel_id">
                             <option value="0">— Alle toestellen —</option>
@@ -77,6 +77,18 @@
                             {% endfor %}
                         </select>
                     </div>
+
+                    {% if resultaten %}
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label for="resultaat_id" class="form-label">Resultaat</label>
+                        <select class="form-select" id="resultaat_id" name="resultaat_id">
+                            <option value="0">— Alle resultaten —</option>
+                            {% for r in resultaten %}
+                            <option value="{{ r.id }}">{{ r.omschrijving }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <hr class="my-4">

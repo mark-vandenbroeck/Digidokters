@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}Beheer Resultaten van het bezoek – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-clipboard2-check me-2 text-primary"></i>Resultaten van het bezoek</h1>
+        <p class="dd-page-subtitle mb-0">Beheer de keuzelijst met resultaten/uitkomsten voor consultatieregistraties</p>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Status filter">
+            <a href="{{ url_for('admin.resultaten', status='alle') }}"
+               class="btn {% if status_filter == 'alle' or not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Alle
+            </a>
+            <a href="{{ url_for('admin.resultaten', status='actief') }}"
+               class="btn {% if status_filter == 'actief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-check-circle me-1"></i>Enkel actieve
+            </a>
+            <a href="{{ url_for('admin.resultaten', status='inactief') }}"
+               class="btn {% if status_filter == 'inactief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-eye-slash me-1"></i>Enkel gedeactiveerde
+            </a>
+        </div>
+        <a href="{{ url_for('admin.resultaat_nieuw') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Nieuw resultaat
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if items %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-3" style="width:60px">Sortering</th>
+                        <th>Omschrijving</th>
+                        <th>Status</th>
+                        <th class="pe-3 text-end">Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="ps-3">
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('admin.resultaat_volgorde', item_id=item.id, richting='omhoog', status=status_filter) }}"
+                                   class="btn btn-light btn-sort {% if loop.first %}disabled{% endif %}" title="Omhoog">
+                                    <i class="bi bi-chevron-up"></i>
+                                </a>
+                                <a href="{{ url_for('admin.resultaat_volgorde', item_id=item.id, richting='omlaag', status=status_filter) }}"
+                                   class="btn btn-light btn-sort {% if loop.last %}disabled{% endif %}" title="Omlaag">
+                                    <i class="bi bi-chevron-down"></i>
+                                </a>
+                            </div>
+                        </td>
+                        <td class="fw-medium">
+                            {{ item.omschrijving }}
+                            <span class="text-muted" style="font-size: 0.75rem; opacity: 0.6; font-weight: normal; margin-left: 4px;">#{{ item.id }}</span>
+                        </td>
+                        <td>
+                            {% if item.actief %}
+                            <span class="badge bg-success">Actief</span>
+                            {% else %}
+                            <span class="badge bg-dark">Gedeactiveerd</span>
+                            {% endif %}
+                        </td>
+                        <td class="pe-3 text-end text-nowrap">
+                            <a href="{{ url_for('admin.resultaat_wijzigen', item_id=item.id) }}"
+                               class="btn btn-sm btn-outline-primary" title="Wijzigen">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{{ url_for('admin.resultaat_toggle', item_id=item.id, status=status_filter) }}"
+                               class="btn btn-sm {% if item.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
+                               title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
+                                <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
+                            </a>
+                            {% set count = usage_counts.get(item.id, 0) if usage_counts is defined else 0 %}
+                            {% if count == 0 %}
+                            <form action="{{ url_for('admin.resultaat_verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u resultaat \'{{ item.omschrijving }}\' wilt verwijderen?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: er zijn nog {{ count }} registratie(s) aan gekoppeld">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-clipboard2-check fs-1 text-muted mb-3 d-block"></i>
+            {% if status_filter and status_filter != 'alle' %}
+            <p class="text-muted">Geen resultaten gevonden met status "{{ status_filter }}".</p>
+            <a href="{{ url_for('admin.resultaten', status='alle') }}" class="btn btn-sm btn-outline-secondary">Toon alle resultaten</a>
+            {% else %}
+            <p class="text-muted">Geen resultaten gedefinieerd.</p>
+            <a href="{{ url_for('admin.resultaat_nieuw') }}" class="btn btn-sm btn-primary">Eerste toevoegen</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

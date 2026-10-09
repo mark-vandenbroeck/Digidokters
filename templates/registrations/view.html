@@ -70,6 +70,15 @@
                 <dt class="col-sm-4 text-muted fw-normal small">Onderwerp</dt>
                 <dd class="col-sm-8">{{ reg.onderwerp }}</dd>
 
+                {% if reg.resultaat %}
+                <dt class="col-sm-4 text-muted fw-normal small">Resultaat</dt>
+                <dd class="col-sm-8">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                        <i class="bi bi-clipboard2-check me-1"></i>{{ reg.resultaat.omschrijving }}
+                    </span>
+                </dd>
+                {% endif %}
+
                 <dt class="col-sm-4 text-muted fw-normal small">Vraagclassificatie</dt>
                 <dd class="col-sm-8">
                     {% if reg.classification %}

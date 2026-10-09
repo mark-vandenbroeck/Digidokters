@@ -242,6 +242,44 @@ def overzicht():
 
     per_geslacht = sorted(per_geslacht, key=lambda x: x[1], reverse=True)
 
+    # Per resultaat (Afloop / Resultaat van het bezoek)
+    from models.resultaat import Resultaat
+    org_resultaten = (
+        Resultaat.query
+        .filter_by(organisatie_id=org_id)
+        .order_by(Resultaat.volgorde.asc(), Resultaat.omschrijving.asc())
+        .all()
+    )
+    heeft_resultaten = len(org_resultaten) > 0
+
+    resultaat_counts_raw = (
+        jaar_filter(
+            db.session.query(
+                Registration.resultaat_id,
+                func.count(Registration.id).label('aantal')
+            )
+        )
+        .group_by(Registration.resultaat_id)
+        .all()
+    )
+    resultaat_counts = {r[0]: r[1] for r in resultaat_counts_raw}
+
+    per_resultaat = []
+    seen_resultaat_ids = set()
+
+    for res in org_resultaten:
+        per_resultaat.append((res.omschrijving, resultaat_counts.get(res.id, 0)))
+        seen_resultaat_ids.add(res.id)
+
+    overige_res_ids = [rid for rid in resultaat_counts if rid is not None and rid not in seen_resultaat_ids]
+    if overige_res_ids:
+        overige_res = Resultaat.query.filter(Resultaat.id.in_(overige_res_ids)).order_by(Resultaat.volgorde.asc(), Resultaat.omschrijving.asc()).all()
+        for res in overige_res:
+            per_resultaat.append((res.omschrijving, resultaat_counts.get(res.id, 0)))
+            seen_resultaat_ids.add(res.id)
+
+    totaal_resultaten = sum(r[1] for r in per_resultaat)
+
     # Recente 10 dagen met meeste bezoeken
     per_dag = (
         jaar_filter(
@@ -561,6 +599,9 @@ def overzicht():
         per_locatie=per_locatie,
         heeft_consultatie_locaties=heeft_consultatie_locaties,
         per_geslacht=per_geslacht,
+        per_resultaat=per_resultaat,
+        totaal_resultaten=totaal_resultaten,
+        heeft_resultaten=heeft_resultaten,
         nieuwe_klanten=nieuwe_klanten,
         terugkerende_klanten=totaal_jaar - nieuwe_klanten,
         per_dag=per_dag,

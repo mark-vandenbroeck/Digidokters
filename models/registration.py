@@ -16,6 +16,7 @@ class Registration(db.Model):
     gender_identity_id = db.Column(db.Integer, db.ForeignKey('gender_identities.id', ondelete='SET NULL'), nullable=True, index=True)
     gender_identity = db.relationship('GenderIdentity', backref=db.backref('registraties', lazy=True))
     onderwerp = db.Column(db.Text, nullable=False)
+    resultaat_id = db.Column(db.Integer, db.ForeignKey('resultaten.id', ondelete='SET NULL'), nullable=True, index=True)
     leeftijdscategorie_id = db.Column(db.Integer, db.ForeignKey('age_categories.id'), nullable=False, index=True)
     toestel_id = db.Column(db.Integer, db.ForeignKey('devices.id'), nullable=False, index=True)
     locatie_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True, index=True)
@@ -63,6 +64,7 @@ class Registration(db.Model):
         db.Index('ix_registrations_org_digidokter', 'organisatie_id', 'digidokter_id'),
         db.Index('ix_registrations_org_locatie', 'organisatie_id', 'locatie_id'),
         db.Index('ix_registrations_org_gender', 'organisatie_id', 'gender_identity_id'),
+        db.Index('ix_registrations_org_resultaat', 'organisatie_id', 'resultaat_id'),
     )
 
     def __repr__(self):

@@ -445,6 +445,26 @@
                     </div>
                 </div>
 
+                <!-- Resultaat van het bezoek (enkel indien de organisatie actieve resultaten heeft gedefinieerd) -->
+                {% if resultaten %}
+                <div class="mb-4 mt-2">
+                    <label class="form-label fw-bold text-dark d-flex align-items-center gap-1 mb-2">
+                        <i class="bi bi-clipboard2-check text-primary me-1"></i>
+                        Resultaat van het bezoek
+                    </label>
+                    <div class="touch-pill-group flex-wrap">
+                        {% set sel_res = form_data.resultaat_id|int if form_data and form_data.resultaat_id else 0 %}
+                        {% for r in resultaten %}
+                        <input type="radio" class="touch-pill-check" name="resultaat_id" id="res_quick_{{ r.id }}" value="{{ r.id }}"
+                               {{ 'checked' if sel_res == r.id }}>
+                        <label class="touch-pill-label" for="res_quick_{{ r.id }}">
+                            {{ r.omschrijving }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- 5. Herkomstkanaal (optioneel inklapbaar of subtiel) -->
                 {% if herkomsten %}
                 <div class="mt-3 pt-2">

@@ -123,6 +123,22 @@
                         <div class="form-text text-muted small">Beschrijf de vraag functioneel en algemeen. Voer geen medische details of gevoelige persoonsgegevens in (bijv. 'Hulp bij inloggen eHealth' in plaats van 'Hulp bij inloggen MyHealth vanwege ziekte X').</div>
                     </div>
 
+                    <!-- Resultaat van het bezoek (enkel indien er resultaten gedefinieerd zijn in de organisatie) -->
+                    {% if resultaten %}
+                    <div class="col-12 col-sm-6">
+                        <label for="resultaat_id" class="form-label">Resultaat</label>
+                        <select class="form-select" id="resultaat_id" name="resultaat_id">
+                            <option value="">— Kies een resultaat —</option>
+                            {% for r in resultaten %}
+                            <option value="{{ r.id }}"
+                                {{ 'selected' if form_data and form_data.resultaat_id == r.id|string }}>
+                                {{ r.omschrijving }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
                     <!-- Leeftijdscategorie -->
                     <div class="col-12 col-sm-6">
                         <label for="leeftijdscategorie_id" class="form-label">Leeftijdscategorie <span class="text-danger">*</span></label>

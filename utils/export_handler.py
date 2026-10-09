@@ -11,7 +11,7 @@ from extensions import db
 KOLOMMEN = [
     'Registratienummer', 'Datum', 'Bezoeker', 'Digidokter',
     'Nieuwe bezoeker', 'Herkomst', 'Geslacht', 'Onderwerp',
-    'Vraagclassificatie', 'Leeftijdscategorie', 'Toestel', 'Locatie'
+    'Vraagclassificatie', 'Resultaat', 'Leeftijdscategorie', 'Toestel', 'Locatie'
 ]
 
 
@@ -21,6 +21,7 @@ def _haal_registraties(
     digidokter_id: int | None = None,
     leeftijdscategorie_id: int | None = None,
     toestel_id: int | None = None,
+    resultaat_id: int | None = None,
 ) -> list:
     """Haal gefilterde registraties op als lijst van dicts met eager loading."""
     from utils.tenant import get_huidige_organisatie_id
@@ -31,6 +32,7 @@ def _haal_registraties(
             joinedload(Registration.digidokter),
             joinedload(Registration.herkomst),
             joinedload(Registration.locatie),
+            joinedload(Registration.resultaat),
             joinedload(Registration.leeftijdscategorie).joinedload(AgeCategory.mapped_to),
             joinedload(Registration.toestel).joinedload(Device.mapped_to),
             joinedload(Registration.classification).joinedload(QuestionClassification.category),
@@ -51,6 +53,8 @@ def _haal_registraties(
     if toestel_id:
         mapped_t_ids = [t.id for t in Device.query.filter_by(mapped_to_id=toestel_id).all()]
         query = query.filter(Registration.toestel_id.in_([toestel_id] + mapped_t_ids))
+    if resultaat_id:
+        query = query.filter(Registration.resultaat_id == resultaat_id)
 
     rijen = []
     for reg in query.all():
@@ -64,6 +68,7 @@ def _haal_registraties(
             'Geslacht': reg.geslacht or '',
             'Onderwerp': reg.onderwerp,
             'Vraagclassificatie': reg.classification.category.naam if (reg.classification and reg.classification.category) else '',
+            'Resultaat': reg.resultaat.omschrijving if reg.resultaat else '',
             'Leeftijdscategorie': reg.leeftijdscategorie.effectieve_naam if reg.leeftijdscategorie else '',
             'Toestel': reg.toestel.effectieve_naam if reg.toestel else '',
             'Locatie': reg.locatie.naam if reg.locatie else '',
@@ -73,10 +78,11 @@ def _haal_registraties(
 
 def exporteer_csv(
     van_datum=None, tot_datum=None,
-    digidokter_id=None, leeftijdscategorie_id=None, toestel_id=None
+    digidokter_id=None, leeftijdscategorie_id=None, toestel_id=None,
+    resultaat_id=None
 ) -> bytes:
     """Genereer CSV als bytes."""
-    rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
+    rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id, resultaat_id)
     df = pd.DataFrame(rijen) if rijen else pd.DataFrame(columns=KOLOMMEN)
     output = io.StringIO()
     df.to_csv(output, index=False, encoding='utf-8-sig')
@@ -85,10 +91,11 @@ def exporteer_csv(
 
 def exporteer_xlsx(
     van_datum=None, tot_datum=None,
-    digidokter_id=None, leeftijdscategorie_id=None, toestel_id=None
+    digidokter_id=None, leeftijdscategorie_id=None, toestel_id=None,
+    resultaat_id=None
 ) -> bytes:
     """Genereer XLSX als bytes."""
-    rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
+    rijen = _haal_registraties(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id, resultaat_id)
     df = pd.DataFrame(rijen) if rijen else pd.DataFrame(columns=KOLOMMEN)
 
     output = io.BytesIO()

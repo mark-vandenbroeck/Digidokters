@@ -12,6 +12,7 @@ from models.location import Location
 from models.herkomst import Herkomst
 from models.gender_identity import GenderIdentity
 from models.functie import Functie, user_functies
+from models.resultaat import Resultaat
 from models.registration import Registration
 from models.group import Group, GroupPermission, UserGroup
 from models.constants import (
@@ -1398,6 +1399,127 @@ def functie_verwijderen(item_id):
 @admin_required
 def functie_volgorde(item_id, richting):
     return _beheer_volgorde(Functie, item_id, richting, 'admin.functies')
+
+
+# ─── Resultaten van het bezoek ───────────────────────────────────────────────
+
+@admin_bp.route('/resultaten')
+@login_required
+@admin_required
+def resultaten():
+    return _beheer_lijst(Resultaat, 'admin/resultaten.html', naam_veld='omschrijving')
+
+
+@admin_bp.route('/resultaten/nieuw', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def resultaat_nieuw():
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+
+    if request.method == 'POST':
+        omschrijving = request.form.get('omschrijving', '').strip() or request.form.get('naam', '').strip()
+        if not omschrijving:
+            flash('Omschrijving is verplicht.', 'danger')
+            return render_template('admin/item_form.html', titel='Resultaat', actie='Nieuw',
+                                   item=None, terug_url=url_for('admin.resultaten'))
+        existing = Resultaat.query.filter(
+            db.func.lower(Resultaat.omschrijving) == omschrijving.lower(),
+            Resultaat.organisatie_id == org_id
+        ).first()
+        if existing:
+            flash(f'Resultaat "{omschrijving}" bestaat al.', 'danger')
+            return render_template('admin/item_form.html', titel='Resultaat', actie='Nieuw',
+                                   item=None, terug_url=url_for('admin.resultaten'))
+
+        max_volgorde = db.session.query(db.func.max(Resultaat.volgorde)).filter(Resultaat.organisatie_id == org_id).scalar() or 0
+        db.session.add(Resultaat(omschrijving=omschrijving, volgorde=max_volgorde + 1, organisatie_id=org_id,
+                                 actief=request.form.get('actief') == 'on' if 'actief' in request.form else True))
+        db.session.commit()
+        flash(f'Resultaat "{omschrijving}" toegevoegd.', 'success')
+        return redirect(url_for('admin.resultaten'))
+    return render_template('admin/item_form.html', titel='Resultaat', actie='Nieuw',
+                           item=None, terug_url=url_for('admin.resultaten'))
+
+
+@admin_bp.route('/resultaten/<int:item_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def resultaat_wijzigen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Resultaat, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    if request.method == 'POST':
+        omschrijving = request.form.get('omschrijving', request.form.get('naam', item.omschrijving)).strip()
+        if not omschrijving:
+            flash('Omschrijving is verplicht.', 'danger')
+            return render_template('admin/item_form.html', titel='Resultaat', actie='Wijzigen',
+                                   item=item, terug_url=url_for('admin.resultaten'))
+        existing = Resultaat.query.filter(
+            db.func.lower(Resultaat.omschrijving) == omschrijving.lower(),
+            Resultaat.organisatie_id == org_id,
+            Resultaat.id != item_id
+        ).first()
+        if existing:
+            flash(f'Resultaat "{omschrijving}" bestaat al.', 'danger')
+            return render_template('admin/item_form.html', titel='Resultaat', actie='Wijzigen',
+                                   item=item, terug_url=url_for('admin.resultaten'))
+
+        item.omschrijving = omschrijving
+        item.actief = request.form.get('actief') == 'on'
+        db.session.commit()
+        flash(f'Resultaat "{item.omschrijving}" bijgewerkt.', 'success')
+        return redirect(url_for('admin.resultaten'))
+    return render_template('admin/item_form.html', titel='Resultaat', actie='Wijzigen',
+                           item=item, terug_url=url_for('admin.resultaten'))
+
+
+@admin_bp.route('/resultaten/<int:item_id>/toggle')
+@login_required
+@admin_required
+def resultaat_toggle(item_id):
+    return _beheer_toggle(Resultaat, item_id, 'admin.resultaten')
+
+
+@admin_bp.route('/resultaten/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def resultaat_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id, filter_op_organisatie
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Resultaat, item_id)
+
+    if item.organisatie_id != org_id:
+        from flask import abort
+        abort(403)
+
+    count = (
+        filter_op_organisatie(Registration.query, Registration)
+        .filter(Registration.resultaat_id == item.id)
+        .count()
+    )
+    if count > 0:
+        flash(f'Resultaat "{item.omschrijving}" kan niet worden verwijderd omdat er nog {count} registratie(s) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+        return redirect(url_for('admin.resultaten'))
+
+    naam = item.omschrijving
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Resultaat "{naam}" is succesvol verwijderd.', 'success')
+    return redirect(url_for('admin.resultaten'))
+
+
+@admin_bp.route('/resultaten/<int:item_id>/volgorde/<richting>')
+@login_required
+@admin_required
+def resultaat_volgorde(item_id, richting):
+    return _beheer_volgorde(Resultaat, item_id, richting, 'admin.resultaten')
+
 
 
 @admin_bp.route('/backup')

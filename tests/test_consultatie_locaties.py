@@ -263,7 +263,7 @@ class ConsultatieLocatiesTestCase(BaseTestCase):
         self.assertIn('Locatie', html)
         self.assertIn('Locatie Xylophone', html)
         self.assertIn('Locatie Yellow', html)
-        self.assertIn('<select class="form-select form-select-sm" name="locatie">', html)
+        self.assertIn('<select id="filter_locatie" class="form-select form-select-sm" name="locatie">', html)
 
         # 2. Filteren op loc_x
         resp_filter_x = self.client.get(f'/registraties?locatie={loc_x.id}')

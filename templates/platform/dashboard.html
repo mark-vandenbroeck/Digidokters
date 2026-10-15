@@ -20,10 +20,10 @@
     </div>
     <div class="d-flex align-items-center gap-2">
         <form method="GET" action="{{ url_for('platform.dashboard') }}" class="d-flex align-items-center gap-2 mb-0">
-            <label class="text-nowrap small text-muted fw-semibold">
+            <label for="platform_dashboard_jaar" class="text-nowrap small text-muted fw-semibold">
                 <i class="bi bi-funnel me-1"></i>Periode:
             </label>
-            <select name="jaar" class="form-select form-select-sm" onchange="this.form.submit()">
+            <select id="platform_dashboard_jaar" name="jaar" class="form-select form-select-sm" onchange="this.form.submit()">
                 <option value="alle" {% if geselecteerd_jaar == 'alle' %}selected{% endif %}>Alle jaren (Totaal)</option>
                 {% for j in beschikbare_jaren %}
                 <option value="{{ j }}" {% if geselecteerd_jaar == j|string %}selected{% endif %}>{{ j }}</option>

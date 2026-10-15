@@ -55,16 +55,16 @@
 
             <div class="row g-2 align-items-end">
                 <div class="col-6 col-md-2">
-                    <label class="form-label mb-1">Datum van</label>
-                    <input type="date" class="form-control form-control-sm" name="datum_van" value="{{ datum_van }}">
+                    <label for="agenda_filter_datum_van" class="form-label mb-1">Datum van</label>
+                    <input type="date" id="agenda_filter_datum_van" class="form-control form-control-sm" name="datum_van" value="{{ datum_van }}">
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label mb-1">Datum tot</label>
-                    <input type="date" class="form-control form-control-sm" name="datum_tot" value="{{ datum_tot }}">
+                    <label for="agenda_filter_datum_tot" class="form-label mb-1">Datum tot</label>
+                    <input type="date" id="agenda_filter_datum_tot" class="form-control form-control-sm" name="datum_tot" value="{{ datum_tot }}">
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label mb-1">Activiteit</label>
-                    <select class="form-select form-select-sm" name="type_id">
+                    <label for="agenda_filter_type_id" class="form-label mb-1">Activiteit</label>
+                    <select id="agenda_filter_type_id" class="form-select form-select-sm" name="type_id">
                         <option value="0">Alle</option>
                         {% for t in types %}
                         <option value="{{ t.id }}" {{ 'selected' if t.id == filter_type_id }}>{{ t.naam }}</option>
@@ -72,8 +72,8 @@
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label mb-1">Locatie</label>
-                    <select class="form-select form-select-sm" name="locatie_id">
+                    <label for="agenda_filter_locatie_id" class="form-label mb-1">Locatie</label>
+                    <select id="agenda_filter_locatie_id" class="form-select form-select-sm" name="locatie_id">
                         <option value="0">Alle</option>
                         {% for l in locaties %}
                         <option value="{{ l.id }}" {{ 'selected' if l.id == filter_locatie_id }}>{{ l.naam }}</option>
@@ -81,8 +81,8 @@
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label mb-1">Digidokter</label>
-                    <select class="form-select form-select-sm" name="digidokter_id">
+                    <label for="agenda_filter_digidokter_id" class="form-label mb-1">Digidokter</label>
+                    <select id="agenda_filter_digidokter_id" class="form-select form-select-sm" name="digidokter_id">
                         <option value="0">Alle</option>
                         {% for d in digidokters %}
                         <option value="{{ d.id }}" {{ 'selected' if d.id == filter_digidokter_id }}>{{ d.naam }}</option>

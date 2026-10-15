@@ -69,7 +69,7 @@
                         {% endif %}
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" name="zoek" class="form-select-sm form-control" placeholder="Zoek in mappen, bestanden of inhoud..." value="{{ zoek }}">
+                            <input type="text" id="document_zoek" name="zoek" aria-label="Zoek in mappen, bestanden of inhoud" class="form-select-sm form-control" placeholder="Zoek in mappen, bestanden of inhoud..." value="{{ zoek }}">
                             {% if zoek %}
                                 <a href="{{ url_for('doc.index', map_id=huidige_map.id if huidige_map else None) }}" class="btn btn-outline-secondary" title="Wis zoekopdracht">
                                     <i class="bi bi-x-lg"></i>
@@ -301,8 +301,8 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Nieuwe naam</label>
-                            <input type="text" name="naam" class="form-control" value="{{ huidige_map.naam }}" required autofocus>
+                            <label for="hernoem_huidige_map_naam" class="form-label fw-semibold">Nieuwe naam</label>
+                            <input type="text" id="hernoem_huidige_map_naam" name="naam" class="form-control" value="{{ huidige_map.naam }}" required autofocus>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -328,8 +328,8 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Nieuwe naam</label>
-                            <input type="text" name="naam" class="form-control" value="{{ map.naam }}" required autofocus>
+                            <label for="hernoem_map_naam_{{ map.id }}" class="form-label fw-semibold">Nieuwe naam</label>
+                            <input type="text" id="hernoem_map_naam_{{ map.id }}" name="naam" class="form-control" value="{{ map.naam }}" required autofocus>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -374,12 +374,12 @@
                             <form action="{{ url_for('doc.bewerken', doc_id=doc.id) }}" method="POST">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <div class="mb-3">
-                                    <label class="form-label fw-semibold">Bestandsnaam</label>
-                                    <input type="text" name="bestandsnaam" class="form-control" value="{{ doc.bestandsnaam }}" required>
+                                    <label for="doc_bestandsnaam_{{ doc.id }}" class="form-label fw-semibold">Bestandsnaam</label>
+                                    <input type="text" id="doc_bestandsnaam_{{ doc.id }}" name="bestandsnaam" class="form-control" value="{{ doc.bestandsnaam }}" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-semibold">Omschrijving</label>
-                                    <textarea name="omschrijving" class="form-control" rows="3" placeholder="Optionele omschrijving...">{{ doc.omschrijving or '' }}</textarea>
+                                    <label for="doc_omschrijving_{{ doc.id }}" class="form-label fw-semibold">Omschrijving</label>
+                                    <textarea id="doc_omschrijving_{{ doc.id }}" name="omschrijving" class="form-control" rows="3" placeholder="Optionele omschrijving...">{{ doc.omschrijving or '' }}</textarea>
                                 </div>
                                 <div class="d-flex justify-content-end gap-2">
                                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
@@ -397,8 +397,8 @@
                                     Huidige versie: <strong>v{{ doc.versie or 1 }}</strong>. Door een nieuw bestand te uploaden wordt dit document vervangen en opgehoogd naar <strong>v{{ (doc.versie or 1) + 1 }}</strong>.
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-semibold">Kies nieuw bestand</label>
-                                    <input type="file" name="bestand" class="form-control" required>
+                                    <label for="doc_replace_file_{{ doc.id }}" class="form-label fw-semibold">Kies nieuw bestand</label>
+                                    <input type="file" id="doc_replace_file_{{ doc.id }}" name="bestand" class="form-control" required>
                                     <div class="form-text text-danger fw-semibold mt-1">
                                         <i class="bi bi-info-circle me-1"></i>Maximale bestandsgrootte: <strong>16 MB</strong>.
                                     </div>
@@ -450,8 +450,8 @@
                         </div>
                     {% endif %}
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Mapnaam</label>
-                        <input type="text" name="naam" class="form-control" placeholder="Bijv. Jaarverslagen, Financiën..." required autofocus>
+                        <label for="nieuwe_map_naam_input" class="form-label fw-semibold">Mapnaam</label>
+                        <input type="text" id="nieuwe_map_naam_input" name="naam" class="form-control" placeholder="Bijv. Jaarverslagen, Financiën..." required autofocus>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -485,15 +485,15 @@
                         </div>
                     {% endif %}
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Selecteer bestand</label>
-                        <input type="file" name="bestand" class="form-control" required>
+                        <label for="upload_doc_bestand_input" class="form-label fw-semibold">Selecteer bestand</label>
+                        <input type="file" id="upload_doc_bestand_input" name="bestand" class="form-control" required>
                         <div class="form-text text-danger fw-semibold mt-1">
                             <i class="bi bi-exclamation-circle me-1"></i>Maximale bestandsgrootte is <strong>16 MB</strong> per bestand.
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Omschrijving (optioneel)</label>
-                        <textarea name="omschrijving" class="form-control" rows="3" placeholder="Optionele toelichting bij dit document..."></textarea>
+                        <label for="upload_doc_omschrijving_input" class="form-label fw-semibold">Omschrijving (optioneel)</label>
+                        <textarea id="upload_doc_omschrijving_input" name="omschrijving" class="form-control" rows="3" placeholder="Optionele toelichting bij dit document..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">

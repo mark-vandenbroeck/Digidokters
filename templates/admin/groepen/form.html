@@ -180,28 +180,32 @@
                         <a href="{{ url_for('admin.groepen_overzicht') }}" class="btn btn-outline-secondary">Annuleren</a>
                     </div>
                     {% if actie == 'Bewerken' and not groep.is_standaard and not is_pb_group and groep.users.count() == 0 %}
-                    <form method="POST" action="{{ url_for('admin.groep_verwijderen', groep_id=groep.id) }}" class="d-inline"
-                          onsubmit="return confirm('Weet u zeker dat u deze groep wilt verwijderen?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">
-                            <i class="bi bi-trash me-1"></i>Groep Verwijderen
-                        </button>
-                    </form>
+                    <button type="submit" form="deleteGroupForm" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-trash me-1"></i>Groep Verwijderen
+                    </button>
                     {% endif %}
                 </div>
             </form>
+            {% if actie == 'Bewerken' and not groep.is_standaard and not is_pb_group and groep.users.count() == 0 %}
+            <form id="deleteGroupForm" method="POST" action="{{ url_for('admin.groep_verwijderen', groep_id=groep.id) }}"
+                  onsubmit="return confirm('Weet u zeker dat u deze groep wilt verwijderen?');" class="d-none">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            </form>
+            {% endif %}
         </div>
     </div>
 
 </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 function setAllMatrix(targetLevel) {
-    const radios = document.querySelectorAll('.matrix-' + targetLevel);
-    radios.forEach(r => {
-        r.checked = true;
-    });
+    var radios = document.querySelectorAll('.matrix-' + targetLevel);
+    for (var i = 0; i < radios.length; i++) {
+        radios[i].checked = true;
+    }
 }
 </script>
 {% endblock %}

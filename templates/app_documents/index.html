@@ -74,7 +74,7 @@
                         {% endif %}
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" name="zoek" class="form-select-sm form-control" placeholder="Zoek in app-documenten of inhoud..." value="{{ zoek }}">
+                            <input type="text" id="app_doc_zoek" name="zoek" aria-label="Zoek in app-documenten of inhoud" class="form-select-sm form-control" placeholder="Zoek in app-documenten of inhoud..." value="{{ zoek }}">
                             {% if zoek %}
                                 <a href="{{ url_for('app_docs.index', map_id=huidige_map.id if huidige_map else None) }}" class="btn btn-outline-secondary" title="Wis zoekopdracht">
                                     <i class="bi bi-x-lg"></i>
@@ -378,8 +378,8 @@
                 </div>
                 <div class="modal-body py-3">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Nieuwe mapnaam <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="naam" value="{{ map.naam }}" required>
+                        <label for="app_map_naam_{{ map.id }}" class="form-label fw-semibold">Nieuwe mapnaam <span class="text-danger">*</span></label>
+                        <input type="text" id="app_map_naam_{{ map.id }}" class="form-control" name="naam" value="{{ map.naam }}" required>
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-top">
@@ -474,12 +474,12 @@
                         <form action="{{ url_for('app_docs.bewerken', doc_id=doc.id) }}" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Bestandsnaam</label>
-                                <input type="text" class="form-control" name="bestandsnaam" value="{{ doc.bestandsnaam }}" required>
+                                <label for="app_doc_bestandsnaam_{{ doc.id }}" class="form-label fw-semibold">Bestandsnaam</label>
+                                <input type="text" id="app_doc_bestandsnaam_{{ doc.id }}" class="form-control" name="bestandsnaam" value="{{ doc.bestandsnaam }}" required>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Omschrijving</label>
-                                <textarea class="form-control" name="omschrijving" rows="2">{{ doc.omschrijving or '' }}</textarea>
+                                <label for="app_doc_omschrijving_{{ doc.id }}" class="form-label fw-semibold">Omschrijving</label>
+                                <textarea id="app_doc_omschrijving_{{ doc.id }}" class="form-control" name="omschrijving" rows="2">{{ doc.omschrijving or '' }}</textarea>
                             </div>
                             <div class="d-flex justify-content-end gap-2">
                                 <button type="submit" class="btn btn-primary btn-sm">Opslaan</button>
@@ -495,8 +495,8 @@
                                 <i class="bi bi-info-circle me-1"></i>Huidige versie: <strong>v{{ doc.versie }}</strong>. Na overschrijven wordt dit <strong>v{{ doc.versie + 1 }}</strong>.
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Nieuw bestand selecteren</label>
-                                <input class="form-control" type="file" name="bestand" required>
+                                <label for="app_doc_bestand_{{ doc.id }}" class="form-label fw-semibold">Nieuw bestand selecteren</label>
+                                <input id="app_doc_bestand_{{ doc.id }}" class="form-control" type="file" name="bestand" required>
                             </div>
                             <div class="d-flex justify-content-end gap-2">
                                 <button type="submit" class="btn btn-warning btn-sm">Overschrijven als v{{ doc.versie + 1 }}</button>

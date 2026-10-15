@@ -184,21 +184,21 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Vraagtekst <span class="text-danger">*</span></label>
-                        <input type="text" name="vraag_tekst" class="form-control" value="{{ vraag.vraag_tekst }}" required>
+                        <label for="vraag_tekst_{{ vraag.id }}" class="form-label fw-semibold">Vraagtekst <span class="text-danger">*</span></label>
+                        <input type="text" id="vraag_tekst_{{ vraag.id }}" name="vraag_tekst" class="form-control" value="{{ vraag.vraag_tekst }}" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Type vraag</label>
-                        <select name="type" class="form-select vraag-type-select" data-target="optiesEdit{{ vraag.id }}">
+                        <label for="vraag_type_{{ vraag.id }}" class="form-label fw-semibold">Type vraag</label>
+                        <select id="vraag_type_{{ vraag.id }}" name="type" class="form-select vraag-type-select" data-target="optiesEdit{{ vraag.id }}">
                             <option value="multiple_choice" {% if vraag.type == 'multiple_choice' %}selected{% endif %}>Multiple Choice (Keuzerondjes)</option>
                             <option value="open_tekst" {% if vraag.type == 'open_tekst' %}selected{% endif %}>Vrij Tekstveld</option>
                         </select>
                     </div>
 
                     <div class="mb-3 opties-container" id="optiesEdit{{ vraag.id }}" style="{% if vraag.type == 'open_tekst' %}display: none;{% endif %}">
-                        <label class="form-label fw-semibold">Keuzemogelijkheden (één per regel)</label>
-                        <textarea name="opties" class="form-control" rows="4" placeholder="Optie 1&#10;Optie 2&#10;Optie 3">{{ '\n'.join(vraag.opties_lijst) }}</textarea>
+                        <label for="vraag_opties_{{ vraag.id }}" class="form-label fw-semibold">Keuzemogelijkheden (één per regel)</label>
+                        <textarea id="vraag_opties_{{ vraag.id }}" name="opties" class="form-control" rows="4" placeholder="Optie 1&#10;Optie 2&#10;Optie 3">{{ '\n'.join(vraag.opties_lijst) }}</textarea>
                         <div class="form-text text-muted small">Typ elke mogelijke antwoordoptie op een nieuwe regel.</div>
                     </div>
 
@@ -233,21 +233,21 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Vraagtekst <span class="text-danger">*</span></label>
-                        <input type="text" name="vraag_tekst" class="form-control" placeholder="Bijv. Hebben de deelnemers iets geleerd vandaag?" required autofocus>
+                        <label for="nieuwe_vraag_tekst" class="form-label fw-semibold">Vraagtekst <span class="text-danger">*</span></label>
+                        <input type="text" id="nieuwe_vraag_tekst" name="vraag_tekst" class="form-control" placeholder="Bijv. Hebben de deelnemers iets geleerd vandaag?" required autofocus>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Type vraag</label>
-                        <select name="type" class="form-select vraag-type-select" data-target="optiesNieuw">
+                        <label for="nieuwe_vraag_type" class="form-label fw-semibold">Type vraag</label>
+                        <select id="nieuwe_vraag_type" name="type" class="form-select vraag-type-select" data-target="optiesNieuw">
                             <option value="multiple_choice" selected>Multiple Choice (Keuzerondjes)</option>
                             <option value="open_tekst">Vrij Tekstveld</option>
                         </select>
                     </div>
 
                     <div class="mb-3 opties-container" id="optiesNieuw">
-                        <label class="form-label fw-semibold">Keuzemogelijkheden (één per regel)</label>
-                        <textarea name="opties" class="form-control" rows="4" placeholder="Niet veel&#10;Een beetje&#10;Redelijk wat&#10;Veel&#10;Heel veel"></textarea>
+                        <label for="nieuwe_vraag_opties" class="form-label fw-semibold">Keuzemogelijkheden (één per regel)</label>
+                        <textarea id="nieuwe_vraag_opties" name="opties" class="form-control" rows="4" placeholder="Niet veel&#10;Een beetje&#10;Redelijk wat&#10;Veel&#10;Heel veel"></textarea>
                         <div class="form-text text-muted small">Typ elke mogelijke antwoordoptie op een nieuwe regel.</div>
                     </div>
 

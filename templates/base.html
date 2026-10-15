@@ -72,7 +72,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-dark text-white border-secondary"><i class="bi bi-building"></i></span>
-                    <select name="organisatie_id" onchange="this.form.submit()" class="form-select form-select-sm bg-dark text-white border-secondary">
+                    <select id="switch_organisatie_id" name="organisatie_id" aria-label="Organisatie selecteren" onchange="this.form.submit()" class="form-select form-select-sm bg-dark text-white border-secondary">
                         {% if current_user.rol == 'platformbeheerder' %}
                             <option value="">— Kies een organisatie —</option>
                             {% for org in g.beschikbare_organisaties %}

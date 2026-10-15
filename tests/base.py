@@ -7,6 +7,8 @@ from werkzeug.security import generate_password_hash
 
 from config import Config
 
+TEST_PASSWORD_HASH = generate_password_hash("password123", method="pbkdf2:sha256:1")
+
 class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
@@ -53,7 +55,7 @@ class BaseTestCase(unittest.TestCase):
         self.admin_user = User(
             naam="AdminMark",
             email="admin@test.com",
-            wachtwoord_hash=generate_password_hash("password123"),
+            wachtwoord_hash=TEST_PASSWORD_HASH,
             rol="beheerder",
             actief=True,
             moet_wachtwoord_wijzigen=False
@@ -64,7 +66,7 @@ class BaseTestCase(unittest.TestCase):
         self.medewerker_user = User(
             naam="UserTim",
             email="tim@test.com",
-            wachtwoord_hash=generate_password_hash("password123"),
+            wachtwoord_hash=TEST_PASSWORD_HASH,
             rol="medewerker",
             actief=True,
             moet_wachtwoord_wijzigen=False
@@ -133,10 +135,19 @@ class BaseTestCase(unittest.TestCase):
         self.functie_digihelper = Functie(naam="Digihelper", actief=True, volgorde=1, organisatie_id=self.org.id)
         self.functie_lesgever = Functie(naam="Lesgever", actief=True, volgorde=2, organisatie_id=self.org.id)
 
+        from models.resultaat import Resultaat
+        self.resultaat_beantwoord = Resultaat(omschrijving="Vraag beantwoord", actief=True, volgorde=0, organisatie_id=self.org.id)
+        self.resultaat_terug = Resultaat(omschrijving="Bezoeker komt later terug", actief=True, volgorde=1, organisatie_id=self.org.id)
+        self.resultaat_doorverwezen = Resultaat(omschrijving="Bezoeker doorverwezen", actief=True, volgorde=2, organisatie_id=self.org.id)
+        self.resultaat_onmogelijk = Resultaat(omschrijving="Vraag onmogelijk te beantwoorden", actief=True, volgorde=3, organisatie_id=self.org.id)
+        self.resultaat_andere = Resultaat(omschrijving="Andere", actief=True, volgorde=4, organisatie_id=self.org.id)
+
         db.session.add_all([
             self.digidokter, self.age_category, self.device, self.herkomst,
             self.gender_man, self.gender_vrouw,
-            self.functie_digidokter, self.functie_digihelper, self.functie_lesgever
+            self.functie_digidokter, self.functie_digihelper, self.functie_lesgever,
+            self.resultaat_beantwoord, self.resultaat_terug, self.resultaat_doorverwezen,
+            self.resultaat_onmogelijk, self.resultaat_andere
         ])
         db.session.commit()
 

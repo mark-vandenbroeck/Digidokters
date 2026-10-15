@@ -12,6 +12,7 @@ from models.herkomst import Herkomst
 from models.gender_identity import GenderIdentity
 from models.functie import Functie, user_functies
 from models.registration import Registration
+from models.resultaat import Resultaat
 from models.activity_type import ActivityType
 from models.location import Location
 from models.agenda import AgendaItem
@@ -107,6 +108,13 @@ def maak_backup(org_id: int) -> dict:
         for fn in functies
     ]
 
+    # 5d. Resultaten (Afloop van het bezoek)
+    resultaten = Resultaat.query.filter_by(organisatie_id=org_id).order_by(Resultaat.volgorde).all()
+    resultaten_data = [
+        {'omschrijving': res.omschrijving, 'actief': res.actief, 'volgorde': res.volgorde}
+        for res in resultaten
+    ]
+
     # 6. Registrations (eager load foreign key relations)
     registrations = (
         Registration.query
@@ -117,6 +125,7 @@ def maak_backup(org_id: int) -> dict:
             joinedload(Registration.herkomst),
             joinedload(Registration.gender_identity),
             joinedload(Registration.locatie),
+            joinedload(Registration.resultaat),
             joinedload(Registration.aangemaakt_door_user),
         )
         .filter_by(organisatie_id=org_id)
@@ -132,6 +141,7 @@ def maak_backup(org_id: int) -> dict:
             'herkomst': r.herkomst.naam if r.herkomst else '',
             'geslacht': r.geslacht,
             'onderwerp': r.onderwerp,
+            'resultaat_omschrijving': r.resultaat.omschrijving if r.resultaat else None,
             'digidokter_naam': r.digidokter.naam if r.digidokter else '',
             'leeftijdscategorie_naam': r.leeftijdscategorie.naam if r.leeftijdscategorie else '',
             'toestel_naam': r.toestel.naam if r.toestel else '',
@@ -203,6 +213,7 @@ def maak_backup(org_id: int) -> dict:
         'herkomsten': herkomsten_data,
         'gender_identities': gender_identities_data,
         'functies': functies_data,
+        'resultaten': resultaten_data,
         'activity_types': activity_types_data,
         'locations': locations_data,
         'agenda_items': agenda_items_data,
@@ -232,6 +243,7 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
             Herkomst.query.filter_by(organisatie_id=org_id).delete()
             GenderIdentity.query.filter_by(organisatie_id=org_id).delete()
             Functie.query.filter_by(organisatie_id=org_id).delete()
+            Resultaat.query.filter_by(organisatie_id=org_id).delete()
             ActivityType.query.filter_by(organisatie_id=org_id).delete()
             Location.query.filter_by(organisatie_id=org_id).delete()
 
@@ -366,6 +378,20 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                     db.session.flush()
                     functies_map[name] = fn
 
+            # 5d. Herstel resultaten
+            resultaten_map = {}
+            if 'resultaten' in data:
+                for res_data in data.get('resultaten', []):
+                    res = Resultaat(
+                        omschrijving=res_data['omschrijving'],
+                        actief=res_data.get('actief', True),
+                        volgorde=res_data.get('volgorde', 0),
+                        organisatie_id=org_id
+                    )
+                    db.session.add(res)
+                    db.session.flush()
+                    resultaten_map[res.omschrijving] = res.id
+
             # 6. Herstel gebruikers & lidmaatschappen
             users_map = {}
             for u_data in data.get('users', []):
@@ -434,6 +460,9 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                 geslacht_val = r_data.get('geslacht')
                 g_id = gender_identities_map.get(geslacht_val.lower()) if (geslacht_val and isinstance(geslacht_val, str)) else None
 
+                res_omschrijving = r_data.get('resultaat_omschrijving')
+                res_id = resultaten_map.get(res_omschrijving) if res_omschrijving else None
+
                 reg_datum = datetime.fromisoformat(r_data['datum']).date() if r_data.get('datum') else None
                 created_at = datetime.fromisoformat(r_data['aangemaakt_op']) if r_data.get('aangemaakt_op') else datetime.now(timezone.utc)
                 modified_at = datetime.fromisoformat(r_data['gewijzigd_op']) if r_data.get('gewijzigd_op') else datetime.now(timezone.utc)
@@ -446,6 +475,7 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                     herkomst_id=h_id,
                     gender_identity_id=g_id,
                     onderwerp=r_data['onderwerp'],
+                    resultaat_id=res_id,
                     digidokter_id=d_id,
                     leeftijdscategorie_id=c_id,
                     toestel_id=t_id,

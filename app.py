@@ -455,6 +455,22 @@ def create_app(config_class=Config):
                 db.session.commit()
                 print("✓ Standaard mappen voor App Documentatie geïnitialiseerd")
 
+        # 13. Seed Resultaten van het bezoek voor alle organisaties
+        from models.resultaat import Resultaat
+        standaard_resultaten = [
+            'Vraag beantwoord',
+            'Bezoeker komt later terug',
+            'Bezoeker doorverwezen',
+            'Vraag onmogelijk te beantwoorden',
+            'Andere'
+        ]
+        for org in alle_orgs:
+            if not Resultaat.query.filter_by(organisatie_id=org.id).first():
+                for i, omschrijving in enumerate(standaard_resultaten):
+                    db.session.add(Resultaat(omschrijving=omschrijving, actief=True, volgorde=i, organisatie_id=org.id))
+        db.session.commit()
+        print("✓ Resultaten van het bezoek geïnitialiseerd voor alle organisaties")
+
     # CLI-commando: flask create-org <naam> <slug>
     import click
     @app.cli.command('create-org')

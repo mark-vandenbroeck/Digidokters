@@ -45,4 +45,15 @@ scripts/*
 !scripts/switch_schema.py
 !scripts/sync_productie_naar_lokaal.py
 
+# coverage / testresultaten
+.coverage
+.coverage.*
+coverage.xml
+results.xml
+htmlcov/
 
+# virtuele omgevingen en tooling
+.venv/
+venv/
+.pytest_cache/
+.scannerwork/

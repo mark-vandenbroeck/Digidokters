@@ -117,11 +117,11 @@
             <div class="col-12 col-md-4 col-lg-3">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Zoek op onderwerp, nr of uitleg...">
+                    <input type="text" id="filter_q" aria-label="Zoek op onderwerp, nr of uitleg" class="form-control" name="q" value="{{ q }}" placeholder="Zoek op onderwerp, nr of uitleg...">
                 </div>
             </div>
             <div class="col-6 col-md-3 col-lg-2">
-                <select name="categorie_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                <select id="filter_categorie_id" name="categorie_id" aria-label="Filter op categorie" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">Alle categorieën</option>
                     {% for cat in categorieen %}
                     <option value="{{ cat.id }}" {% if geselecteerde_cat == (cat.id|string) %}selected{% endif %}>{{ cat.naam }}</option>
@@ -129,7 +129,7 @@
                 </select>
             </div>
             <div class="col-6 col-md-3 col-lg-2">
-                <select name="organisatie_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                <select id="filter_organisatie_id" name="organisatie_id" aria-label="Filter op organisatie" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">Alle organisaties</option>
                     {% for org in organisaties %}
                     <option value="{{ org.id }}" {% if geselecteerde_org == (org.id|string) %}selected{% endif %}>{{ org.naam }}</option>
@@ -366,9 +366,9 @@
 
                 <!-- Onderwerp van de vraag -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold text-dark small text-uppercase mb-1">
+                    <div class="form-label fw-bold text-dark small text-uppercase mb-1">
                         <i class="bi bi-chat-left-text me-1 text-primary"></i>Vraag / Onderwerp
-                    </label>
+                    </div>
                     <div class="p-3 bg-white border rounded-3 fw-medium text-dark">
                         {{ item.registration.onderwerp }}
                     </div>

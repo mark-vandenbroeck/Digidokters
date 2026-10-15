@@ -60,9 +60,9 @@
         </button>
         <!-- Jaar filter selector -->
         <form method="GET" action="{{ url_for('stats.overzicht') }}" class="d-flex align-items-center gap-2 mb-0" id="jaarForm">
-            <label class="text-nowrap small text-muted">Jaar selecteren:</label>
+            <label for="select_stats_jaar" class="text-nowrap small text-muted">Jaar selecteren:</label>
             <input type="hidden" name="tab" id="activeTabInput" value="{{ actieve_tab }}">
-            <select class="form-select form-select-sm" name="jaar" onchange="this.form.submit()">
+            <select id="select_stats_jaar" class="form-select form-select-sm" name="jaar" onchange="this.form.submit()">
                 <option value="alle" {{ 'selected' if jaar == 'alle' }}>Alle jaren</option>
                 {% for j in jaren %}
                 <option value="{{ j }}" {{ 'selected' if j|string == jaar|string }}>{{ j }}</option>
@@ -263,6 +263,36 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Resultaat van het bezoek -->
+            {% if heeft_resultaten or per_resultaat %}
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-check2-circle me-1 text-primary"></i>Resultaat van het bezoek</span>
+                        {% if per_resultaat %}
+                        <span class="badge bg-light text-dark border fw-normal">{{ per_resultaat|length }} opties</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if per_resultaat and totaal_resultaten > 0 %}
+                        {% for res_naam, aantal in per_resultaat %}
+                        {% set pct = (aantal / totaal_resultaten * 100)|round(1) if totaal_resultaten > 0 else 0 %}
+                        <div class="dd-progress-row">
+                            <div class="dd-progress-label">{{ res_naam }}</div>
+                            <div class="dd-progress-bar-wrap">
+                                <div class="dd-progress-fill bg-success" style="width: {{ pct }}%"></div>
+                            </div>
+                            <div class="dd-progress-count">{{ aantal }} <small class="text-muted">({{ pct }}%)</small></div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted text-center py-4 mb-0">Geen data beschikbaar voor dit jaar.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Verdeling over locaties -->
             <div class="col-12 col-md-6">

@@ -43,6 +43,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 16. **Vraagcategorieën (`question_categories`):** Centrale lijst van 10 gestandaardiseerde hoofdcategorieën met AI-richtlijnen en actieve status.
 17. **Vraagclassificaties (`question_classifications`):** 1-op-1 gekoppeld aan registraties met AI-categorietoewijzing, betrouwbaarheidsscore (zekerheid %), toelichting en handmatige override-auditering.
 18. **App Mappen & App Documenten (`app_mappen`, `app_documenten`):** Centrale, platformbrede documentenopslag gedeeld door alle organisaties (zonder `organisatie_id`).
+19. **Resultaten (`resultaten`):** Keuzelijst met mogelijke uitkomsten/afloop van een consultatie (bijv. 'Vraag beantwoord', 'Bezoeker komt later terug', 'Bezoeker doorverwezen', 'Vraag onmogelijk te beantwoorden', 'Andere') per organisatie, met koppeling via `resultaat_id` op `registrations`.
 
 ---
 
@@ -53,8 +54,9 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   **Sticky Sessie-Context:** Datum, actieve Digidokter en consultatielocatie blijven gedurende de hele sessie automatisch bewaard en vooraf geselecteerd.
 *   **Touch Segmented Buttons:** Grote, vlot tikbare knoppen voor 'Nieuwe bezoeker (Ja/Nee)', geslacht, leeftijdscategorie en toesteltype.
 *   **Snelle Onderwerp-Tags:** Met één tik populaire thema's (itsme, WhatsApp, E-mail, Smartschool, Wifi/Router) toevoegen aan de hulpvraag.
+*   **Resultaat van het bezoek (Afloop):** Onder 'Hulpvraag/onderwerp' kan de digidokter het resultaat van de consultatie selecteren (bijv. *Vraag beantwoord*, *Bezoeker komt later terug*, *Bezoeker doorverwezen*, *Vraag onmogelijk te beantwoorden*, *Andere*). Dit veld is conditioneel en verschijnt uitsluitend indien de organisatie minstens één resultaat heeft ingesteld in de stamgegevens.
 *   **Opslaan & Volgende bezoeker:** Eén opvallende actieknop slaat de consultatie op en zet het scherm direct klaar voor de volgende bezoeker.
-*   **Detailpagina & AI-Inzage:** Op de detailpagina van een registratie worden alle gegevens overzichtelijk getoond, inclusief de AI-vraagclassificatie (toegewezen categorie, zekerheidsscore in % en de toelichting/motivatie van het model).
+*   **Detailpagina & AI-Inzage:** Op de detailpagina van een registratie worden alle gegevens overzichtelijk getoond, inclusief het geregistreerde resultaat en de AI-vraagclassificatie (toegewezen categorie, zekerheidsscore in % en de toelichting/motivatie van het model).
 *   **Dynamische Genderidentiteit:** Het geslacht van de bezoeker wordt gekozen uit de geconfigureerde genderidentiteiten van de organisatie (standaard 'Man' en 'Vrouw', uitbreidbaar via stamgegevens).
 *   **Consultatielocaties:** Indien er binnen de organisatie meerdere locaties zijn gemarkeerd als *"Gebruikt voor consultaties"*, kan de specifieke locatie direct worden geselecteerd. Bij exact één consultatielocatie wordt deze automatisch zonder extra dropdown toegekend.
 *   **Realtime Asynchrone AI-classificatie:** Zodra een consultatie wordt opgeslagen of bewerkt, wordt de vraag op de achtergrond binnen 1-2 seconden geanalyseerd via Google Gemini AI en toegekend aan de passende categorie.
@@ -69,7 +71,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 
 ### 3. Statistieken & Dashboard
 Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
-*   **Bezoekers & Consultaties:** Tijdlijn per week (jaar-op-jaar), maandelijkse verdelingen, verdeling over locaties, nieuwe vs. terugkerende bezoekers, meest populaire leeftijdscategorieën, toestellen, geslachtsverdeling en drukste dagen.
+*   **Bezoekers & Consultaties:** Tijdlijn per week (jaar-op-jaar), maandelijkse verdelingen, verdeling over locaties, nieuwe vs. terugkerende bezoekers, meest populaire leeftijdscategorieën, toestellen, geslachtsverdeling, overzicht van **Resultaten van het bezoek** (met procentuele verdeling over alle consultaties met een geregistreerd resultaat) en drukste dagen.
 *   **Vrijwilligers & Agenda:** Totaal aantal gepresteerde uren per digidokter, sessies per locatie en activiteitstype, urentrend per maand en de **Druktest ratio** (gemiddeld aantal bezoeken per aanwezige vrijwilliger per sessie, uitsluitend berekend voor activiteiten in het verleden).
 *   **Vragen & AI-Analyse:** AI-gestuurde analyse van consultaties met realtime KPI's (dekkingsgraad, populairste categorie, gemiddelde zekerheid), categorie-staafdiagram, top-5 maandelijkse evolutiegrafiek en kruistabellen per apparaat en leeftijdscategorie.
 *   **Filter 'Alle jaren' & Tab-behoud:** Ondersteunt filteren per specifiek jaar én over 'Alle jaren' heen, waarbij het geopende tabblad altijd actief blijft bij filterwijzigingen.
@@ -120,15 +122,16 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 *   Subtiele weergave van record-IDs in alle data-weergaven ter vereenvoudiging van auditing.
 
 ### 8. Stamgegevensbeheer & Veilig Wissen
-*   **Volledig beheer van keuzelijsten:** Beheerders en platformbeheerders kunnen binnen hun organisatie locaties, activiteitstypes, leeftijdscategorieën, toestellen, herkomstbronnen, **genderidentiteiten** en **functies** aanmaken, bewerken, activeren/deactiveren en handmatig van volgorde veranderen.
+*   **Volledig beheer van keuzelijsten:** Beheerders en platformbeheerders kunnen binnen hun organisatie locaties, activiteitstypes, leeftijdscategorieën, toestellen, herkomstbronnen, **genderidentiteiten**, **functies** en **resultaten (afloop van het bezoek)** aanmaken, bewerken, activeren/deactiveren en handmatig van volgorde veranderen.
 *   **Statusfilters op alle pagina's:** Elke stamgegevens-beheerpagina bevat een handige statusfilter (*Alle items*, *Enkel actieve items*, *Enkel gedeactiveerde items*) om direct een overzichtelijk beeld te krijgen.
 *   **Locaties voor Consultaties:** Locaties kunnen worden aangeduid met de optie *"Gebruikt voor consultaties"*. Enkel locaties met deze vlag verschijnen bij de registratie van consultaties en in het consultatielocatiefilter.
+*   **Conditionele registratie-integratie van Resultaten:** Indien een organisatie geen resultaten wenst te registreren, kunnen alle items in Resultaten worden gewist of leeg gelaten; het veld verdwijnt dan automatisch uit de consultatieformulieren en de exportfilter.
 *   **Mapping van gedeactiveerde entries:** Gedeactiveerde leeftijdscategorieën en toesteltypes kunnen in het beheer worden gekoppeld (gemapt) naar een actieve categorie. Historische consultaties blijven intact in de database, maar worden in overzichten, filters, detailweergaven, statistieken en exports automatisch getoond en geaggregeerd onder de gemapte actieve categorie.
-*   **Geavanceerde filters in het consultatieoverzicht:** De overzichtspagina van registraties bevat kolommen en filters op zoekterm, digidokter, locatie, toesteltype, geslacht, leeftijdscategorie en datum (van-tot). De dropdowns tonen enkel actieve opties; filteren op een optie matcht automatisch ook historische registraties met een gekoppelde inactieve entry.
+*   **Geavanceerde filters in het consultatieoverzicht:** De overzichtspagina van registraties bevat kolommen en filters op zoekterm, digidokter, locatie, toesteltype, geslacht, leeftijdscategorie, resultaat en datum (van-tot). De dropdowns tonen enkel actieve opties; filteren op een optie matcht automatisch ook historische registraties met een gekoppelde inactieve entry.
 *   **Referentiecontroles bij wissen:** Stamgegevens kunnen uitsluitend permanent gewist worden als er **geen enkele andere data naar verwijst**:
     *   *Locaties:* Mag niet gewist worden zolang er nog gekoppelde agenda-activiteiten of geregistreerde consultaties zijn.
     *   *Activiteitstypes:* Mag niet gewist worden zolang er gekoppelde agenda-activiteiten of ingevulde evaluaties zijn.
-    *   *Leeftijdscategorieën, Toestellen, Herkomst & Genderidentiteiten:* Mogen niet gewist worden zolang er nog geregistreerde consultaties aan gekoppeld zijn.
+    *   *Leeftijdscategorieën, Toestellen, Herkomst, Genderidentiteiten & Resultaten:* Mogen niet gewist worden zolang er nog geregistreerde consultaties aan gekoppeld zijn.
     *   *Functies:* Mogen niet gewist worden zolang ze nog toegekend zijn aan één of meerdere gebruikers.
 *   **Duidelijke gebruikersfeedback:** Indien een item nog in gebruik is, wordt de verwijderknop automatisch gedeactiveerd met een tooltip die het aantal gekoppelde records vermeldt. Indien ongebruikt, kan het item met één klik en bevestiging definitief worden verwijderd.
 
@@ -319,7 +322,7 @@ Zie de volledige [Handleiding: Agenda Import Script](file:///Users/mark/Python/D
 
 ## 🧪 Unit Tests Uitvoeren
 
-Het platform is uitgerust met een geautomatiseerde test-suite van **224 tests** verdeeld over 30 testbestanden die draaien op een in-memory SQLite database.
+Het platform is uitgerust met een geautomatiseerde test-suite van **236 tests** verdeeld over 32 testbestanden die draaien op een in-memory SQLite database.
 
 **Met pytest (aanbevolen):**
 ```bash
@@ -331,7 +334,7 @@ Het platform is uitgerust met een geautomatiseerde test-suite van **224 tests** 
 python -m unittest discover -s tests
 ```
 
-### 📋 Overzicht van de Unit Test Suite (224 tests)
+### 📋 Overzicht van de Unit Test Suite (236 tests)
 
 | # | Testbestand | Aantal Tests | Dekkingsgebied / Beschrijving |
 |---|---|:---:|---|
@@ -341,7 +344,7 @@ python -m unittest discover -s tests
 | 4 | `tests/test_app_documents.py` | 4 | Centrale, gedeelde platformdocumenten en globale mappenstructuur |
 | 5 | `tests/test_audit.py` | 2 | Logging van mutaties op database-entiteiten en filteren op datum/gebruiker |
 | 6 | `tests/test_auth.py` | 12 | Authenticatie, inloggen, logout, wachtwoordreset, wachtwoordwissel-dwang, organisatieselectie & groepsnaamweergave in UI |
-| 7 | `tests/test_communicatie.py` | 14 | Interne & platform communicatie, broadcast e-mails, doelgroepfiltering op groepen, proefmail naar mezelf, JSON-snapshots van ontvangers & strikte tenant-isolatie |
+| 7 | `tests/test_communicatie.py` | 16 | Interne & platform communicatie, broadcast e-mails, doelgroepfiltering op groepen, proefmail naar mezelf, JSON-snapshots van ontvangers & strikte tenant-isolatie |
 | 8 | `tests/test_consultatie_locaties.py` | 7 | Consultatielocaties markeren, sticky sessiekeuze bij balieformulier "Nieuw bezoek" |
 | 9 | `tests/test_digidokter_email.py` | 7 | E-mailvalidatie, duplicatiecontroles en uniekheid voor digidokters |
 | 10 | `tests/test_document_search.py` | 3 | Full-text content search binnen documenten (PDF, DOCX, ODT, XLSX, TXT) en context-snippets |
@@ -361,12 +364,13 @@ python -m unittest discover -s tests
 | 24 | `tests/test_platform_dashboard_and_templates.py` | 5 | Platformdashboard metrieken, aanpasbare e-mailsjablonen met dynamische tags en live preview |
 | 25 | `tests/test_quick_registration.py` | 6 | Touch balieformulier "Nieuw bezoek", sessie-context, sneltags, validatie en lezersblokkering |
 | 26 | `tests/test_registrations.py` | 5 | Consultatieregistraties overzicht, filtering, detailweergave met AI-resultaten en registraties wissen |
-| 27 | `tests/test_stamgegevens_delete.py` | 6 | Veilige verwijdering van stamgegevens met integriteitscontroles |
-| 28 | `tests/test_stamgegevens_filter.py` | 10 | Statusfilters (alle/actief/inactief) op alle 9 stamgegevenstabellen |
-| 29 | `tests/test_stamgegevens_mapping.py` | 7 | Alias mapping van legacy leeftijdscategorieën en toestellen naar standaardcategorieën |
-| 30 | `tests/test_user_delete_and_sorting.py` | 10 | Gebruikers veilig verwijderen/ontkoppelen, multi-tenant bescherming en tabel-sorteringen |
-| 31 | `tests/test_vraagcategorieen.py` | 9 | 10 gestandaardiseerde vraagcategorieën, asynchrone AI-classificaties (Gemini), batch-analyse en statistieken |
-| **Totaal** | **31 testsuites** | **224 tests** | **100% geslaagd** |
+| 27 | `tests/test_resultaten.py` | 10 | Stamgegeven Resultaten CRUD, statusfilters, veilige verwijdering, conditionele weergave in registratieformulieren, statistieken, CSV/Excel export filter en multi-tenant isolatie |
+| 28 | `tests/test_stamgegevens_delete.py` | 6 | Veilige verwijdering van stamgegevens met integriteitscontroles |
+| 29 | `tests/test_stamgegevens_filter.py` | 10 | Statusfilters (alle/actief/inactief) op alle 9 stamgegevenstabellen |
+| 30 | `tests/test_stamgegevens_mapping.py` | 7 | Alias mapping van legacy leeftijdscategorieën en toestellen naar standaardcategorieën |
+| 31 | `tests/test_user_delete_and_sorting.py` | 10 | Gebruikers veilig verwijderen/ontkoppelen, multi-tenant bescherming en tabel-sorteringen |
+| 32 | `tests/test_vraagcategorieen.py` | 9 | 10 gestandaardiseerde vraagcategorieën, asynchrone AI-classificaties (Gemini), batch-analyse en statistieken |
+| **Totaal** | **32 testsuites** | **236 tests** | **100% geslaagd** |
 
 ---
 

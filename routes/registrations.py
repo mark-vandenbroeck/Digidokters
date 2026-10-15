@@ -10,6 +10,7 @@ from models.device import Device
 from models.herkomst import Herkomst
 from models.gender_identity import GenderIdentity
 from models.location import Location
+from models.resultaat import Resultaat
 from utils.decorators import writer_required
 from utils.helpers import safe_int, safe_date, safe_str
 from utils.tenant import filter_op_organisatie
@@ -29,6 +30,7 @@ def _keuzelijsten():
         'herkomsten': filter_op_organisatie(Herkomst.query.filter_by(actief=True), Herkomst).order_by(Herkomst.volgorde, Herkomst.naam).all(),
         'genderidentiteiten': filter_op_organisatie(GenderIdentity.query.filter_by(actief=True), GenderIdentity).order_by(GenderIdentity.volgorde, GenderIdentity.naam).all(),
         'consultatie_locaties': filter_op_organisatie(Location.query.filter_by(actief=True, gebruikt_voor_consultaties=True), Location).order_by(Location.volgorde, Location.naam).all(),
+        'resultaten': filter_op_organisatie(Resultaat.query.filter_by(actief=True), Resultaat).order_by(Resultaat.volgorde, Resultaat.omschrijving).all(),
     }
 
 
@@ -48,6 +50,7 @@ def lijst():
     filter_toestel = safe_int(request.args.get('toestel')) or safe_int(request.args.get('toesteltype'), default=0) or 0
     filter_leeftijd = safe_int(request.args.get('leeftijd')) or safe_int(request.args.get('leeftijdscategorie'), default=0) or 0
     filter_geslacht = safe_str(request.args.get('geslacht')).lower()
+    filter_resultaat = safe_int(request.args.get('resultaat'), default=0) or 0
     filter_datum_van = safe_str(request.args.get('datum_van'))
     filter_datum_tot = safe_str(request.args.get('datum_tot'))
     sort_by = safe_str(request.args.get('sort_by'), default='datum') or 'datum'
@@ -65,7 +68,8 @@ def lijst():
             joinedload(Registration.leeftijdscategorie).joinedload(AgeCategory.mapped_to),
             joinedload(Registration.toestel).joinedload(Device.mapped_to),
             joinedload(Registration.herkomst),
-            joinedload(Registration.locatie)
+            joinedload(Registration.locatie),
+            joinedload(Registration.resultaat)
         )
     )
 
@@ -122,6 +126,8 @@ def lijst():
             query = query.filter(
                 Registration.gender_identity.has(db.func.lower(GenderIdentity.naam) == filter_geslacht.lower())
             )
+    if filter_resultaat:
+        query = query.filter(Registration.resultaat_id == filter_resultaat)
     if filter_datum_van:
         try:
             query = query.filter(Registration.datum >= date.fromisoformat(filter_datum_van))
@@ -167,6 +173,10 @@ def lijst():
         effective_naam = db.func.coalesce(MappedDevice.naam, Device.naam)
         order_col = effective_naam.desc() if direction == 'desc' else effective_naam.asc()
         query = query.order_by(order_col)
+    elif sort_by == 'resultaat':
+        query = query.outerjoin(Resultaat, Registration.resultaat_id == Resultaat.id)
+        order_col = Resultaat.omschrijving.desc() if direction == 'desc' else Resultaat.omschrijving.asc()
+        query = query.order_by(order_col)
     elif sort_by == 'nieuw':
         order_col = Registration.nieuwe_klant.desc() if direction == 'desc' else Registration.nieuwe_klant.asc()
         query = query.order_by(order_col)
@@ -189,6 +199,7 @@ def lijst():
         filter_toestel=filter_toestel,
         filter_leeftijd=filter_leeftijd,
         filter_geslacht=filter_geslacht,
+        filter_resultaat=filter_resultaat,
         filter_datum_van=filter_datum_van,
         filter_datum_tot=filter_datum_tot,
         digidokters=keuzes['digidokters'],
@@ -196,6 +207,7 @@ def lijst():
         toestellen=keuzes['toestellen'],
         leeftijdscategorieën=keuzes['leeftijdscategorieën'],
         genderidentiteiten=keuzes['genderidentiteiten'],
+        resultaten=keuzes['resultaten'],
         sort_by=sort_by,
         direction=direction,
         alleen_eigen_registraties=alleen_eigen_registraties,
@@ -275,6 +287,12 @@ def nieuw():
             if not h or h.organisatie_id != org_id:
                 fouten.append('Ongeldige herkomst geselecteerd.')
 
+        resultaat_id = request.form.get('resultaat_id', 0, type=int) or None
+        if resultaat_id:
+            res = db.session.get(Resultaat, resultaat_id)
+            if not res or res.organisatie_id != org_id:
+                fouten.append('Ongeldig resultaat geselecteerd.')
+
         if not onderwerp:
             fouten.append('Onderwerp is verplicht.')
             
@@ -322,6 +340,7 @@ def nieuw():
             herkomst_id=herkomst_id,
             gender_identity_id=gender_identity_id,
             onderwerp=onderwerp,
+            resultaat_id=resultaat_id,
             leeftijdscategorie_id=leeftijdscategorie_id,
             toestel_id=toestel_id,
             locatie_id=locatie_id,
@@ -451,6 +470,12 @@ def snel():
             if not h or h.organisatie_id != org_id:
                 fouten.append('Ongeldige herkomst geselecteerd.')
 
+        resultaat_id = request.form.get('resultaat_id', 0, type=int) or None
+        if resultaat_id:
+            res = db.session.get(Resultaat, resultaat_id)
+            if not res or res.organisatie_id != org_id:
+                fouten.append('Ongeldig resultaat geselecteerd.')
+
         if not onderwerp:
             fouten.append('Onderwerp/vraag is verplicht.')
 
@@ -503,6 +528,7 @@ def snel():
             herkomst_id=herkomst_id,
             gender_identity_id=gender_identity_id,
             onderwerp=onderwerp,
+            resultaat_id=resultaat_id,
             leeftijdscategorie_id=leeftijdscategorie_id,
             toestel_id=toestel_id,
             locatie_id=locatie_id,
@@ -620,6 +646,12 @@ def wijzigen(reg_id):
             if not h or h.organisatie_id != org_id:
                 fouten.append('Ongeldige herkomst geselecteerd.')
 
+        resultaat_id = request.form.get('resultaat_id', 0, type=int) or None
+        if resultaat_id:
+            res = db.session.get(Resultaat, resultaat_id)
+            if not res or res.organisatie_id != org_id:
+                fouten.append('Ongeldig resultaat geselecteerd.')
+
         if not onderwerp:
             fouten.append('Onderwerp is verplicht.')
             
@@ -664,6 +696,7 @@ def wijzigen(reg_id):
         reg.herkomst_id = herkomst_id
         reg.gender_identity_id = gender_identity_id
         reg.onderwerp = onderwerp
+        reg.resultaat_id = resultaat_id
         reg.leeftijdscategorie_id = leeftijdscategorie_id
         reg.toestel_id = toestel_id
         reg.locatie_id = locatie_id

@@ -48,9 +48,9 @@
                     <!-- Beschikbare variabelen helper -->
                     {% if template.beschikbare_variabelen %}
                     <div class="mb-3 p-3 bg-light rounded border">
-                        <label class="form-label small fw-bold text-secondary mb-2 d-block">
+                        <div class="form-label small fw-bold text-secondary mb-2 d-block">
                             <i class="bi bi-code-slash me-1"></i>Klik op een variabele om deze in te voegen in het bericht:
-                        </label>
+                        </div>
                         <div class="d-flex flex-wrap gap-1">
                             {% for var in template.beschikbare_variabelen.split(',') %}
                             {% set clean_var = var.strip() %}

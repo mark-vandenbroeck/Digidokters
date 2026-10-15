@@ -69,6 +69,13 @@ def get_usage_counts(model: Type[db.Model], org_id: int) -> dict[int, int]:
             .group_by(user_functies.c.functie_id)
             .all()
         )
+    if name == 'Resultaat':
+        return dict(
+            db.session.query(Registration.resultaat_id, db.func.count(Registration.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Registration.resultaat_id)
+            .all()
+        )
     return {}
 
 

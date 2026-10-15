@@ -56,7 +56,7 @@
 
                     <!-- Nieuwe bezoeker -->
                     <div class="col-12 col-sm-6">
-                        <label class="form-label">Nieuwe bezoeker <span class="text-danger">*</span></label>
+                        <div class="form-label fw-bold">Nieuwe bezoeker <span class="text-danger">*</span></div>
                         <div class="d-flex gap-3 mt-1">
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="nieuwe_klant"
@@ -122,6 +122,22 @@
                                placeholder="Bijv. e-mail instellen, wifi-problemen…" maxlength="500" required>
                         <div class="form-text text-muted small">Beschrijf de vraag functioneel en algemeen. Voer geen medische details of gevoelige persoonsgegevens in (bijv. 'Hulp bij inloggen eHealth' in plaats van 'Hulp bij inloggen MyHealth vanwege ziekte X').</div>
                     </div>
+
+                    <!-- Resultaat van het bezoek (enkel indien er resultaten gedefinieerd zijn in de organisatie) -->
+                    {% if resultaten %}
+                    <div class="col-12 col-sm-6">
+                        <label for="resultaat_id" class="form-label">Resultaat</label>
+                        <select class="form-select" id="resultaat_id" name="resultaat_id">
+                            <option value="">— Kies een resultaat —</option>
+                            {% for r in resultaten %}
+                            <option value="{{ r.id }}"
+                                {{ 'selected' if form_data and form_data.resultaat_id == r.id|string }}>
+                                {{ r.omschrijving }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
 
                     <!-- Leeftijdscategorie -->
                     <div class="col-12 col-sm-6">

@@ -1,0 +1,8 @@
+[run]
+source = .
+omit =
+    tests/*
+    scripts/*
+    .venv/*
+    venv/*
+

@@ -30,26 +30,26 @@
                         <!-- Automatisch ingevulde velden (niet wijzigbaar) -->
                         <div class="row g-3 mb-4 p-3 bg-light rounded border border-light-subtle">
                             <div class="col-md-6">
-                                <label class="form-label small text-muted mb-1">
+                                <label for="feedback_gebruiker" class="form-label small text-muted mb-1">
                                     <i class="bi bi-person me-1"></i>Gebruiker <span class="text-muted fst-italic">(automatisch)</span>
                                 </label>
-                                <input type="text" class="form-control form-control-sm bg-white"
+                                <input type="text" id="feedback_gebruiker" class="form-control form-control-sm bg-white"
                                        value="{{ current_user.naam }} ({{ current_user.email }})" readonly disabled>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small text-muted mb-1">
+                                <label for="feedback_tijdstip" class="form-label small text-muted mb-1">
                                     <i class="bi bi-clock me-1"></i>Tijdstip <span class="text-muted fst-italic">(automatisch)</span>
                                 </label>
-                                <input type="text" class="form-control form-control-sm bg-white"
+                                <input type="text" id="feedback_tijdstip" class="form-control form-control-sm bg-white"
                                        value="{{ vandaag_str }}" readonly disabled>
                             </div>
                         </div>
 
                         <!-- Keuzemogelijkheid: Foutje? of Voorstel -->
                         <div class="mb-4">
-                            <label class="form-label fw-semibold text-dark d-block mb-2">
+                            <div class="form-label fw-semibold text-dark d-block mb-2">
                                 Type feedback <span class="text-danger">*</span>
-                            </label>
+                            </div>
                             <div class="d-flex gap-3">
                                 <div class="form-check p-0">
                                     <input type="radio" class="btn-check" name="type" id="type_voorstel" value="voorstel"

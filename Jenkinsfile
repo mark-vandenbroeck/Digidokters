@@ -6,6 +6,7 @@ pipeline {
         timestamps()
         disableConcurrentBuilds(abortPrevious: true)
         timeout(time: 45, unit: 'MINUTES')
+        durabilityHint('PERFORMANCE_OPTIMIZED')
     }
 
     environment {
@@ -43,7 +44,7 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli:latest'
-                    args '-u root:root --entrypoint= --memory=1g --memory-swap=1g --cpus=1 -e SONAR_SCANNER_OPTS=-Xmx512m'
+                    args '-u root:root --entrypoint= --memory=2g --memory-swap=1g --cpus=1 -e SONAR_SCANNER_OPTS=-Xmx512m'
                     reuseNode true
                 }
             }

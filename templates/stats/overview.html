@@ -60,9 +60,9 @@
         </button>
         <!-- Jaar filter selector -->
         <form method="GET" action="{{ url_for('stats.overzicht') }}" class="d-flex align-items-center gap-2 mb-0" id="jaarForm">
-            <label class="text-nowrap small text-muted">Jaar selecteren:</label>
+            <label for="select_stats_jaar" class="text-nowrap small text-muted">Jaar selecteren:</label>
             <input type="hidden" name="tab" id="activeTabInput" value="{{ actieve_tab }}">
-            <select class="form-select form-select-sm" name="jaar" onchange="this.form.submit()">
+            <select id="select_stats_jaar" class="form-select form-select-sm" name="jaar" onchange="this.form.submit()">
                 <option value="alle" {{ 'selected' if jaar == 'alle' }}>Alle jaren</option>
                 {% for j in jaren %}
                 <option value="{{ j }}" {{ 'selected' if j|string == jaar|string }}>{{ j }}</option>

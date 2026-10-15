@@ -390,7 +390,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="input-group input-group-sm" style="max-width: 320px;">
                             <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" class="form-control" id="excelSearchInput" placeholder="Filteren in spreadsheet..." onkeyup="filterExcelTable()">
+                            <input type="text" class="form-control" id="excelSearchInput" aria-label="Filteren in spreadsheet" placeholder="Filteren in spreadsheet..." onkeyup="filterExcelTable()">
                         </div>
                         <div class="text-muted small">
                             <i class="bi bi-info-circle me-1"></i>{{ preview.sheets[0].total_rows }} rijen &bull; {{ preview.sheets[0].total_cols }} kolommen
@@ -537,7 +537,7 @@
 </div>
 
 {% if preview.raw_text %}
-<textarea id="hiddenRawText" style="display:none;">{{ preview.raw_text }}</textarea>
+<textarea id="hiddenRawText" aria-label="Ruwe tekst document" style="display:none;">{{ preview.raw_text }}</textarea>
 {% endif %}
 
 <script>

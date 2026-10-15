@@ -49,7 +49,7 @@
 
                 <!-- Type Filter -->
                 <div class="col-6 col-md-auto">
-                    <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <select id="feedback_type_filter" name="type" aria-label="Filter op type feedback" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="alle" {% if type_filter == 'alle' %}selected{% endif %}>Alle types</option>
                         <option value="foutje" {% if type_filter == 'foutje' %}selected{% endif %}>Foutje?</option>
                         <option value="voorstel" {% if type_filter == 'voorstel' %}selected{% endif %}>Voorstel</option>
@@ -60,7 +60,7 @@
                 <div class="col-12 col-md">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" name="zoek" value="{{ zoek }}" class="form-control"
+                        <input type="text" id="feedback_zoek" name="zoek" aria-label="Zoek in feedback" value="{{ zoek }}" class="form-control"
                                placeholder="Zoek op onderwerp of beschrijving...">
                         {% if zoek %}
                         <a href="{{ url_for('feedback.lijst', status=status_filter, type=type_filter) }}" class="btn btn-outline-secondary" title="Wis zoekfilter">

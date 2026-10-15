@@ -31,7 +31,7 @@
                 <span class="input-group-text bg-light text-muted">
                     <i class="bi bi-funnel me-1 text-primary"></i>Groep:
                 </span>
-                <select class="form-select form-select-sm" name="groep_id" onchange="this.form.submit()" style="min-width: 150px;">
+                <select id="user_filter_groep_id" aria-label="Filter op groep" class="form-select form-select-sm" name="groep_id" onchange="this.form.submit()" style="min-width: 150px;">
                     <option value="">Alle groepen</option>
                     {% for g in beschikbare_groepen %}
                     <option value="{{ g.id }}" {% if g.id == groep_id %}selected{% endif %}>{{ g.naam }}</option>

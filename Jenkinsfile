@@ -44,7 +44,7 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli:latest'
-                    args '-u root:root --entrypoint= --memory=2g --memory-swap=1g --cpus=1 -e SONAR_SCANNER_OPTS=-Xmx512m'
+                    args '-u root:root --entrypoint= --memory=2g --memory-swap=2g --cpus=1 -e SONAR_SCANNER_OPTS=-Xmx512m'
                     reuseNode true
                 }
             }

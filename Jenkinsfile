@@ -4,6 +4,8 @@ pipeline {
     options {
         buildDiscarder(logRotator(numToKeepStr: '20'))
         timestamps()
+        disableConcurrentBuilds(abortPrevious: true)
+        timeout(time: 20, unit: 'MINUTES')
     }
 
     environment {
@@ -17,11 +19,11 @@ pipeline {
             }
         }
 
-        stage('Setup virtualenv') {
+        stage('Install & test') {
             agent {
                 docker {
                     image 'python:3.12.4-slim'
-                    args '-u root:root'
+                    args '-u root:root --memory=1g --memory-swap=1g --cpus=1'
                     reuseNode true
                 }
             }
@@ -31,21 +33,6 @@ pipeline {
                     . ${VENV_DIR}/bin/activate
                     pip install --upgrade pip
                     pip install -r requirements-dev.txt
-                '''
-            }
-        }
-
-        stage('Run tests') {
-            agent {
-                docker {
-                    image 'python:3.12.4-slim'
-                    args '-u root:root'
-                    reuseNode true
-                }
-            }
-            steps {
-                sh '''
-                    . ${VENV_DIR}/bin/activate
                     pytest --junitxml=results.xml --cov=. --cov-report=xml:coverage.xml
                 '''
             }
@@ -55,7 +42,7 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli:latest'
-                    args '-u root:root --entrypoint='
+                    args '-u root:root --entrypoint= --memory=1g --memory-swap=1g --cpus=1 -e SONAR_SCANNER_OPTS=-Xmx512m'
                     reuseNode true
                 }
             }

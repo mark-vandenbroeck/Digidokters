@@ -10,6 +10,7 @@ pipeline {
 
     environment {
         VENV_DIR = '.venv'
+        COVERAGE_CORE = 'sysmon'
     }
 
     stages {

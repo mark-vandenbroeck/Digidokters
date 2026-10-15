@@ -4,3 +4,5 @@ omit =
     tests/*
     scripts/*
     .venv/*
+    venv/*
+

@@ -7,6 +7,8 @@ from werkzeug.security import generate_password_hash
 
 from config import Config
 
+TEST_PASSWORD_HASH = generate_password_hash("password123", method="pbkdf2:sha256:1")
+
 class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
@@ -53,7 +55,7 @@ class BaseTestCase(unittest.TestCase):
         self.admin_user = User(
             naam="AdminMark",
             email="admin@test.com",
-            wachtwoord_hash=generate_password_hash("password123"),
+            wachtwoord_hash=TEST_PASSWORD_HASH,
             rol="beheerder",
             actief=True,
             moet_wachtwoord_wijzigen=False
@@ -64,7 +66,7 @@ class BaseTestCase(unittest.TestCase):
         self.medewerker_user = User(
             naam="UserTim",
             email="tim@test.com",
-            wachtwoord_hash=generate_password_hash("password123"),
+            wachtwoord_hash=TEST_PASSWORD_HASH,
             rol="medewerker",
             actief=True,
             moet_wachtwoord_wijzigen=False

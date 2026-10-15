@@ -9,6 +9,7 @@ from extensions import db
 from models.digidokter import Digidokter
 from models.age_category import AgeCategory
 from models.device import Device
+from models.resultaat import Resultaat
 from utils.decorators import admin_required
 from utils.import_handler import verwerk_import
 from utils.export_handler import exporteer_csv, exporteer_xlsx
@@ -86,9 +87,10 @@ def import_log(bestandsnaam):
 @login_required
 def exporteer():
     from utils.tenant import filter_op_organisatie
-    digidokters = filter_op_organisatie(Digidokter.query, Digidokter).order_by(Digidokter.naam).all()
-    leeftijdscategorieën = filter_op_organisatie(AgeCategory.query, AgeCategory).order_by(AgeCategory.naam).all()
-    toestellen = filter_op_organisatie(Device.query, Device).order_by(Device.naam).all()
+    digidokters = filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.volgorde, Digidokter.naam).all()
+    leeftijdscategorieën = filter_op_organisatie(AgeCategory.query.filter_by(actief=True), AgeCategory).order_by(AgeCategory.volgorde, AgeCategory.naam).all()
+    toestellen = filter_op_organisatie(Device.query.filter_by(actief=True), Device).order_by(Device.volgorde, Device.naam).all()
+    resultaten = filter_op_organisatie(Resultaat.query.filter_by(actief=True), Resultaat).order_by(Resultaat.volgorde, Resultaat.omschrijving).all()
 
     if request.method == 'POST':
         formaat = request.form.get('formaat', 'csv')
@@ -97,6 +99,7 @@ def exporteer():
         digidokter_id = request.form.get('digidokter_id', 0, type=int) or None
         leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', 0, type=int) or None
         toestel_id = request.form.get('toestel_id', 0, type=int) or None
+        resultaat_id = request.form.get('resultaat_id', 0, type=int) or None
 
         van_datum = None
         tot_datum = None
@@ -112,11 +115,11 @@ def exporteer():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         if formaat == 'xlsx':
-            data = exporteer_xlsx(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
+            data = exporteer_xlsx(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id, resultaat_id)
             bestandsnaam = f'digidokters_export_{timestamp}.xlsx'
             mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         else:
-            data = exporteer_csv(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id)
+            data = exporteer_csv(van_datum, tot_datum, digidokter_id, leeftijdscategorie_id, toestel_id, resultaat_id)
             bestandsnaam = f'digidokters_export_{timestamp}.csv'
             mimetype = 'text/csv'
 
@@ -133,4 +136,5 @@ def exporteer():
         digidokters=digidokters,
         leeftijdscategorieën=leeftijdscategorieën,
         toestellen=toestellen,
+        resultaten=resultaten,
     )

@@ -150,6 +150,27 @@ def seed_organisatie_defaults(org_id):
             for i, name in enumerate(['Digidokter', 'Digihelper', 'Lesgever']):
                 db.session.add(Functie(naam=name, actief=True, volgorde=i, organisatie_id=org_id))
 
+    # Resultaten van het bezoek
+    from models.resultaat import Resultaat
+    if not Resultaat.query.filter_by(organisatie_id=org_id).first():
+        active_resultaten = []
+        if source_org_id:
+            active_resultaten = Resultaat.query.filter_by(organisatie_id=source_org_id, actief=True).order_by(Resultaat.volgorde).all()
+
+        if active_resultaten:
+            for i, res in enumerate(active_resultaten):
+                db.session.add(Resultaat(omschrijving=res.omschrijving, actief=True, volgorde=i, organisatie_id=org_id))
+        else:
+            standaard_resultaten = [
+                'Vraag beantwoord',
+                'Bezoeker komt later terug',
+                'Bezoeker doorverwezen',
+                'Vraag onmogelijk te beantwoorden',
+                'Andere'
+            ]
+            for i, omschrijving in enumerate(standaard_resultaten):
+                db.session.add(Resultaat(omschrijving=omschrijving, actief=True, volgorde=i, organisatie_id=org_id))
+
     db.session.commit()
 
     # Groepen & Permissies seeden

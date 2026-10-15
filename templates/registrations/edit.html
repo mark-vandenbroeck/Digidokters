@@ -111,6 +111,19 @@
                         <div class="form-text text-muted small">Beschrijf de vraag functioneel en algemeen. Voer geen medische details of gevoelige persoonsgegevens in (bijv. 'Hulp bij inloggen eHealth' in plaats van 'Hulp bij inloggen MyHealth vanwege ziekte X').</div>
                     </div>
 
+                    <!-- Resultaat van het bezoek (enkel indien de organisatie actieve resultaten heeft gedefinieerd) -->
+                    {% if resultaten %}
+                    <div class="col-12 col-sm-6">
+                        <label for="resultaat_id" class="form-label">Resultaat</label>
+                        <select class="form-select" id="resultaat_id" name="resultaat_id">
+                            <option value="">— Kies een resultaat —</option>
+                            {% for r in resultaten %}
+                            <option value="{{ r.id }}" {{ 'selected' if r.id == reg.resultaat_id }}>{{ r.omschrijving }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
                     <div class="col-12 col-sm-6">
                         <label for="leeftijdscategorie_id" class="form-label">Leeftijdscategorie <span class="text-danger">*</span></label>
                         <select class="form-select" id="leeftijdscategorie_id" name="leeftijdscategorie_id" required>

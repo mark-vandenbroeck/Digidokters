@@ -285,6 +285,11 @@
                     <i class="bi bi-person-badge"></i>
                     <span>Functies</span>
                 </a>
+                <a href="{{ url_for('admin.resultaten') }}"
+                   class="dd-nav-link {% if request.endpoint and 'resultaat' in request.endpoint %}active{% endif %}">
+                    <i class="bi bi-clipboard2-check"></i>
+                    <span>Resultaten</span>
+                </a>
                 <a href="{{ url_for('admin.emailsjablonen') }}"
                    class="dd-nav-link {% if request.endpoint and 'emailsjabloon' in request.endpoint and 'admin.' in request.endpoint %}active{% endif %}">
                     <i class="bi bi-envelope-paper"></i>

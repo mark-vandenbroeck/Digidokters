@@ -262,6 +262,7 @@ def organisatie_verwijderen(org_id):
     from models.age_category import AgeCategory
     from models.herkomst import Herkomst
     from models.gender_identity import GenderIdentity
+    from models.resultaat import Resultaat
     from models.document import Document, Folder
     from models.evaluation import EvaluationForm, EvaluationQuestion, EvaluationResponse, EvaluationInvitation
     from models.audit import AuditLog
@@ -306,6 +307,7 @@ def organisatie_verwijderen(org_id):
     Herkomst.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
     GenderIdentity.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
     Functie.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
+    Resultaat.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)
 
     # 6. Audit Logs
     AuditLog.query.filter_by(organisatie_id=org_id).delete(synchronize_session=False)

@@ -264,6 +264,36 @@
                 </div>
             </div>
 
+            <!-- Resultaat van het bezoek -->
+            {% if heeft_resultaten or per_resultaat %}
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-check2-circle me-1 text-primary"></i>Resultaat van het bezoek</span>
+                        {% if per_resultaat %}
+                        <span class="badge bg-light text-dark border fw-normal">{{ per_resultaat|length }} opties</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if per_resultaat and totaal_resultaten > 0 %}
+                        {% for res_naam, aantal in per_resultaat %}
+                        {% set pct = (aantal / totaal_resultaten * 100)|round(1) if totaal_resultaten > 0 else 0 %}
+                        <div class="dd-progress-row">
+                            <div class="dd-progress-label">{{ res_naam }}</div>
+                            <div class="dd-progress-bar-wrap">
+                                <div class="dd-progress-fill bg-success" style="width: {{ pct }}%"></div>
+                            </div>
+                            <div class="dd-progress-count">{{ aantal }} <small class="text-muted">({{ pct }}%)</small></div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted text-center py-4 mb-0">Geen data beschikbaar voor dit jaar.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Verdeling over locaties -->
             <div class="col-12 col-md-6">
                 <div class="card h-100">

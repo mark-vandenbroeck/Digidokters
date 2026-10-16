@@ -10,7 +10,7 @@ pipeline {
     }
 
     environment {
-        VENV_DIR = '.venv'
+        VENV_DIR = '/tmp/venv'
         COVERAGE_CORE = 'sysmon'
     }
 

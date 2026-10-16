@@ -40,10 +40,14 @@ scripts/*
 !scripts/HANDLEIDING.txt
 !scripts/import_agenda.md
 !scripts/import_agenda.py
+!scripts/export_sonar_issues.py
 !scripts/migrate_gender_identity_fk.py
 !scripts/restore_productie_backup.py
 !scripts/switch_schema.py
 !scripts/sync_productie_naar_lokaal.py
+
+# Sonar issues export
+sonar_issues/
 
 # coverage / testresultaten
 .coverage

@@ -76,10 +76,10 @@ def _parse_geslacht(waarde) -> str | None:
 
 
 def _parse_date(waarde) -> date | None:
-    if isinstance(waarde, date):
-        return waarde
     if isinstance(waarde, datetime):
         return waarde.date()
+    if isinstance(waarde, date):
+        return waarde
     if pd.isna(waarde):
         return None
     # Strip eventuele tijdstempels (bijv. "13-6-2026 07:05:29" -> "13-6-2026")
@@ -183,8 +183,8 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
             resultaat['overgeslagen'] += 1
             continue
 
-        client = str(rij.get('client', '')).strip()
-        if not client:
+        client = str(rij.get('client', '') or '').strip()
+        if not client or client.lower() == 'nan':
             msg = f'Rij {rijnr}: Naam van bezoeker ontbreekt'
             logger.warning(msg)
             resultaat['fouten'].append(msg)
@@ -194,8 +194,8 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
         onderwerp = str(rij.get('onderwerp', '')).strip()
 
         # Digidokter opzoeken of aanmaken
-        dd_naam_original = str(rij.get('digidokter', '')).strip()
-        if not dd_naam_original:
+        dd_naam_original = str(rij.get('digidokter', '') or '').strip()
+        if not dd_naam_original or dd_naam_original.lower() == 'nan':
             msg = f'Rij {rijnr}: Digidokter ontbreekt'
             logger.warning(msg)
             resultaat['fouten'].append(msg)
@@ -212,8 +212,8 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
             logger.info(f'Nieuwe digidokter aangemaakt: {dd_naam_original}')
 
         # Leeftijdscategorie opzoeken of aanmaken
-        lft_naam_original = str(rij.get('leeftijdscategorie', '')).strip()
-        if not lft_naam_original:
+        lft_naam_original = str(rij.get('leeftijdscategorie', '') or '').strip()
+        if not lft_naam_original or lft_naam_original.lower() == 'nan':
             msg = f'Rij {rijnr}: Leeftijdscategorie ontbreekt'
             logger.warning(msg)
             resultaat['fouten'].append(msg)
@@ -230,8 +230,8 @@ def verwerk_import(bestand_pad: str, bestandsnaam: str, log_map: str) -> dict:
             logger.info(f'Nieuwe leeftijdscategorie aangemaakt: {lft_naam_original}')
 
         # Toestel opzoeken of aanmaken
-        tst_naam_original = str(rij.get('toestel', '')).strip()
-        if not tst_naam_original:
+        tst_naam_original = str(rij.get('toestel', '') or '').strip()
+        if not tst_naam_original or tst_naam_original.lower() == 'nan':
             msg = f'Rij {rijnr}: Toestel ontbreekt'
             logger.warning(msg)
             resultaat['fouten'].append(msg)

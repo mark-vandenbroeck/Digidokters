@@ -131,6 +131,7 @@ def create_app(config_class=Config):
 
     @app.before_request
     def check_organisatie_context():
+        ENDPOINT_SELECT_ORG = 'auth.select_org'
         if request.endpoint:
             # Exclude statics, service worker, auth endpoints and platform endpoints
             exempt_endpoints = [
@@ -139,7 +140,7 @@ def create_app(config_class=Config):
                 'ping',
                 'auth.login',
                 'auth.logout',
-                'auth.select_org',
+                ENDPOINT_SELECT_ORG,
                 'auth.switch_organisatie',
             ]
             if request.endpoint in exempt_endpoints or request.endpoint.startswith('auth.') or request.endpoint.startswith('platform.') or request.endpoint.startswith('app_docs.'):
@@ -160,12 +161,12 @@ def create_app(config_class=Config):
                         session['organisatie_naam'] = target_org.naam
                 org_id = session.get('organisatie_id')
                 if not org_id:
-                    return redirect(url_for('auth.select_org', next=request.full_path))
+                    return redirect(url_for(ENDPOINT_SELECT_ORG, next=request.full_path))
                 org = Organisatie.query.filter_by(id=org_id, actief=True).first()
                 if not org:
                     session.pop('organisatie_id', None)
                     flash('De geselecteerde organisatie is niet langer actief.', 'warning')
-                    return redirect(url_for('auth.select_org'))
+                    return redirect(url_for(ENDPOINT_SELECT_ORG))
 
                 # Beperkingen voor organisatie 'Sjabloon'
                 if org.slug == 'sjabloon':
@@ -200,14 +201,14 @@ def create_app(config_class=Config):
             else:
                 org_id = session.get('organisatie_id')
                 if not org_id:
-                    return redirect(url_for('auth.select_org', next=request.full_path))
+                    return redirect(url_for(ENDPOINT_SELECT_ORG, next=request.full_path))
                 
                 # Controleer of de gebruiker nog een actief lidmaatschap heeft (en geen Sjabloon-organisatie is)
                 membership = next((uo for uo in current_user.user_organisaties if uo.organisatie_id == org_id and uo.actief and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon'), None)
                 if not membership:
                     session.pop('organisatie_id', None)
                     flash('Uw toegang tot deze organisatie is niet geldig.', 'warning')
-                    return redirect(url_for('auth.select_org'))
+                    return redirect(url_for(ENDPOINT_SELECT_ORG))
 
     # Service worker moet op root-niveau staan (niet /static/sw.js) zodat
     # zijn scope de volledige app dekt, wat vereist is voor PWA-installatie.

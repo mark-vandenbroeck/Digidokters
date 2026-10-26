@@ -70,6 +70,8 @@
         <div class="px-3 pb-3 border-bottom border-secondary border-opacity-25">
             <form action="{{ url_for('auth.switch_organisatie') }}" method="POST" class="m-0">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="current_endpoint" value="{{ request.endpoint or '' }}">
+                <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-dark text-white border-secondary"><i class="bi bi-building"></i></span>
                     <select id="switch_organisatie_id" name="organisatie_id" aria-label="Organisatie selecteren" onchange="this.form.submit()" class="form-select form-select-sm bg-dark text-white border-secondary">

@@ -2,7 +2,7 @@
 import re
 from datetime import datetime, timezone
 from urllib.parse import urlparse
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db, limiter
@@ -239,10 +239,240 @@ def select_org():
     return render_template('auth/select_org.html', memberships=memberships)
 
 
+
+MENU_ENDPOINT_MAP = {
+    # Platformbeheer
+    'platform.dashboard': 'platform.dashboard',
+    'platform.organisaties': 'platform.organisaties',
+    'platform.organisatie_nieuw': 'platform.organisaties',
+    'platform.organisatie_wijzigen': 'platform.organisaties',
+    'platform.organisatie_toggle': 'platform.organisaties',
+    'platform.organisatie_verwijderen': 'platform.organisaties',
+    'platform.koppelingen': 'platform.koppelingen',
+    'platform.koppeling_toggle': 'platform.koppelingen',
+    'platform.koppeling_verwijderen': 'platform.koppelingen',
+    'platform.emailsjablonen': 'platform.emailsjablonen',
+    'platform.emailsjablonen_wijzigen': 'platform.emailsjablonen',
+    'platform.emailsjablonen_herstellen': 'platform.emailsjablonen',
+    'platform.communicatie': 'platform.communicatie',
+    'platform.communicatie_log_detail': 'platform.communicatie',
+    'platform.vraagcategorieen': 'platform.vraagcategorieen',
+    'platform.vraagcategorie_nieuw': 'platform.vraagcategorieen',
+    'platform.vraagcategorie_wijzigen': 'platform.vraagcategorieen',
+    'platform.vraagcategorie_toggle': 'platform.vraagcategorieen',
+    'platform.vraagcategorie_volgorde': 'platform.vraagcategorieen',
+    'platform.vraagcategorie_verwijderen': 'platform.vraagcategorieen',
+    'platform.vraagclassificaties': 'platform.vraagclassificaties',
+    'platform.vraagclassificatie_wijzigen': 'platform.vraagclassificaties',
+    'platform.vraagclassificatie_heranalyse': 'platform.vraagclassificaties',
+    'platform.vraagclassificaties_batch_analyse': 'platform.vraagclassificaties',
+    'platform.vraagclassificaties_batch_status': 'platform.vraagclassificaties',
+    'admin.audit_log': 'admin.audit_log',
+    'admin.audit_log_opschonen': 'admin.audit_log',
+
+    # Registraties
+    'reg.lijst': 'reg.lijst',
+    'reg.index': 'reg.lijst',
+    'reg.bekijken': 'reg.lijst',
+    'reg.wijzigen': 'reg.lijst',
+    'reg.verwijderen': 'reg.lijst',
+    'reg.nieuw': 'reg.lijst',
+    'reg.snel': 'reg.snel',
+    'agenda.lijst': 'agenda.lijst',
+    'agenda.nieuw': 'agenda.lijst',
+    'agenda.wijzigen': 'agenda.lijst',
+    'agenda.verwijderen': 'agenda.lijst',
+    'eval.resultaten': 'eval.resultaten',
+    'eval.sessie_detail': 'eval.resultaten',
+    'eval.reactie_bewerken': 'eval.resultaten',
+    'eval.verstuur_uitnodigingen': 'eval.resultaten',
+    'eval.verstuur_herinneringen': 'eval.resultaten',
+
+    # Documentbeheer
+    'doc.index': 'doc.index',
+    'doc.bekijken': 'doc.index',
+    'doc.bewerken': 'doc.index',
+    'doc.download': 'doc.index',
+    'doc.map_hernoemen': 'doc.index',
+    'doc.map_toevoegen': 'doc.index',
+    'doc.map_verwijderen': 'doc.index',
+    'doc.overschrijven': 'doc.index',
+    'doc.upload': 'doc.index',
+    'doc.verwijderen': 'doc.index',
+
+    # Beheer
+    'admin.gebruikers': 'admin.gebruikers',
+    'admin.gebruiker_nieuw': 'admin.gebruikers',
+    'admin.gebruiker_wijzigen': 'admin.gebruikers',
+    'admin.gebruiker_toggle': 'admin.gebruikers',
+    'admin.gebruiker_verwijderen': 'admin.gebruikers',
+    'admin.groepen_overzicht': 'admin.groepen_overzicht',
+    'admin.groep_nieuw': 'admin.groepen_overzicht',
+    'admin.groep_bewerken': 'admin.groepen_overzicht',
+    'admin.groep_toggle': 'admin.groepen_overzicht',
+    'admin.groep_verwijderen': 'admin.groepen_overzicht',
+    'admin.digidokters': 'admin.digidokters',
+    'admin.digidokter_nieuw': 'admin.digidokters',
+    'admin.digidokter_wijzigen': 'admin.digidokters',
+    'admin.digidokter_toggle': 'admin.digidokters',
+    'admin.digidokter_volgorde': 'admin.digidokters',
+    'admin.digidokter_verwijderen': 'admin.digidokters',
+    'admin.communicatie': 'admin.communicatie',
+    'admin.activiteitstypes': 'admin.activiteitstypes',
+    'admin.activiteitstype_nieuw': 'admin.activiteitstypes',
+    'admin.activiteitstype_wijzigen': 'admin.activiteitstypes',
+    'admin.activiteitstype_toggle': 'admin.activiteitstypes',
+    'admin.activiteitstype_volgorde': 'admin.activiteitstypes',
+    'admin.activiteitstype_verwijderen': 'admin.activiteitstypes',
+    'eval.overzicht': 'eval.overzicht',
+    'eval.formulier_bewerken': 'eval.overzicht',
+    'eval.vraag_bewerken': 'eval.overzicht',
+    'eval.vraag_toevoegen': 'eval.overzicht',
+    'eval.vraag_verwijderen': 'eval.overzicht',
+    'eval.vraag_volgorde': 'eval.overzicht',
+    'admin.locaties': 'admin.locaties',
+    'admin.locatie_nieuw': 'admin.locaties',
+    'admin.locatie_wijzigen': 'admin.locaties',
+    'admin.locatie_toggle': 'admin.locaties',
+    'admin.locatie_volgorde': 'admin.locaties',
+    'admin.locatie_verwijderen': 'admin.locaties',
+    'admin.leeftijdscategorieën': 'admin.leeftijdscategorieën',
+    'admin.leeftijdscategorie_nieuw': 'admin.leeftijdscategorieën',
+    'admin.leeftijdscategorie_wijzigen': 'admin.leeftijdscategorieën',
+    'admin.leeftijdscategorie_toggle': 'admin.leeftijdscategorieën',
+    'admin.leeftijdscategorie_volgorde': 'admin.leeftijdscategorieën',
+    'admin.leeftijdscategorie_verwijderen': 'admin.leeftijdscategorieën',
+    'admin.toestellen': 'admin.toestellen',
+    'admin.toestel_nieuw': 'admin.toestellen',
+    'admin.toestel_wijzigen': 'admin.toestellen',
+    'admin.toestel_toggle': 'admin.toestellen',
+    'admin.toestel_volgorde': 'admin.toestellen',
+    'admin.toestel_verwijderen': 'admin.toestellen',
+    'admin.herkomsten': 'admin.herkomsten',
+    'admin.herkomst_nieuw': 'admin.herkomsten',
+    'admin.herkomst_wijzigen': 'admin.herkomsten',
+    'admin.herkomst_toggle': 'admin.herkomsten',
+    'admin.herkomst_volgorde': 'admin.herkomsten',
+    'admin.herkomst_verwijderen': 'admin.herkomsten',
+    'admin.genderidentiteiten': 'admin.genderidentiteiten',
+    'admin.genderidentiteit_nieuw': 'admin.genderidentiteiten',
+    'admin.genderidentiteit_wijzigen': 'admin.genderidentiteiten',
+    'admin.genderidentiteit_toggle': 'admin.genderidentiteiten',
+    'admin.genderidentiteit_volgorde': 'admin.genderidentiteiten',
+    'admin.genderidentiteit_verwijderen': 'admin.genderidentiteiten',
+    'admin.functies': 'admin.functies',
+    'admin.functie_nieuw': 'admin.functies',
+    'admin.functie_wijzigen': 'admin.functies',
+    'admin.functie_toggle': 'admin.functies',
+    'admin.functie_volgorde': 'admin.functies',
+    'admin.functie_verwijderen': 'admin.functies',
+    'admin.resultaten': 'admin.resultaten',
+    'admin.resultaat_nieuw': 'admin.resultaten',
+    'admin.resultaat_wijzigen': 'admin.resultaten',
+    'admin.resultaat_toggle': 'admin.resultaten',
+    'admin.resultaat_volgorde': 'admin.resultaten',
+    'admin.resultaat_verwijderen': 'admin.resultaten',
+    'admin.emailsjablonen': 'admin.emailsjablonen',
+    'admin.emailsjablonen_wijzigen': 'admin.emailsjablonen',
+    'admin.emailsjablonen_herstellen': 'admin.emailsjablonen',
+    'admin.backup': 'admin.backup',
+    'admin.restore': 'admin.restore',
+
+    # Data
+    'ie.exporteer': 'ie.exporteer',
+    'ie.importeer': 'ie.exporteer',
+    'ie.import_log': 'ie.exporteer',
+    'stats.overzicht': 'stats.overzicht',
+
+    # Algemeen
+    'app_docs.index': 'app_docs.index',
+    'app_docs.bekijken': 'app_docs.index',
+    'app_docs.bewerken': 'app_docs.index',
+    'app_docs.download': 'app_docs.index',
+    'app_docs.map_hernoemen': 'app_docs.index',
+    'app_docs.map_toevoegen': 'app_docs.index',
+    'app_docs.map_verwijderen': 'app_docs.index',
+    'app_docs.overschrijven': 'app_docs.index',
+    'app_docs.upload': 'app_docs.index',
+    'app_docs.verwijderen': 'app_docs.index',
+    'feedback.formulier': 'feedback.formulier',
+    'feedback.nieuw': 'feedback.formulier',
+    'feedback.lijst': 'feedback.lijst',
+    'feedback.detail': 'feedback.lijst',
+}
+
+
+def _is_allowed_in_sjabloon(endpoint: str) -> bool:
+    """Controleer of een endpoint is toegestaan binnen de sjabloon-organisatie."""
+    allowed_sjabloon_prefixes = (
+        'static', 'service_worker', 'ping', 'auth.', 'platform.', 'app_docs.', 'feedback.'
+    )
+    allowed_sjabloon_endpoints = (
+        'admin.leeftijdscategorieën', 'admin.toestellen', 'admin.activiteitstypes',
+        'admin.locaties', 'admin.herkomsten', 'admin.genderidentiteiten',
+        'admin.functies', 'admin.groepen_overzicht', 'eval.overzicht'
+    )
+    return any(endpoint.startswith(p) for p in allowed_sjabloon_prefixes) or (endpoint in allowed_sjabloon_endpoints)
+
+
+def _bepaal_switch_redirect_url(target_org, current_endpoint: str | None = None, next_url: str | None = None) -> str:
+    """Bepaal de juiste redirect-URL bij het wisselen van organisatie, waarbij de menukeuze behouden blijft."""
+    # Als next_url niet expliciet meegegeven is, probeer request.referrer
+    if not next_url and request.referrer:
+        parsed_ref = urlparse(request.referrer)
+        if parsed_ref.netloc == request.host or not parsed_ref.netloc:
+            ref_path = parsed_ref.path
+            if parsed_ref.query:
+                ref_path += f"?{parsed_ref.query}"
+            if _is_veilige_redirect(ref_path):
+                next_url = ref_path
+
+    # Probeer endpoint te achterhalen uit next_url indien niet expliciet meegegeven
+    if not current_endpoint and next_url and _is_veilige_redirect(next_url):
+        try:
+            adapter = current_app.url_map.bind('localhost')
+            matched_endpoint, _ = adapter.match(urlparse(next_url).path, method='GET')
+            current_endpoint = matched_endpoint
+        except Exception:
+            pass
+
+    # Negeer auth endpoints
+    if current_endpoint in ('auth.switch_organisatie', 'auth.login', 'auth.logout', 'auth.select_org'):
+        current_endpoint = None
+        next_url = None
+
+    target_menu_endpoint = MENU_ENDPOINT_MAP.get(current_endpoint) if current_endpoint else None
+
+    is_sjabloon = bool(target_org and getattr(target_org, 'slug', None) == 'sjabloon')
+
+    if is_sjabloon:
+        if target_menu_endpoint and _is_allowed_in_sjabloon(target_menu_endpoint):
+            if current_endpoint == target_menu_endpoint and next_url and _is_veilige_redirect(next_url):
+                return next_url
+            try:
+                return url_for(target_menu_endpoint)
+            except Exception:
+                pass
+        return url_for('admin.leeftijdscategorieën')
+
+    # Reguliere organisatie
+    if target_menu_endpoint:
+        if current_endpoint == target_menu_endpoint and next_url and _is_veilige_redirect(next_url):
+            return next_url
+        try:
+            return url_for(target_menu_endpoint)
+        except Exception:
+            pass
+
+    return url_for('reg.lijst')
+
+
 @auth_bp.route('/switch-organisatie', methods=['POST'])
 @login_required
 def switch_organisatie():
     org_id = request.form.get('organisatie_id', type=int)
+    current_endpoint = request.form.get('current_endpoint')
+    next_url = request.form.get('next')
     target_org = None
     if current_user.rol == 'platformbeheerder':
         from models.organisatie import Organisatie
@@ -266,9 +496,7 @@ def switch_organisatie():
         else:
             flash('U heeft geen toegang tot deze organisatie.', 'danger')
         
-    if target_org and target_org.slug == 'sjabloon':
-        return redirect(url_for('admin.leeftijdscategorieën'))
-    return redirect(url_for('reg.lijst'))
+    return redirect(_bepaal_switch_redirect_url(target_org, current_endpoint=current_endpoint, next_url=next_url))
 
 
 @auth_bp.route('/wachtwoord-vergeten', methods=['GET', 'POST'])

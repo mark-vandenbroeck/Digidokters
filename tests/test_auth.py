@@ -205,3 +205,121 @@ class TestAuth(BaseTestCase):
         self.assertEqual(res_main.status_code, 200)
         html_main = res_main.get_data(as_text=True)
         self.assertIn("Beheerders", html_main)
+
+    def test_switch_organisatie_retains_current_menu_choice(self):
+        from extensions import db
+        from models.organisatie import Organisatie
+        from tests.base import TEST_PASSWORD_HASH
+
+        # Create a second organization and platform admin
+        org2 = Organisatie(naam="Tweede Org", slug="tweede-org", actief=True)
+        platform_user = User(
+            naam="PBMark",
+            email="pb@test.com",
+            wachtwoord_hash=TEST_PASSWORD_HASH,
+            rol="platformbeheerder",
+            actief=True
+        )
+        db.session.add_all([org2, platform_user])
+        db.session.commit()
+
+        self.login("pb@test.com", "password123")
+
+        # 1. On Statistieken -> switches org -> stays on Statistieken
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': org2.id,
+            'current_endpoint': 'stats.overzicht',
+            'next': '/statistieken?jaar=2024'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/statistieken?jaar=2024')
+
+        # 2. On Agenda -> switches org -> stays on Agenda
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': self.org.id,
+            'current_endpoint': 'agenda.lijst',
+            'next': '/agenda'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/agenda')
+
+        # 3. On Platform Dashboard -> switches org -> stays on Platform Dashboard
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': org2.id,
+            'current_endpoint': 'platform.dashboard',
+            'next': '/platform/dashboard'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/platform/dashboard')
+
+        # 4. On Locaties -> switches org -> stays on Locaties
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': self.org.id,
+            'current_endpoint': 'admin.locaties',
+            'next': '/beheer/locaties'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/beheer/locaties')
+
+        # 5. On an edit page (e.g. reg.wijzigen) -> switches org -> safely redirects to reg.lijst overview
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': org2.id,
+            'current_endpoint': 'reg.wijzigen',
+            'next': '/registraties/42/wijzig'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/registraties')
+
+        # 6. On an admin sub-page (e.g. admin.locatie_wijzigen) -> safely redirects to admin.locaties overview
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': self.org.id,
+            'current_endpoint': 'admin.locatie_wijzigen',
+            'next': '/beheer/locaties/3/wijzigen'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/beheer/locaties')
+
+        # 7. With Referer header only (no form hidden inputs) -> infers and stays on menu choice
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': org2.id,
+        }, headers={'Referer': 'http://localhost/statistieken'}, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/statistieken')
+
+        # 8. Switch to Sjabloon from stats.overzicht -> redirected to admin.leeftijdscategorieën
+        sjabloon = Organisatie(naam="Sjabloon", slug="sjabloon", actief=True)
+        db.session.add(sjabloon)
+        db.session.commit()
+
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': sjabloon.id,
+            'current_endpoint': 'stats.overzicht',
+            'next': '/statistieken'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/beheer/leeftijdscategorie%C3%ABn')
+
+        # 9. Switch to Sjabloon from an allowed page (e.g. admin.toestellen) -> stays on admin.toestellen
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': sjabloon.id,
+            'current_endpoint': 'admin.toestellen',
+            'next': '/beheer/toestellen'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/beheer/toestellen')
+
+        # 10. Switch away from Sjabloon to regular org -> retains menu choice (e.g. admin.toestellen)
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': org2.id,
+            'current_endpoint': 'admin.toestellen',
+            'next': '/beheer/toestellen'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/beheer/toestellen')
+
+        # 11. Without any context or referrer -> falls back to reg.lijst
+        res = self.client.post('/switch-organisatie', data={
+            'organisatie_id': self.org.id,
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers['Location'], '/registraties')

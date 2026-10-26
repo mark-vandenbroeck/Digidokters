@@ -17,10 +17,10 @@ def serialize_val(val):
 
 def should_audit(obj):
     """Bepaalt of we de wijzigingen op dit model moeten loggen."""
-    # Sla AuditLog zelf en eventuele systeemtabellen over
-    if obj.__class__.__name__ == 'AuditLog':
+    # Sla AuditLog zelf en eventuele systeem- en telemetrietabellen over
+    if obj.__class__.__name__ in ('AuditLog', 'PageViewStat', 'SystemErrorLog'):
         return False
-    if obj.__tablename__.startswith('limiter_') or obj.__tablename__ == 'audit_logs':
+    if obj.__tablename__.startswith('limiter_') or obj.__tablename__ in ('audit_logs', 'page_view_stats', 'system_error_logs'):
         return False
     return True
 
@@ -47,6 +47,8 @@ def register_audit_listeners(db):
         
         nieuwe_waarden = {}
         for attr in mapper.column_attrs:
+            if attr.key == 'laatste_activiteit' and target.__class__.__name__ == 'User':
+                continue
             val = getattr(target, attr.key)
             if attr.key == 'inhoud' and target.__class__.__name__ == 'Document':
                 nieuwe_waarden[attr.key] = '<binaire inhoud>'
@@ -77,6 +79,8 @@ def register_audit_listeners(db):
         
         for attr in mapper.column_attrs:
             field = attr.key
+            if field == 'laatste_activiteit' and target.__class__.__name__ == 'User':
+                continue
             history = state.attrs[field].history
             if history.has_changes():
                 old_val = history.deleted[0] if history.deleted else None

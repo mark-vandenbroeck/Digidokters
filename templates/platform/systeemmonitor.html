@@ -1,0 +1,1071 @@
+{% extends 'base.html' %}
+{% block title %}Systeemmonitor – Digidokters{% endblock %}
+
+{% block extra_css %}
+<style>
+.monitor-status-pulse {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7);
+    animation: pulse-green 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+.monitor-status-pulse-orange {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    animation: pulse-orange 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+@keyframes pulse-green {
+    to {
+        box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+    }
+}
+@keyframes pulse-orange {
+    to {
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+}
+.nav-pills-monitor .nav-link {
+    color: #495057;
+    font-weight: 500;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    transition: all 0.2s ease-in-out;
+}
+.nav-pills-monitor .nav-link:hover {
+    background-color: #f1f3f5;
+    color: #0d6efd;
+}
+.nav-pills-monitor .nav-link.active {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(13, 110, 253, 0.25);
+}
+.health-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid rgba(0,0,0,0.06);
+}
+.health-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08) !important;
+}
+.status-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.35rem 0.65rem;
+    border-radius: 20px;
+}
+.avatar-circle-sm {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="dd-page-title mb-0">
+            <i class="bi bi-activity me-2 text-primary"></i>Systeemmonitor
+        </h1>
+        <p class="dd-page-subtitle mb-0">
+            Realtime platformgezondheid, live sessies, paginabezoeken en foutdiagnose
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-secondary border px-3 py-2 small">
+            <i class="bi bi-clock me-1"></i>{{ now_utc.strftime('%H:%M:%S') }} UTC
+        </span>
+        <a href="{{ request.full_path }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-arrow-clockwise me-1"></i>Vernieuwen
+        </a>
+    </div>
+</div>
+
+<!-- Tabs Navigation -->
+<ul class="nav nav-pills nav-pills-monitor bg-white p-2 rounded-3 shadow-sm border mb-4">
+    <li class="nav-item">
+        <a class="nav-link {% if actieve_tab == 'gezondheid' %}active{% endif %}"
+           href="{{ url_for('platform.systeemmonitor', tab='gezondheid') }}">
+            <i class="bi bi-heart-pulse me-1"></i>Systeemgezondheid
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if actieve_tab == 'live' %}active{% endif %}"
+           href="{{ url_for('platform.systeemmonitor', tab='live') }}">
+            <i class="bi bi-person-check-fill me-1"></i>Live Gebruikers
+            {% if actief_nu_count is defined and actief_nu_count > 0 %}
+            <span class="badge rounded-pill bg-success ms-1">{{ actief_nu_count }}</span>
+            {% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if actieve_tab == 'gebruik' %}active{% endif %}"
+           href="{{ url_for('platform.systeemmonitor', tab='gebruik') }}">
+            <i class="bi bi-bar-chart-line-fill me-1"></i>Paginagebruik & Telemetrie
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if actieve_tab == 'fouten' %}active{% endif %}"
+           href="{{ url_for('platform.systeemmonitor', tab='fouten') }}">
+            <i class="bi bi-shield-exclamation me-1"></i>Fouten & Beveiliging
+            {% if onopgelost_count is defined and onopgelost_count > 0 %}
+            <span class="badge rounded-pill bg-danger ms-1">{{ onopgelost_count }}</span>
+            {% endif %}
+        </a>
+    </li>
+</ul>
+
+<!-- ========================================== -->
+<!-- TAB 1: SYSTEEMGEZONDHEID                   -->
+<!-- ========================================== -->
+{% if actieve_tab == 'gezondheid' %}
+<div class="row g-4 mb-4">
+    <!-- Overall Health Banner -->
+    <div class="col-12">
+        {% if health.overall_status == 'healthy' %}
+        <div class="alert alert-success d-flex align-items-center justify-content-between p-3 rounded-3 shadow-sm border-0 mb-0">
+            <div class="d-flex align-items-center gap-3">
+                <div class="fs-2 text-success"><i class="bi bi-check-circle-fill"></i></div>
+                <div>
+                    <h5 class="alert-heading mb-0 fw-bold">Alle kernsystemen operationeel</h5>
+                    <p class="mb-0 small text-success-emphasis">Database, e-mailservice, opslag en beveiligingsmechanismen functioneren naar behoren.</p>
+                </div>
+            </div>
+            <span class="badge bg-success px-3 py-2 fs-6">Gezond</span>
+        </div>
+        {% elif health.overall_status == 'warning' %}
+        <div class="alert alert-warning d-flex align-items-center justify-content-between p-3 rounded-3 shadow-sm border-0 mb-0">
+            <div class="d-flex align-items-center gap-3">
+                <div class="fs-2 text-warning"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <div>
+                    <h5 class="alert-heading mb-0 fw-bold">Aandachtspunten gedetecteerd</h5>
+                    <p class="mb-0 small text-warning-emphasis">Eén of meerdere subsystemen vertonen vertraging of vereisen configuratie.</p>
+                </div>
+            </div>
+            <span class="badge bg-warning text-dark px-3 py-2 fs-6">Waarschuwing</span>
+        </div>
+        {% else %}
+        <div class="alert alert-danger d-flex align-items-center justify-content-between p-3 rounded-3 shadow-sm border-0 mb-0">
+            <div class="d-flex align-items-center gap-3">
+                <div class="fs-2 text-danger"><i class="bi bi-x-octagon-fill"></i></div>
+                <div>
+                    <h5 class="alert-heading mb-0 fw-bold">Kritieke storing vastgesteld</h5>
+                    <p class="mb-0 small text-danger-emphasis">Een essentieel subsysteem is onbereikbaar of rapporteert fouten.</p>
+                </div>
+            </div>
+            <span class="badge bg-danger px-3 py-2 fs-6">Kritiek</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 1. Database Card -->
+    <div class="col-12 col-lg-6 col-xl-4">
+        <div class="card health-card shadow-sm h-100 rounded-3">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="dd-stat-icon bg-blue-soft text-blue" style="width: 36px; height: 36px; font-size: 1.1rem;">
+                        <i class="bi bi-database"></i>
+                    </div>
+                    <span class="fw-bold">Database</span>
+                </div>
+                {% if health.database.status == 'ok' %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle status-pill">Actief</span>
+                {% else %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle status-pill">Fout</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Type & Engine:</span>
+                    <span class="fw-semibold small">{{ health.database.db_type }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Database naam:</span>
+                    <span class="font-monospace small">{{ health.database.db_name or 'N.v.t.' }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Latentie (ping):</span>
+                    <span class="badge {% if health.database.latency_ms < 15 %}bg-success-subtle text-success{% elif health.database.latency_ms < 100 %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %}">
+                        {{ health.database.latency_ms }} ms
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Totale omvang:</span>
+                    <span class="fw-semibold small">{{ health.database.size_human }}</span>
+                </div>
+                <div class="mt-3">
+                    <div class="text-muted small mb-2 fw-semibold">Geregistreerde records:</div>
+                    <div class="row g-2 text-center">
+                        <div class="col-4">
+                            <div class="bg-light p-2 rounded">
+                                <div class="fw-bold fs-6">{{ health.database.counts.registraties or 0 }}</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.7rem;">Consultaties</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="bg-light p-2 rounded">
+                                <div class="fw-bold fs-6">{{ health.database.counts.gebruikers or 0 }}</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.7rem;">Gebruikers</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="bg-light p-2 rounded">
+                                <div class="fw-bold fs-6">{{ health.database.counts.organisaties or 0 }}</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.7rem;">Gemeenten</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Mail & SMTP Card -->
+    <div class="col-12 col-lg-6 col-xl-4">
+        <div class="card health-card shadow-sm h-100 rounded-3">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="dd-stat-icon bg-purple-soft text-purple" style="width: 36px; height: 36px; font-size: 1.1rem;">
+                        <i class="bi bi-envelope"></i>
+                    </div>
+                    <span class="fw-bold">E-mail (SMTP)</span>
+                </div>
+                {% if health.email.status == 'ok' %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle status-pill">Verbonden</span>
+                {% elif health.email.status == 'disabled' %}
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle status-pill">Uitgeschakeld</span>
+                {% else %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle status-pill">Niet bereikbaar</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">SMTP Host:</span>
+                    <span class="font-monospace small">{{ health.email.smtp_host or 'Niet geconfigureerd' }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Poort & Beveiliging:</span>
+                    <span class="small">
+                        {{ health.email.smtp_port or '-' }}
+                        {% if health.email.tls %}<span class="badge bg-light text-dark border">TLS</span>{% endif %}
+                        {% if health.email.ssl %}<span class="badge bg-light text-dark border">SSL</span>{% endif %}
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Standaard afzender:</span>
+                    <span class="font-monospace small text-truncate" style="max-width: 170px;">
+                        {{ health.email.default_sender or 'Geen' }}
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Aantal verzonden mails:</span>
+                    <span class="fw-semibold small">{{ health.email.total_sent_logs }}</span>
+                </div>
+                {% if health.email.error %}
+                <div class="alert alert-warning p-2 small mt-2 mb-0">
+                    <i class="bi bi-exclamation-circle me-1"></i>{{ health.email.error }}
+                </div>
+                {% else %}
+                <div class="mt-3">
+                    <a href="{{ url_for('platform.communicatie') }}" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="bi bi-send me-1"></i>Berichtenarchief & Communicatie
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. AI Classificatieservice Card -->
+    <div class="col-12 col-lg-6 col-xl-4">
+        <div class="card health-card shadow-sm h-100 rounded-3">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="dd-stat-icon bg-teal-soft text-teal" style="width: 36px; height: 36px; font-size: 1.1rem;">
+                        <i class="bi bi-stars"></i>
+                    </div>
+                    <span class="fw-bold">AI Classificatie</span>
+                </div>
+                {% if health.ai.status == 'ok' %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle status-pill">Geconfigureerd</span>
+                {% elif health.ai.status == 'mock' %}
+                <span class="badge bg-info-subtle text-info border border-info-subtle status-pill">Ontwikkelmodus</span>
+                {% else %}
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle status-pill">Geen sleutel</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Provider:</span>
+                    <span class="fw-semibold small">{{ health.ai.provider }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Actief model:</span>
+                    <span class="font-monospace small">{{ health.ai.model }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">API Sleutel aanwezig:</span>
+                    <span class="small">
+                        {% if health.ai.has_api_key %}
+                        <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Ingesteld</span>
+                        {% else %}
+                        <span class="text-muted"><i class="bi bi-x-circle me-1"></i>Niet ingesteld</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Geclassificeerde vragen:</span>
+                    <span class="fw-semibold small">{{ health.ai.classified_count }}</span>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ url_for('platform.vraagclassificaties') }}" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="bi bi-stars me-1"></i>Vraagclassificaties beheren
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Storage & Schijfruimte Card -->
+    <div class="col-12 col-lg-6 col-xl-4">
+        <div class="card health-card shadow-sm h-100 rounded-3">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="dd-stat-icon bg-orange-soft text-orange" style="width: 36px; height: 36px; font-size: 1.1rem;">
+                        <i class="bi bi-hdd-network"></i>
+                    </div>
+                    <span class="fw-bold">Opslag & Schijfruimte</span>
+                </div>
+                {% if health.storage.status == 'ok' %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle status-pill">Voldoende vrij</span>
+                {% elif health.storage.status == 'warning' %}
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle status-pill">&gt;85% bezet</span>
+                {% else %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle status-pill">Kritiek</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between text-muted small mb-1">
+                        <span>Schijfbezetting:</span>
+                        <span class="fw-bold text-dark">{{ health.storage.used_percent }}%</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar {% if health.storage.used_percent > 90 %}bg-danger{% elif health.storage.used_percent > 75 %}bg-warning{% else %}bg-primary{% endif %}"
+                             role="progressbar"
+                             style="width: {{ health.storage.used_percent }}%;"
+                             aria-valuenow="{{ health.storage.used_percent }}"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Beschikbaar vrij:</span>
+                    <span class="fw-semibold small text-success">{{ health.storage.free_human }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">In gebruik / Totaal:</span>
+                    <span class="small">{{ health.storage.used_human }} / {{ health.storage.total_human }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Totaal documenten:</span>
+                    <span class="fw-semibold small">{{ health.storage.total_documents }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2">
+                    <span class="text-muted small">Opslagmap:</span>
+                    <span class="font-monospace small text-truncate" style="max-width: 170px;">{{ health.storage.upload_folder }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Beveiliging & Rate Limiting Card -->
+    <div class="col-12 col-lg-6 col-xl-4">
+        <div class="card health-card shadow-sm h-100 rounded-3">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="dd-stat-icon bg-red-soft text-red" style="width: 36px; height: 36px; font-size: 1.1rem;">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <span class="fw-bold">Beveiliging & Limiter</span>
+                </div>
+                <span class="badge bg-success-subtle text-success border border-success-subtle status-pill">Beveiligd</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Rate Limiter opslag:</span>
+                    <span class="font-monospace small">{{ health.security.rate_limiter_storage }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">HTTPS Actief:</span>
+                    <span class="small">
+                        {% if health.security.https_active %}
+                        <span class="text-success"><i class="bi bi-lock-fill me-1"></i>Ja (SSL/TLS)</span>
+                        {% else %}
+                        <span class="text-muted"><i class="bi bi-unlock me-1"></i>HTTP (Lokaal / Proxy)</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">HSTS & CSP Headers:</span>
+                    <span class="badge bg-success-subtle text-success">Actief</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">CSRF Bescherming:</span>
+                    <span class="badge bg-success-subtle text-success">Actief</span>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ url_for('admin.audit_log') }}" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="bi bi-shield-shaded me-1"></i>Audit Logs inzien
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Systeeminformatie Card -->
+    <div class="col-12 col-lg-6 col-xl-4">
+        <div class="card health-card shadow-sm h-100 rounded-3">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="dd-stat-icon bg-blue-soft text-blue" style="width: 36px; height: 36px; font-size: 1.1rem;">
+                        <i class="bi bi-cpu"></i>
+                    </div>
+                    <span class="fw-bold">Systeeminformatie</span>
+                </div>
+                <span class="badge bg-light text-secondary border status-pill">Uptime {{ health.system.uptime_human }}</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Python versie:</span>
+                    <span class="font-monospace small">{{ health.system.python_version }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Flask & Werkzeug:</span>
+                    <span class="font-monospace small">v{{ health.system.flask_version }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Besturingssysteem:</span>
+                    <span class="small">{{ health.system.os }} ({{ health.system.architecture }})</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted small">Geheugengebruik (RAM):</span>
+                    <span class="fw-semibold small">{{ health.system.memory_usage_human }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2">
+                    <span class="text-muted small">Hostnaam:</span>
+                    <span class="font-monospace small text-truncate" style="max-width: 170px;">{{ health.system.hostname }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ========================================== -->
+<!-- TAB 2: LIVE & ACTIEVE GEBRUIKERS           -->
+<!-- ========================================== -->
+{% if actieve_tab == 'live' %}
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-green-soft text-green">
+                <i class="bi bi-person-check-fill"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value text-success d-flex align-items-center gap-2">
+                    {{ actief_nu_count }}
+                    <span class="monitor-status-pulse"></span>
+                </div>
+                <div class="dd-stat-label">Actief Nu (&lt; 15 min)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-blue-soft text-blue">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ actief_vandaag_count }}</div>
+                <div class="dd-stat-label">Actieve Gebruikers Vandaag</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-purple-soft text-purple">
+                <i class="bi bi-building"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ actieve_gemeenten_telling }}</div>
+                <div class="dd-stat-label">Actieve Gemeenten Vandaag</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-teal-soft text-teal">
+                <i class="bi bi-person-badge"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ totaal_actieve_accounts }} <span class="fs-6 text-muted fw-normal">/ {{ totaal_users }}</span></div>
+                <div class="dd-stat-label">Totaal Actieve Accounts</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Live Active Sessions Table -->
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm border-0 rounded-3">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="monitor-status-pulse"></span>
+                    <h6 class="mb-0 fw-bold">Live Sessies (Laatste 15 minuten actief)</h6>
+                </div>
+                <span class="badge bg-light text-dark border">{{ actieve_gebruikers|length }} online</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Gebruiker</th>
+                            <th>Rol</th>
+                            <th>Gemeente(n)</th>
+                            <th>Laatste activiteit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in actieve_gebruikers %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="avatar-circle-sm bg-primary-subtle text-primary">
+                                        {{ u.naam[:2].upper() }}
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold text-dark">{{ u.naam }}</div>
+                                        <div class="text-muted small">{{ u.email or 'Geen e-mail' }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if u.rol == 'platformbeheerder' %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Platformbeheerder</span>
+                                {% elif u.rol == 'beheerder' %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Beheerder</span>
+                                {% elif u.rol == 'vrijwilliger' %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">Digidokter</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ u.rol|capitalize }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.rol == 'platformbeheerder' %}
+                                <span class="text-muted fst-italic small">Alle organisaties</span>
+                                {% else %}
+                                {% for uo in u.user_organisaties if uo.actief and uo.organisatie.actief %}
+                                <span class="badge bg-light text-dark border me-1">{{ uo.organisatie.naam }}</span>
+                                {% else %}
+                                <span class="text-muted small">-</span>
+                                {% endfor %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.laatste_activiteit %}
+                                <span class="badge bg-success-subtle text-success font-monospace">
+                                    {{ u.laatste_activiteit.strftime('%H:%M:%S') }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">
+                                <i class="bi bi-info-circle me-1"></i>Er zijn momenteel geen actieve gebruikers in de afgelopen 15 minuten.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Logins Table -->
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm border-0 rounded-3 h-100">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2 text-primary"></i>Recente Aanmeldingen</h6>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for u in recente_logins %}
+                    <li class="list-group-item px-3 py-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-semibold small text-dark">{{ u.naam }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">{{ u.email or u.rol }}</div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-light text-secondary font-monospace" style="font-size: 0.75rem;">
+                                {{ u.laatste_login.strftime('%d/%m %H:%M') }}
+                            </span>
+                        </div>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-center py-4 text-muted small">
+                        Geen recente aanmeldingen gevonden.
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ========================================== -->
+<!-- TAB 3: PAGINAGEBRUIK & TELEMETRIE          -->
+<!-- ========================================== -->
+{% if actieve_tab == 'gebruik' %}
+<!-- Filterbar -->
+<div class="card shadow-sm border-0 rounded-3 mb-4">
+    <div class="card-body p-3">
+        <form method="GET" action="{{ url_for('platform.systeemmonitor') }}" class="row g-2 align-items-center">
+            <input type="hidden" name="tab" value="gebruik">
+            <div class="col-12 col-md-4 col-lg-3">
+                <label for="mon_periode" class="form-label small text-muted mb-1 fw-semibold">Periode</label>
+                <select id="mon_periode" name="periode" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="vandaag" {% if periode == 'vandaag' %}selected{% endif %}>Vandaag</option>
+                    <option value="7d" {% if periode == '7d' %}selected{% endif %}>Laatste 7 dagen</option>
+                    <option value="30d" {% if periode == '30d' %}selected{% endif %}>Laatste 30 dagen</option>
+                    <option value="jaar" {% if periode == 'jaar' %}selected{% endif %}>Laatste jaar</option>
+                    <option value="alles" {% if periode == 'alles' %}selected{% endif %}>Alle data (Totaal)</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-5 col-lg-4">
+                <label for="mon_org" class="form-label small text-muted mb-1 fw-semibold">Gemeente / Organisatie</label>
+                <select id="mon_org" name="org_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="alle" {% if geselecteerde_org_id == 'alle' %}selected{% endif %}>Alle gemeenten (Platform globaal)</option>
+                    {% for org in organisaties %}
+                    <option value="{{ org.id }}" {% if geselecteerde_org_id == org.id|string %}selected{% endif %}>{{ org.naam }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3 col-lg-5 text-md-end pt-md-4">
+                <span class="badge bg-primary-subtle text-primary fs-6 px-3 py-2">
+                    <i class="bi bi-eye me-1"></i>Totaal weergaven: <strong>{{ "{:,}".format(totaal_views).replace(',', '.') }}</strong>
+                </span>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Charts Grid -->
+<div class="row g-4 mb-4">
+    <!-- Trend Chart -->
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm border-0 rounded-3 h-100">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up me-2 text-primary"></i>Dagelijkse Activiteitstrend</h6>
+            </div>
+            <div class="card-body">
+                {% if chart_trend_data %}
+                <canvas id="trendChart" style="max-height: 280px;"></canvas>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-bar-chart fs-1 mb-2 d-block"></i>
+                    Geen telemetriegegevens beschikbaar voor deze selectie.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Org Distribution Chart -->
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm border-0 rounded-3 h-100">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart me-2 text-primary"></i>Verdeling over Gemeenten</h6>
+            </div>
+            <div class="card-body">
+                {% if chart_org_data %}
+                <canvas id="orgChart" style="max-height: 280px;"></canvas>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-pie-chart fs-1 mb-2 d-block"></i>
+                    Onvoldoende gegevens per organisatie.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Endpoints Table -->
+<div class="card shadow-sm border-0 rounded-3 mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-list-ol me-2 text-primary"></i>Top Bezochte Schermen & Functionaliteiten</h6>
+        <span class="badge bg-light text-dark border">{{ top_endpoints|length }} modules geregistreerd</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>Scherm / Module</th>
+                    <th>Technisch Endpoint</th>
+                    <th class="text-end">Aantal Weergaven</th>
+                    <th style="width: 200px;">Aandeel</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ep in top_endpoints %}
+                <tr>
+                    <td class="text-muted fw-bold">{{ loop.index }}</td>
+                    <td>
+                        <span class="fw-semibold text-dark">{{ ep.label }}</span>
+                    </td>
+                    <td>
+                        <span class="font-monospace small text-muted">{{ ep.endpoint }}</span>
+                    </td>
+                    <td class="text-end fw-bold">
+                        {{ "{:,}".format(ep.hits).replace(',', '.') }}
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="progress flex-grow-1" style="height: 6px;">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ ep.percentage }}%;"></div>
+                            </div>
+                            <span class="small text-muted font-monospace" style="min-width: 45px;">{{ ep.percentage }}%</span>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-4 text-muted">
+                        Geen telemetrie voor paginabezoeken gevonden in de geselecteerde periode.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ========================================== -->
+<!-- TAB 4: FOUTEN & BEVEILIGINGSINCIDENTEN     -->
+<!-- ========================================== -->
+{% if actieve_tab == 'fouten' %}
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon {% if onopgelost_count > 0 %}bg-red-soft text-red{% else %}bg-green-soft text-green{% endif %}">
+                <i class="bi bi-exclamation-octagon"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value {% if onopgelost_count > 0 %}text-danger{% else %}text-success{% endif %}">
+                    {{ onopgelost_count }}
+                </div>
+                <div class="dd-stat-label">Onopgeloste Incidenten</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-orange-soft text-orange">
+                <i class="bi bi-bug"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ fouten_500_24u }}</div>
+                <div class="dd-stat-label">500 Server Errors (24u)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-purple-soft text-purple">
+                <i class="bi bi-speedometer"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ fouten_429_24u }}</div>
+                <div class="dd-stat-label">Rate Limit Hits (429 / 24u)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="dd-stat-card shadow-sm border-0">
+            <div class="dd-stat-icon bg-blue-soft text-blue">
+                <i class="bi bi-shield-lock"></i>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ login_failed_24u }}</div>
+                <div class="dd-stat-label">Mislukte Logins (24u)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card shadow-sm border-0 rounded-3 mb-4">
+    <div class="card-body p-3">
+        <form method="GET" action="{{ url_for('platform.systeemmonitor') }}" class="row g-2 align-items-center">
+            <input type="hidden" name="tab" value="fouten">
+            <div class="col-12 col-md-4">
+                <label for="mon_status" class="form-label small text-muted mb-1 fw-semibold">Status Filter</label>
+                <select id="mon_status" name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="onopgelost" {% if status_filter == 'onopgelost' %}selected{% endif %}>Onopgelost (Openstaand)</option>
+                    <option value="opgelost" {% if status_filter == 'opgelost' %}selected{% endif %}>Opgelost</option>
+                    <option value="alle" {% if status_filter == 'alle' %}selected{% endif %}>Alle incidenten</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="mon_type" class="form-label small text-muted mb-1 fw-semibold">Type Incident</label>
+                <select id="mon_type" name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="alle" {% if type_filter == 'alle' %}selected{% endif %}>Alle incidenttypes</option>
+                    {% for t in beschikbare_types %}
+                    <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-4 text-md-end pt-md-4">
+                <span class="badge bg-light text-dark border px-3 py-2 small">
+                    Totaal weergegeven: {{ fouten_paginatie.total }} incidenten
+                </span>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Incidenten Tabel -->
+<div class="card shadow-sm border-0 rounded-3 mb-4">
+    <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-journal-x me-2 text-danger"></i>Geregistreerde Fout- en Incidentenlog</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Status</th>
+                    <th>Tijdstip (UTC)</th>
+                    <th>Type & Code</th>
+                    <th>Endpoint / Pad</th>
+                    <th>Gebruiker / IP</th>
+                    <th>Foutmelding</th>
+                    <th class="text-end">Actie</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for err in fouten %}
+                <tr>
+                    <td>
+                        {% if err.is_opgelost %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle" title="Opgelost door {{ err.opgelost_door or 'onbekend' }}">
+                            <i class="bi bi-check-circle me-1"></i>Opgelost
+                        </span>
+                        {% else %}
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                            <i class="bi bi-exclamation-circle me-1"></i>Onopgelost
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="font-monospace small text-muted">
+                            {{ err.timestamp.strftime('%d-%m-%Y %H:%M:%S') }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="fw-semibold small text-dark d-block">{{ err.type_fout }}</span>
+                        {% if err.status_code %}
+                        <span class="badge {% if err.status_code >= 500 %}bg-danger{% elif err.status_code == 429 %}bg-warning text-dark{% else %}bg-secondary{% endif %}" style="font-size: 0.7rem;">
+                            HTTP {{ err.status_code }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="font-monospace small text-truncate" style="max-width: 200px;" title="{{ err.pad }}">
+                            {{ err.pad or err.endpoint or '-' }}
+                        </div>
+                        {% if err.organisatie %}
+                        <span class="badge bg-light text-dark border small" style="font-size: 0.65rem;">
+                            {{ err.organisatie.naam }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="small fw-semibold text-dark">{{ err.gebruiker or 'Anoniem' }}</div>
+                        <div class="font-monospace text-muted" style="font-size: 0.7rem;">{{ err.ip_adres or '-' }}</div>
+                    </td>
+                    <td>
+                        <div class="small text-truncate" style="max-width: 260px;" title="{{ err.bericht }}">
+                            {{ err.bericht or 'Geen bericht' }}
+                        </div>
+                        {% if err.stacktrace %}
+                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small"
+                                data-bs-toggle="modal" data-bs-target="#stacktraceModal{{ err.id }}">
+                            <i class="bi bi-code-slash me-1"></i>Stacktrace bekijken
+                        </button>
+
+                        <!-- Stacktrace Modal -->
+                        <div class="modal fade" id="stacktraceModal{{ err.id }}" tabindex="-1" aria-labelledby="stacktraceLabel{{ err.id }}" aria-hidden="true">
+                            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-light">
+                                        <h5 class="modal-title fs-6 font-monospace" id="stacktraceLabel{{ err.id }}">
+                                            {{ err.type_fout }}: {{ err.pad }}
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="text-danger fw-bold small mb-2">{{ err.bericht }}</p>
+                                        <pre class="bg-dark text-light p-3 rounded font-monospace small" style="max-height: 400px; overflow-y: auto;">{{ err.stacktrace }}</pre>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Sluiten</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <form method="POST" action="{{ url_for('platform.systeemmonitor_toggle_error', error_id=err.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            {% if err.is_opgelost %}
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Heropenen als onopgelost">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                            {% else %}
+                            <button type="submit" class="btn btn-outline-success btn-sm" title="Markeer als opgelost">
+                                <i class="bi bi-check-lg me-1"></i>Oplossen
+                            </button>
+                            {% endif %}
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="bi bi-check2-circle fs-3 text-success d-block mb-1"></i>
+                        Geen incidenten gevonden voor het geselecteerde filter.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if fouten_paginatie.pages > 1 %}
+    <div class="card-footer bg-white py-3 d-flex justify-content-between align-items-center">
+        <span class="small text-muted">Pagina {{ fouten_paginatie.page }} van {{ fouten_paginatie.pages }}</span>
+        <ul class="pagination pagination-sm mb-0">
+            {% if fouten_paginatie.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('platform.systeemmonitor', tab='fouten', status=status_filter, type=type_filter, page=fouten_paginatie.prev_num) }}">Vorige</a>
+            </li>
+            {% endif %}
+            {% if fouten_paginatie.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('platform.systeemmonitor', tab='fouten', status=status_filter, type=type_filter, page=fouten_paginatie.next_num) }}">Volgende</a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{% if actieve_tab == 'gebruik' and chart_trend_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 1. Trend Chart
+    const trendCtx = document.getElementById('trendChart');
+    if (trendCtx) {
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: {{ chart_trend_labels | tojson }},
+                datasets: [{
+                    label: 'Paginabezoeken',
+                    data: {{ chart_trend_data | tojson }},
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.08)',
+                    fill: true,
+                    tension: 0.3,
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#0d6efd'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Org Distribution Chart
+    const orgCtx = document.getElementById('orgChart');
+    if (orgCtx) {
+        new Chart(orgCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ chart_org_labels | tojson }},
+                datasets: [{
+                    data: {{ chart_org_data | tojson }},
+                    backgroundColor: [
+                        '#0d6efd', '#20c997', '#6f42c1', '#fd7e14', '#0dcaf0',
+                        '#ffc107', '#d63384', '#6c757d', '#198754', '#adb5bd'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

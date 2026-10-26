@@ -376,19 +376,23 @@ class TestAgendaRoutes(BaseTestCase):
         db.session.add_all([item1, item2, standalone])
         db.session.commit()
 
+        standalone_id = standalone.id
+        item1_id = item1.id
+        item2_id = item2.id
+
         # 1. Enkel los item verwijderen (zonder verwijder_reeks flag)
-        res_single = self.client.post(f'/agenda/{standalone.id}/verwijder', follow_redirects=True)
+        res_single = self.client.post(f'/agenda/{standalone_id}/verwijder', follow_redirects=True)
         self.assertEqual(res_single.status_code, 200)
         self.assertIn("agenda-item succesvol verwijderd", res_single.get_data(as_text=True).lower())
-        self.assertIsNone(db.session.get(AgendaItem, standalone.id))
+        self.assertIsNone(db.session.get(AgendaItem, standalone_id))
 
         # 2. Complete reeks verwijderen (met verwijder_reeks=true)
-        res_series = self.client.post(f'/agenda/{item1.id}/verwijder', data={'verwijder_reeks': 'true'}, follow_redirects=True)
+        res_series = self.client.post(f'/agenda/{item1_id}/verwijder', data={'verwijder_reeks': 'true'}, follow_redirects=True)
         self.assertEqual(res_series.status_code, 200)
         self.assertIn("gehele reeks van activiteiten is succesvol verwijderd", res_series.get_data(as_text=True).lower())
 
-        self.assertIsNone(db.session.get(AgendaItem, item1.id))
-        self.assertIsNone(db.session.get(AgendaItem, item2.id))
+        self.assertIsNone(db.session.get(AgendaItem, item1_id))
+        self.assertIsNone(db.session.get(AgendaItem, item2_id))
 
     def test_agenda_cross_tenant_isolation_and_lezer_permissions(self):
         """Test dat agenda-items van andere organisaties niet gemuteerd kunnen worden en lezers geen schrijfrechten hebben."""

@@ -49,10 +49,40 @@ def login():
         gebruiker = User.query.filter(db.func.lower(User.email) == email).first()
 
         if not gebruiker or not check_password_hash(gebruiker.wachtwoord_hash, wachtwoord):
+            try:
+                from utils.health import record_system_error
+                record_system_error(
+                    status_code=401,
+                    type_fout='LoginFailed',
+                    bericht=f'Mislukte inlogpoging voor e-mail: {email}',
+                    endpoint='auth.login',
+                    pad=request.path,
+                    methode='POST',
+                    ip_adres=request.remote_addr,
+                    gebruiker=email,
+                    organisatie_id=None
+                )
+            except Exception:
+                pass
             flash('Ongeldig e-mailadres of wachtwoord.', 'danger')
             return render_template('auth/login.html')
 
         if not gebruiker.actief:
+            try:
+                from utils.health import record_system_error
+                record_system_error(
+                    status_code=403,
+                    type_fout='AccountDisabled',
+                    bericht=f'Inlogpoging op gedeactiveerd account: {email}',
+                    endpoint='auth.login',
+                    pad=request.path,
+                    methode='POST',
+                    ip_adres=request.remote_addr,
+                    gebruiker=email,
+                    organisatie_id=None
+                )
+            except Exception:
+                pass
             flash('Uw account is gedeactiveerd. Contacteer de beheerder.', 'danger')
             return render_template('auth/login.html')
 
@@ -243,6 +273,7 @@ def select_org():
 MENU_ENDPOINT_MAP = {
     # Platformbeheer
     'platform.dashboard': 'platform.dashboard',
+    'platform.systeemmonitor': 'platform.systeemmonitor',
     'platform.organisaties': 'platform.organisaties',
     'platform.organisatie_nieuw': 'platform.organisaties',
     'platform.organisatie_wijzigen': 'platform.organisaties',

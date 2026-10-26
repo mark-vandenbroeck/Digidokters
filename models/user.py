@@ -18,6 +18,7 @@ class User(UserMixin, db.Model):
     moet_wachtwoord_wijzigen = db.Column(db.Boolean, default=False, nullable=False)
     aangemaakt_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     laatste_login = db.Column(db.DateTime, nullable=True)
+    laatste_activiteit = db.Column(db.DateTime, nullable=True)
 
     # Wachtwoord herstel
     reset_code = db.Column(db.String(6), nullable=True)

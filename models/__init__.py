@@ -22,6 +22,7 @@ from .functie import Functie, user_functies
 from .group import Group, GroupPermission, UserGroup
 from .communicatie import CommunicatieLog
 from .resultaat import Resultaat
+from .telemetry import PageViewStat, SystemErrorLog
 
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
@@ -30,7 +31,8 @@ __all__ = [
     'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation',
     'EmailTemplate', 'FeedbackItem', 'FeedbackVote', 'FeedbackComment', 'FeedbackView',
     'QuestionCategory', 'QuestionClassification', 'GenderIdentity', 'Functie', 'user_functies',
-    'Group', 'GroupPermission', 'UserGroup', 'CommunicatieLog', 'Resultaat'
+    'Group', 'GroupPermission', 'UserGroup', 'CommunicatieLog', 'Resultaat',
+    'PageViewStat', 'SystemErrorLog'
 ]
 
 

@@ -86,7 +86,7 @@ def classificeer_vragen_batch(items_lijst):
     if not items_lijst:
         return []
 
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GEMINI_API_KEY")
     if not gemini_api_key:
         raise ValueError("GEMINI_API_KEY ontbreekt in de omgevingsvariabelen.")
 
@@ -414,4 +414,16 @@ def trigger_asynchrone_batch_analyse(app=None, batch_size=25):
     thread = threading.Thread(target=_async_batch_worker, daemon=True)
     thread.start()
     return True, "Batch-analyse is gestart op de achtergrond. U kunt de applicatie gewoon blijven gebruiken."
+
+
+def get_actieve_provider() -> str:
+    """Retourneert de actieve AI-provider op basis van geconfigureerde omgevingsvariabelen."""
+    if os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GEMINI_API_KEY"):
+        return "Google Gemini"
+    elif os.getenv("OPENAI_API_KEY"):
+        return "OpenAI"
+    elif os.getenv("OLLAMA_HOST"):
+        return "Ollama"
+    return "Geen provider geconfigureerd"
+
 

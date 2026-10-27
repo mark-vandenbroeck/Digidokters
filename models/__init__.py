@@ -7,7 +7,7 @@ from .registration import Registration
 from .organisatie import Organisatie, UserOrganisatie
 from .activity_type import ActivityType
 from .location import Location
-from .agenda import AgendaItem
+from .agenda import AgendaItem, AgendaItemLock
 from .document import Folder, Document
 from .app_document import AppFolder, AppDocument
 from .audit import AuditLog
@@ -27,7 +27,7 @@ from .telemetry import PageViewStat, SystemErrorLog
 __all__ = [
     'User', 'Digidokter', 'AgeCategory', 'Device', 'Registration', 
     'Organisatie', 'UserOrganisatie', 'ActivityType', 'Location', 'AgendaItem',
-    'Folder', 'Document', 'AppFolder', 'AppDocument', 'AuditLog', 'Herkomst',
+    'AgendaItemLock', 'Folder', 'Document', 'AppFolder', 'AppDocument', 'AuditLog', 'Herkomst',
     'EvaluationForm', 'EvaluationQuestion', 'EvaluationResponse', 'EvaluationInvitation',
     'EmailTemplate', 'FeedbackItem', 'FeedbackVote', 'FeedbackComment', 'FeedbackView',
     'QuestionCategory', 'QuestionClassification', 'GenderIdentity', 'Functie', 'user_functies',

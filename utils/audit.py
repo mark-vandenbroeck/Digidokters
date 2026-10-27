@@ -17,10 +17,10 @@ def serialize_val(val):
 
 def should_audit(obj):
     """Bepaalt of we de wijzigingen op dit model moeten loggen."""
-    # Sla AuditLog zelf en eventuele systeem- en telemetrietabellen over
-    if obj.__class__.__name__ in ('AuditLog', 'PageViewStat', 'SystemErrorLog'):
+    # Sla AuditLog zelf en eventuele systeem-, lock- en telemetrietabellen over
+    if obj.__class__.__name__ in ('AuditLog', 'PageViewStat', 'SystemErrorLog', 'AgendaItemLock'):
         return False
-    if obj.__tablename__.startswith('limiter_') or obj.__tablename__ in ('audit_logs', 'page_view_stats', 'system_error_logs'):
+    if obj.__tablename__.startswith('limiter_') or obj.__tablename__ in ('audit_logs', 'page_view_stats', 'system_error_logs', 'agenda_item_locks'):
         return False
     return True
 
@@ -50,7 +50,7 @@ def register_audit_listeners(db):
         
         nieuwe_waarden = {}
         for attr in mapper.column_attrs:
-            if attr.key == 'laatste_activiteit' and target.__class__.__name__ == 'User':
+            if attr.key in ('laatste_activiteit', 'gewijzigd_op'):
                 continue
             val = getattr(target, attr.key)
             if attr.key == 'inhoud' and target.__class__.__name__ == 'Document':
@@ -58,6 +58,13 @@ def register_audit_listeners(db):
             else:
                 nieuwe_waarden[attr.key] = serialize_val(val)
                 
+        # Relatie gekoppelde digidokters bij AgendaItem
+        if target.__class__.__name__ == 'AgendaItem':
+            try:
+                nieuwe_waarden['digidokters'] = sorted([d.naam for d in target.digidokters])
+            except Exception:
+                pass
+
         connection.execute(
             AuditLog.__table__.insert().values(
                 tabel=target.__tablename__,
@@ -82,7 +89,7 @@ def register_audit_listeners(db):
         
         for attr in mapper.column_attrs:
             field = attr.key
-            if field == 'laatste_activiteit' and target.__class__.__name__ == 'User':
+            if field in ('laatste_activiteit', 'gewijzigd_op'):
                 continue
             history = state.attrs[field].history
             if history.has_changes():
@@ -97,6 +104,19 @@ def register_audit_listeners(db):
                     nieuwe_waarden[field] = serialize_val(new_val)
                 has_changes = True
                 
+        # Relatie gekoppelde digidokters bij AgendaItem
+        if target.__class__.__name__ == 'AgendaItem':
+            try:
+                rel_hist = state.attrs['digidokters'].history
+                if rel_hist.has_changes():
+                    oude_dd = sorted([d.naam for d in list(rel_hist.deleted) + list(rel_hist.unchanged)])
+                    nieuwe_dd = sorted([d.naam for d in list(rel_hist.added) + list(rel_hist.unchanged)])
+                    oude_waarden['digidokters'] = oude_dd
+                    nieuwe_waarden['digidokters'] = nieuwe_dd
+                    has_changes = True
+            except Exception:
+                pass
+
         if has_changes:
             gebruiker, org_id = get_audit_context()
             obj_org_id = getattr(target, 'organisatie_id', org_id)
@@ -126,12 +146,21 @@ def register_audit_listeners(db):
         
         oude_waarden = {}
         for attr in mapper.column_attrs:
+            if attr.key in ('laatste_activiteit', 'gewijzigd_op'):
+                continue
             val = getattr(target, attr.key)
             if attr.key == 'inhoud' and target.__class__.__name__ == 'Document':
                 oude_waarden[attr.key] = '<binaire inhoud>'
             else:
                 oude_waarden[attr.key] = serialize_val(val)
                 
+        # Relatie gekoppelde digidokters bij AgendaItem
+        if target.__class__.__name__ == 'AgendaItem':
+            try:
+                oude_waarden['digidokters'] = sorted([d.naam for d in target.digidokters])
+            except Exception:
+                pass
+
         connection.execute(
             AuditLog.__table__.insert().values(
                 tabel=target.__tablename__,

@@ -94,6 +94,9 @@ class TestPlatformMonitor(BaseTestCase):
         self.assertIn('Registraties Overzicht', html)
         self.assertIn('reg.lijst', html)
         self.assertIn('57', html)  # 42 + 15 = 57 totaal weergaven
+        # Verifieer dat Chart.js met SRI integrity en crossorigin geladen wordt
+        self.assertIn('integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt"', html)
+        self.assertIn('crossorigin="anonymous"', html)
 
     def test_tab_fouten_and_toggle(self):
         """Controleer foutenlogboek en markeren van fouten als opgelost."""

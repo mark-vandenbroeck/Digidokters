@@ -7,12 +7,15 @@ pipeline {
         disableConcurrentBuilds(abortPrevious: true)
         timeout(time: 60, unit: 'MINUTES')
         durabilityHint('PERFORMANCE_OPTIMIZED')
+        skipDefaultCheckout(true)
     }
 
     environment {
         VENV_DIR = '/tmp/venv'
         COVERAGE_CORE = 'sysmon'
         PYTHONUNBUFFERED = '1'
+        PYTHONDONTWRITEBYTECODE = '1'
+        PIP_CACHE_DIR = '/tmp/pip-cache'
     }
 
     stages {
@@ -26,7 +29,7 @@ pipeline {
             agent {
                 docker {
                     image 'python:3.12.4-slim'
-                    args '-u root:root --memory=2g --memory-swap=2g --cpus=1 -v /tmp/jenkins-pip-cache:/root/.cache/pip'
+                    args '--memory=2g --memory-swap=2g --cpus=1 -v /tmp/jenkins-pip-cache:/tmp/pip-cache'
                     reuseNode true
                 }
             }
@@ -55,7 +58,7 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli:latest'
-                    args '-u root:root --entrypoint= --memory=2g --memory-swap=2g --cpus=1 -e SONAR_SCANNER_OPTS=-Xmx512m'
+                    args '--entrypoint= --memory=2g --memory-swap=2g --cpus=1 -e SONAR_SCANNER_OPTS=-Xmx512m -e SONAR_USER_HOME=/tmp/.sonar'
                     reuseNode true
                 }
             }
@@ -79,7 +82,7 @@ pipeline {
 
     post {
         always {
-            junit 'results.xml'
+            junit testResults: 'results.xml', allowEmptyResults: true
             recordCoverage(tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']])
         }
     }

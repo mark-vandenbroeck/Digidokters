@@ -1870,6 +1870,15 @@ def audit_log():
     org_id = get_huidige_organisatie_id()
     
     page = request.args.get('page', 1, type=int)
+    sort_by = request.args.get('sort_by', 'timestamp').strip().lower()
+    direction = request.args.get('direction', 'desc' if sort_by == 'timestamp' else 'asc').strip().lower()
+    if direction not in ('asc', 'desc'):
+        direction = 'desc' if sort_by == 'timestamp' else 'asc'
+
+    valid_sort_columns = ('timestamp', 'gebruiker', 'operatie', 'tabel', 'record_id', 'organisatie')
+    if sort_by not in valid_sort_columns:
+        sort_by = 'timestamp'
+
     datum_van_str = request.args.get('datum_van', '').strip()
     datum_tot_str = request.args.get('datum_tot', '').strip()
     gebruiker = request.args.get('gebruiker', '').strip()
@@ -1895,6 +1904,7 @@ def audit_log():
                 db.and_(
                     AuditLog.tabel == 'users',
                     AuditLog.operatie == 'UPDATE',
+                    AuditLog.details.isnot(None),
                     AuditLog.details.like(pattern)
                 )
             )
@@ -1916,16 +1926,37 @@ def audit_log():
             pass
             
     if gebruiker:
-        query = query.filter(AuditLog.gebruiker.ilike(f'%{gebruiker}%'))
+        if gebruiker.lower() == 'systeem':
+            query = query.filter(db.or_(AuditLog.gebruiker.ilike('systeem'), AuditLog.gebruiker.is_(None)))
+        else:
+            query = query.filter(AuditLog.gebruiker == gebruiker)
         
     if operatie:
         query = query.filter_by(operatie=operatie)
         
     if tabel:
-        query = query.filter(AuditLog.tabel.ilike(f'%{tabel}%'))
+        query = query.filter(AuditLog.tabel == tabel)
         
-    # Sorteren op meest recent eerst
-    query = query.order_by(AuditLog.timestamp.desc())
+    # Sortering toepassen
+    if sort_by == 'gebruiker':
+        order_col = db.func.lower(AuditLog.gebruiker).desc() if direction == 'desc' else db.func.lower(AuditLog.gebruiker).asc()
+        query = query.order_by(order_col, AuditLog.timestamp.desc())
+    elif sort_by == 'operatie':
+        order_col = AuditLog.operatie.desc() if direction == 'desc' else AuditLog.operatie.asc()
+        query = query.order_by(order_col, AuditLog.timestamp.desc())
+    elif sort_by == 'tabel':
+        order_col = AuditLog.tabel.desc() if direction == 'desc' else AuditLog.tabel.asc()
+        query = query.order_by(order_col, AuditLog.timestamp.desc())
+    elif sort_by == 'record_id':
+        order_col = AuditLog.record_id.desc() if direction == 'desc' else AuditLog.record_id.asc()
+        query = query.order_by(order_col, AuditLog.timestamp.desc())
+    elif sort_by == 'organisatie':
+        query = query.outerjoin(Organisatie, AuditLog.organisatie_id == Organisatie.id)
+        order_col = Organisatie.naam.desc() if direction == 'desc' else Organisatie.naam.asc()
+        query = query.order_by(order_col, AuditLog.timestamp.desc())
+    else:  # sort_by == 'timestamp'
+        order_col = AuditLog.timestamp.desc() if direction == 'desc' else AuditLog.timestamp.asc()
+        query = query.order_by(order_col, AuditLog.id.desc() if direction == 'desc' else AuditLog.id.asc())
     
     # Paginatie
     pagination = query.paginate(page=page, per_page=50, error_out=False)
@@ -1939,23 +1970,51 @@ def audit_log():
             log.parsed_details = {}
     
     # Voor platformbeheerders, lijst met alle organisaties voor de filter-dropdown
-
     organisaties = []
     if current_user.rol == 'platformbeheerder':
         organisaties = Organisatie.query.order_by(Organisatie.naam).all()
+
+    # Bepaal unieke gebruikers en tabellen voor de filter-dropdowns (alfabetisch gesorteerd)
+    gebruikers_query = db.session.query(AuditLog.gebruiker).filter(AuditLog.gebruiker.isnot(None)).distinct()
+    tabellen_query = db.session.query(AuditLog.tabel).filter(AuditLog.tabel.isnot(None)).distinct()
+
+    if current_user.rol != 'platformbeheerder':
+        gebruikers_query = gebruikers_query.filter(AuditLog.organisatie_id == org_id)
+        tabellen_query = tabellen_query.filter(AuditLog.organisatie_id == org_id)
+
+    gebruikers_set = set(r[0] for r in gebruikers_query.all() if r[0])
+    tabellen_set = set(r[0] for r in tabellen_query.all() if r[0])
+
+    unnamed_query = db.session.query(AuditLog.id).filter(AuditLog.gebruiker.is_(None))
+    if current_user.rol != 'platformbeheerder':
+        unnamed_query = unnamed_query.filter(AuditLog.organisatie_id == org_id)
+    if unnamed_query.first():
+        gebruikers_set.add('Systeem')
+
+    if gebruiker:
+        gebruikers_set.add(gebruiker)
+    if tabel:
+        tabellen_set.add(tabel)
+
+    beschikbare_gebruikers = sorted(list(gebruikers_set), key=lambda s: s.lower())
+    beschikbare_tabellen = sorted(list(tabellen_set), key=lambda s: s.lower())
         
     return render_template(
         'admin/audit_logs.html',
         logs=logs,
         pagination=pagination,
         organisaties=organisaties,
+        beschikbare_gebruikers=beschikbare_gebruikers,
+        beschikbare_tabellen=beschikbare_tabellen,
         datum_van=datum_van_str,
         datum_tot=datum_tot_str,
         gebruiker=gebruiker,
         operatie=operatie,
         tabel=tabel,
         filter_organisatie_id=filter_org_id,
-        toon_logins=toon_logins
+        toon_logins=toon_logins,
+        sort_by=sort_by,
+        direction=direction
     )
 
 

@@ -36,6 +36,9 @@ def get_audit_context():
 
 def register_audit_listeners(db):
     """Registreert de SQLAlchemy mapper events voor automatische auditing."""
+    if getattr(db, '_audit_listeners_registered', False):
+        return
+    db._audit_listeners_registered = True
     
     @event.listens_for(db.Model, 'after_insert', propagate=True)
     def after_insert(mapper, connection, target):

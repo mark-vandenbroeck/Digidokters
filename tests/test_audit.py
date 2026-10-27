@@ -99,17 +99,19 @@ class TestAudit(BaseTestCase):
         # 1. Sorteer op gebruiker asc
         resp_gebruiker_asc = self.client.get('/beheer/audit-log?sort_by=gebruiker&direction=asc')
         html_g_asc = resp_gebruiker_asc.data.decode('utf-8')
-        pos_alice = html_g_asc.find("Alice")
-        pos_bob = html_g_asc.find("Bob")
-        pos_charlie = html_g_asc.find("Charlie")
+        tbody_g_asc = html_g_asc.split("<tbody>")[1].split("</tbody>")[0]
+        pos_alice = tbody_g_asc.find("Alice")
+        pos_bob = tbody_g_asc.find("Bob")
+        pos_charlie = tbody_g_asc.find("Charlie")
         self.assertTrue(pos_alice < pos_bob < pos_charlie)
 
         # 2. Sorteer op gebruiker desc
         resp_gebruiker_desc = self.client.get('/beheer/audit-log?sort_by=gebruiker&direction=desc')
         html_g_desc = resp_gebruiker_desc.data.decode('utf-8')
-        pos_alice = html_g_desc.find("Alice")
-        pos_bob = html_g_desc.find("Bob")
-        pos_charlie = html_g_desc.find("Charlie")
+        tbody_g_desc = html_g_desc.split("<tbody>")[1].split("</tbody>")[0]
+        pos_alice = tbody_g_desc.find("Alice")
+        pos_bob = tbody_g_desc.find("Bob")
+        pos_charlie = tbody_g_desc.find("Charlie")
         self.assertTrue(pos_charlie < pos_bob < pos_alice)
 
         # 3. Sorteer op operatie asc (CREATE, DELETE, UPDATE)
@@ -119,23 +121,26 @@ class TestAudit(BaseTestCase):
         # 4. Sorteer op tabel asc (activiteiten, bezoeken, cliënten)
         resp_tabel_asc = self.client.get('/beheer/audit-log?sort_by=tabel&direction=asc')
         html_t_asc = resp_tabel_asc.data.decode('utf-8')
-        pos_act = html_t_asc.find("activiteiten")
-        pos_bez = html_t_asc.find("bezoeken")
+        tbody_t_asc = html_t_asc.split("<tbody>")[1].split("</tbody>")[0]
+        pos_act = tbody_t_asc.find("activiteiten")
+        pos_bez = tbody_t_asc.find("bezoeken")
         self.assertTrue(pos_act < pos_bez)
 
         # 5. Sorteer op record_id desc (30, 20, 10)
         resp_id_desc = self.client.get('/beheer/audit-log?sort_by=record_id&direction=desc')
         html_id_desc = resp_id_desc.data.decode('utf-8')
-        pos_30 = html_id_desc.find("<td>30</td>")
-        pos_20 = html_id_desc.find("<td>20</td>")
-        pos_10 = html_id_desc.find("<td>10</td>")
+        tbody_id_desc = html_id_desc.split("<tbody>")[1].split("</tbody>")[0]
+        pos_30 = tbody_id_desc.find("<td>30</td>")
+        pos_20 = tbody_id_desc.find("<td>20</td>")
+        pos_10 = tbody_id_desc.find("<td>10</td>")
         self.assertTrue(pos_30 < pos_20 < pos_10)
 
         # 6. Sorteer op timestamp asc (oudste eerst: log_a, log_b, log_c)
         resp_time_asc = self.client.get('/beheer/audit-log?sort_by=timestamp&direction=asc')
         html_time_asc = resp_time_asc.data.decode('utf-8')
-        pos_alice = html_time_asc.find("Alice")
-        pos_charlie = html_time_asc.find("Charlie")
+        tbody_time_asc = html_time_asc.split("<tbody>")[1].split("</tbody>")[0]
+        pos_alice = tbody_time_asc.find("Alice")
+        pos_charlie = tbody_time_asc.find("Charlie")
         self.assertTrue(pos_alice < pos_charlie)
 
     def test_audit_logs_sorting_organisatie_for_platform_admin(self):
@@ -194,3 +199,60 @@ class TestAudit(BaseTestCase):
         pos_alpha = tbody_desc.find("Alpha Gemeente")
         pos_zulu = tbody_desc.find("Zulu Gemeente")
         self.assertTrue(pos_zulu < pos_alpha)
+
+    def test_audit_logs_gebruiker_and_tabel_dropdowns(self):
+        """Controleer dat Gebruiker en Tabel als alfabetisch gesorteerde dropdowns worden weergegeven."""
+        import re
+
+        self.login("AdminMark", "password123")
+        self.select_organisatie(self.org.id)
+
+        AuditLog.query.delete()
+        db.session.commit()
+
+        now = datetime.now(timezone.utc)
+        # Maak logs aan met verschillende gebruikers en tabellen in willekeurige volgorde
+        log1 = AuditLog(tabel="users", operatie="UPDATE", record_id=1, gebruiker="Zoe", timestamp=now, organisatie_id=self.org.id)
+        log2 = AuditLog(tabel="activiteiten", operatie="CREATE", record_id=2, gebruiker="Bob", timestamp=now, organisatie_id=self.org.id)
+        log3 = AuditLog(tabel="bezoeken", operatie="DELETE", record_id=3, gebruiker="Alice", timestamp=now, organisatie_id=self.org.id)
+        db.session.add_all([log1, log2, log3])
+        db.session.commit()
+
+        resp = self.client.get('/beheer/audit-log')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # 1. Bevestig dat het dropdowns (select) zijn, geen text inputs
+        self.assertIn('<select class="form-select form-select-sm" id="gebruiker" name="gebruiker">', html)
+        self.assertIn('<select class="form-select form-select-sm" id="tabel" name="tabel">', html)
+
+        # 2. Haal de opties van de gebruiker-dropdown op en controleer alfabetische sortering
+        gebruiker_select = re.search(r'<select[^>]*name="gebruiker"[^>]*>(.*?)</select>', html, re.DOTALL)
+        self.assertIsNotNone(gebruiker_select)
+        user_options = re.findall(r'<option value="([^"]+)"', gebruiker_select.group(1))
+        self.assertEqual(user_options, sorted(user_options, key=lambda s: s.lower()))
+        self.assertIn("Alice", user_options)
+        self.assertIn("Bob", user_options)
+        self.assertIn("Zoe", user_options)
+
+        # 3. Haal de opties van de tabel-dropdown op en controleer alfabetische sortering
+        tabel_select = re.search(r'<select[^>]*name="tabel"[^>]*>(.*?)</select>', html, re.DOTALL)
+        self.assertIsNotNone(tabel_select)
+        table_options = re.findall(r'<option value="([^"]+)"', tabel_select.group(1))
+        self.assertEqual(table_options, sorted(table_options, key=lambda s: s.lower()))
+        self.assertIn("activiteiten", table_options)
+        self.assertIn("bezoeken", table_options)
+        self.assertIn("users", table_options)
+
+        # 4. Controleer dat filteren met geselecteerde optie correct werkt
+        resp_filtered = self.client.get('/beheer/audit-log?gebruiker=Alice&tabel=bezoeken')
+        self.assertEqual(resp_filtered.status_code, 200)
+        html_filtered = resp_filtered.data.decode('utf-8')
+        # Geselecteerde opties moeten als 'selected' worden gemarkeerd in dropdown
+        self.assertIn('<option value="Alice" selected>Alice</option>', html_filtered)
+        self.assertIn('<option value="bezoeken" selected>bezoeken</option>', html_filtered)
+        tbody_filtered = html_filtered.split("<tbody>")[1].split("</tbody>")[0]
+        self.assertIn("Alice", tbody_filtered)
+        self.assertIn("bezoeken", tbody_filtered)
+        self.assertNotIn("Bob", tbody_filtered)
+        self.assertNotIn("Zoe", tbody_filtered)

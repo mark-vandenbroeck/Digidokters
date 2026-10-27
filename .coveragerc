@@ -5,4 +5,12 @@ omit =
     scripts/*
     .venv/*
     venv/*
+    migrations/*
+    doc/*
+    docs/*
+    csv/*
+    uploads/*
+    instance/*
+    seed-data/*
+    sonar_issues/*
 

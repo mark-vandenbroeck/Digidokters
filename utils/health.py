@@ -202,6 +202,9 @@ def check_email_health() -> dict:
         'server': 'Niet geconfigureerd',
         'port': 25,
         'tls': False,
+        'ssl': False,
+        'is_api': False,
+        'protocol': 'SMTP',
         'socket_connected': False,
         'sent_24h': 0,
         'failed_24h': 0,
@@ -209,32 +212,78 @@ def check_email_health() -> dict:
         'error': None
     }
     try:
-        mail_server = current_app.config.get('MAIL_SERVER') or os.environ.get('MAIL_SERVER')
-        mail_port = current_app.config.get('MAIL_PORT') or os.environ.get('MAIL_PORT', 587)
-        mail_use_tls = current_app.config.get('MAIL_USE_TLS') or False
+        # Detecteer of Brevo HTTPS REST API actief is (via expliciete API key of xkeysib- SMTP wachtwoord)
+        brevo_api_key = os.environ.get('BREVO_API_KEY') or os.environ.get('BREVO_KEY')
+        smtp_username = (
+            os.environ.get('SMTP_USERNAME')
+            or os.environ.get('MAIL_USERNAME')
+            or (current_app.config.get('MAIL_USERNAME') if has_request_context() else None)
+        )
+        smtp_password = (
+            os.environ.get('SMTP_PASSWORD')
+            or os.environ.get('MAIL_PASSWORD')
+            or (current_app.config.get('MAIL_PASSWORD') if has_request_context() else None)
+        )
 
-        if mail_server:
-            result['server'] = str(mail_server)
-            result['port'] = int(mail_port)
-            result['tls'] = bool(mail_use_tls)
+        if not brevo_api_key and smtp_password and smtp_password.startswith('xkeysib-'):
+            brevo_api_key = smtp_password
+        elif not brevo_api_key and smtp_username and smtp_username.startswith('xkeysib-'):
+            brevo_api_key = smtp_username
 
+        if brevo_api_key:
+            result['is_api'] = True
+            result['protocol'] = 'Brevo API'
+            result['server'] = 'api.brevo.com'
+            result['port'] = 443
+            result['tls'] = True
+            result['ssl'] = True
             try:
-                s = socket.create_connection((mail_server, int(mail_port)), timeout=1.5)
+                s = socket.create_connection(('api.brevo.com', 443), timeout=3.0)
                 s.close()
                 result['socket_connected'] = True
+                result['status'] = 'ok'
             except Exception as conn_err:
                 result['socket_connected'] = False
                 result['status'] = 'warning'
-                result['error'] = f'Poort {mail_port} niet bereikbaar: {str(conn_err)}'
+                result['error'] = f'Brevo API (api.brevo.com:443) niet bereikbaar: {str(conn_err)}'
         else:
-            result['status'] = 'info'
-            result['server'] = 'Lokale simulatie / Niet geconfigureerd'
+            mail_server = current_app.config.get('MAIL_SERVER') or os.environ.get('MAIL_SERVER')
+            mail_port = current_app.config.get('MAIL_PORT') or os.environ.get('MAIL_PORT', 587)
+            mail_use_tls = current_app.config.get('MAIL_USE_TLS') or False
+            mail_use_ssl = current_app.config.get('MAIL_USE_SSL') if has_request_context() else False
+
+            result['is_api'] = False
+            result['protocol'] = 'SMTP'
+
+            if mail_server:
+                result['server'] = str(mail_server)
+                result['port'] = int(mail_port)
+                result['tls'] = bool(mail_use_tls)
+                result['ssl'] = bool(mail_use_ssl)
+
+                try:
+                    s = socket.create_connection((mail_server, int(mail_port)), timeout=3.0)
+                    s.close()
+                    result['socket_connected'] = True
+                    result['status'] = 'ok'
+                except Exception as conn_err:
+                    result['socket_connected'] = False
+                    result['status'] = 'warning'
+                    result['error'] = f'Poort {mail_port} niet bereikbaar: {str(conn_err)}'
+            else:
+                result['status'] = 'info'
+                result['server'] = 'Lokale simulatie / Niet geconfigureerd'
 
         # Aliases voor templates
         result['smtp_host'] = result['server']
         result['smtp_port'] = result['port']
-        result['ssl'] = current_app.config.get('MAIL_USE_SSL') if has_request_context() else False
-        result['default_sender'] = (current_app.config.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER', 'Niet ingesteld')) if has_request_context() else 'Niet ingesteld'
+        if not result['is_api']:
+            result['ssl'] = current_app.config.get('MAIL_USE_SSL') if has_request_context() else False
+        result['default_sender'] = (
+            current_app.config.get('MAIL_DEFAULT_SENDER')
+            or os.environ.get('SMTP_SENDER')
+            or os.environ.get('MAIL_DEFAULT_SENDER', 'Niet ingesteld')
+        ) if has_request_context() else 'Niet ingesteld'
         result['total_sent_logs'] = CommunicatieLog.query.count()
 
         # Recente communicatielogs
@@ -269,9 +318,9 @@ def check_email_health() -> dict:
 def check_ai_health() -> dict:
     """Controleert status van de AI-classificatieservice."""
     result = {
-        'status': 'ok',
-        'provider': 'Onbekend',
-        'model': 'standaard',
+        'status': 'info',
+        'provider': 'Geen provider geconfigureerd',
+        'model': 'gemini-3.5-flash',
         'has_api_key': False,
         'details': '',
         'classified_count': 0,
@@ -280,10 +329,30 @@ def check_ai_health() -> dict:
     }
     try:
         from utils.ai_classifier import get_actieve_provider
-        provider = get_actieve_provider() if callable(get_actieve_provider) else 'onbekend'
+        provider = get_actieve_provider() if callable(get_actieve_provider) else 'Onbekend'
         result['provider'] = provider
-        result['model'] = os.environ.get('AI_MODEL') or 'gemini-2.5-flash'
-        result['has_api_key'] = bool(os.environ.get('GEMINI_API_KEY') or os.environ.get('OPENAI_API_KEY'))
+
+        has_gemini = bool(
+            os.environ.get('GEMINI_API_KEY')
+            or os.environ.get('GEMINI_KEY')
+            or os.environ.get('GOOGLE_API_KEY')
+            or os.environ.get('GOOGLE_GEMINI_API_KEY')
+        )
+        has_openai = bool(os.environ.get('OPENAI_API_KEY'))
+        has_ollama = bool(os.environ.get('OLLAMA_HOST'))
+
+        result['has_api_key'] = has_gemini or has_openai
+
+        custom_model = os.environ.get('AI_MODEL')
+        if custom_model:
+            result['model'] = custom_model
+        elif has_gemini:
+            result['model'] = 'gemini-3.5-flash'
+        elif has_openai:
+            result['model'] = 'gpt-4o-mini'
+        else:
+            result['model'] = 'gemini-3.5-flash'
+
         result['classified_count'] = QuestionClassification.query.count()
 
         nu = datetime.now(timezone.utc)
@@ -292,19 +361,16 @@ def check_ai_health() -> dict:
             QuestionClassification.geclassificeerd_op >= dertig_dagen_geleden
         ).count()
 
-        if provider == 'heuristiek':
-            result['status'] = 'info'
-            result['details'] = 'Regelgebaseerde trefwoorden (fallback actief, geen LLM verbonden)'
-        elif provider in ('ollama', 'openai'):
+        if has_gemini or has_openai or has_ollama:
             result['status'] = 'ok'
-            result['details'] = f'Actieve AI model service ({provider.upper()})'
+            result['details'] = f'Actieve AI model service ({provider})'
         else:
             result['status'] = 'info'
-            result['details'] = 'Geen externe AI service actief'
+            result['details'] = 'Geen actieve AI API-sleutel gevonden in environment'
     except Exception as e:
         result['status'] = 'info'
         result['error'] = str(e)
-        result['details'] = 'Fallback trefwoordenfilter'
+        result['details'] = 'Fout bij controleren AI-service'
 
     return result
 

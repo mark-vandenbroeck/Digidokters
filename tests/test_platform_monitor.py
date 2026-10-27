@@ -1,5 +1,5 @@
 from datetime import datetime, date, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from tests.base import BaseTestCase
 from extensions import db
 from models.user import User
@@ -184,3 +184,55 @@ class TestPlatformMonitor(BaseTestCase):
         self.assertIsNotNone(err)
         self.assertIn('superadmin@test.be', err.bericht)
         self.assertEqual(err.endpoint, 'auth.login')
+
+    def test_check_email_health_with_brevo_api(self):
+        """Test dat check_email_health automatisch de Brevo HTTPS API herkent en controleert via poort 443."""
+        import os
+        from utils.health import check_email_health
+
+        with patch.dict(os.environ, {'BREVO_API_KEY': 'xkeysib-mock-key-123'}):
+            with patch('socket.create_connection') as mock_conn:
+                mock_conn.return_value = MagicMock()
+                res = check_email_health()
+                self.assertTrue(res['is_api'])
+                self.assertEqual(res['protocol'], 'Brevo API')
+                self.assertEqual(res['server'], 'api.brevo.com')
+                self.assertEqual(res['port'], 443)
+                self.assertEqual(res['status'], 'ok')
+                mock_conn.assert_called_with(('api.brevo.com', 443), timeout=3.0)
+
+        # Controleer weergave op systeemmonitor pagina
+        self.login("superadmin@test.be", "AdminPass123!")
+        with patch.dict(os.environ, {'BREVO_API_KEY': 'xkeysib-mock-key-123'}):
+            with patch('socket.create_connection'):
+                resp = self.client.get('/platform/systeemmonitor?tab=gezondheid')
+                self.assertEqual(resp.status_code, 200)
+                html = resp.get_data(as_text=True)
+                self.assertIn('E-mail (Brevo API)', html)
+                self.assertIn('api.brevo.com', html)
+                self.assertIn('HTTPS', html)
+
+    def test_check_ai_health_gemini(self):
+        """Test dat check_ai_health Google Gemini correct herkent wanneer GEMINI_API_KEY is ingesteld."""
+        import os
+        from utils.health import check_ai_health
+
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'mock-gemini-key', 'AI_MODEL': 'gemini-3.5-flash'}):
+            res = check_ai_health()
+            self.assertEqual(res['status'], 'ok')
+            self.assertEqual(res['provider'], 'Google Gemini')
+            self.assertEqual(res['model'], 'gemini-3.5-flash')
+            self.assertTrue(res['has_api_key'])
+            self.assertIn('Google Gemini', res['details'])
+
+        # Controleer HTML weergave op systeemmonitor pagina
+        self.login("superadmin@test.be", "AdminPass123!")
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'mock-gemini-key'}):
+            resp = self.client.get('/platform/systeemmonitor?tab=gezondheid')
+            self.assertEqual(resp.status_code, 200)
+            html = resp.get_data(as_text=True)
+            self.assertIn('Google Gemini', html)
+            self.assertIn('Ingesteld', html)
+            self.assertIn('Geconfigureerd', html)
+
+

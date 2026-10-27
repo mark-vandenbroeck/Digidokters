@@ -12,6 +12,7 @@ pipeline {
     environment {
         VENV_DIR = '/tmp/venv'
         COVERAGE_CORE = 'sysmon'
+        PYTHONUNBUFFERED = '1'
     }
 
     stages {
@@ -25,18 +26,28 @@ pipeline {
             agent {
                 docker {
                     image 'python:3.12.4-slim'
-                    args '-u root:root --memory=1g --memory-swap=1g --cpus=1'
+                    args '-u root:root --memory=2g --memory-swap=2g --cpus=1 -v /tmp/jenkins-pip-cache:/root/.cache/pip'
                     reuseNode true
                 }
             }
-            steps {
-                sh '''
-                    python -m venv ${VENV_DIR}
-                    . ${VENV_DIR}/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements-dev.txt
-                    pytest --junitxml=results.xml --cov=. --cov-report=xml:coverage.xml
-                '''
+            stages {
+                stage('Install') {
+                    steps {
+                        sh '''
+                            python -m venv ${VENV_DIR}
+                            . ${VENV_DIR}/bin/activate
+                            pip install --no-compile --prefer-binary -r requirements-dev.txt
+                        '''
+                    }
+                }
+                stage('Test') {
+                    steps {
+                        sh '''
+                            . ${VENV_DIR}/bin/activate
+                            pytest tests/ --junitxml=results.xml --cov=app --cov=config --cov=extensions --cov=models --cov=routes --cov=utils --cov-report=xml:coverage.xml --durations=10
+                        '''
+                    }
+                }
             }
         }
 

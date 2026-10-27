@@ -1,5 +1,11 @@
 [run]
-source = .
+source =
+    app.py
+    config.py
+    extensions.py
+    models
+    routes
+    utils
 omit =
     tests/*
     scripts/*

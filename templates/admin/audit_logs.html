@@ -19,10 +19,32 @@
     </div>
 </div>
 
+{% macro sort_link(col_name, display_text) %}
+    {% if sort_by == col_name %}
+        {% set target_dir = 'desc' if direction == 'asc' else 'asc' %}
+    {% else %}
+        {% set target_dir = 'desc' if col_name == 'timestamp' else 'asc' %}
+    {% endif %}
+    <a href="{{ url_for('admin.audit_log', sort_by=col_name, direction=target_dir, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins) }}" class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+        {{ display_text }}
+        {% if sort_by == col_name %}
+            {% if direction == 'asc' %}
+                <i class="bi bi-arrow-up-short"></i>
+            {% else %}
+                <i class="bi bi-arrow-down-short"></i>
+            {% endif %}
+        {% else %}
+            <i class="bi bi-arrow-down-up text-muted" style="font-size: 0.8em; opacity: 0.4;"></i>
+        {% endif %}
+    </a>
+{% endmacro %}
+
 <!-- Filter Kaart -->
 <div class="card mb-4">
     <div class="card-body p-3">
         <form method="GET" action="{{ url_for('admin.audit_log') }}" class="row g-2 align-items-end">
+            <input type="hidden" name="sort_by" value="{{ sort_by }}">
+            <input type="hidden" name="direction" value="{{ direction }}">
             <!-- Datum Van -->
             <div class="col-6 col-sm-3 col-md-2">
                 <label for="datum_van" class="form-label small fw-semibold text-muted mb-1">Van datum</label>
@@ -36,7 +58,12 @@
             <!-- Gebruiker -->
             <div class="col-6 col-sm-3 col-md-2">
                 <label for="gebruiker" class="form-label small fw-semibold text-muted mb-1">Gebruiker</label>
-                <input type="text" class="form-control form-control-sm" id="gebruiker" name="gebruiker" value="{{ gebruiker }}" placeholder="Naam...">
+                <select class="form-select form-select-sm" id="gebruiker" name="gebruiker">
+                    <option value="">-- Alle --</option>
+                    {% for g in beschikbare_gebruikers %}
+                    <option value="{{ g }}" {% if gebruiker == g %}selected{% endif %}>{{ g }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <!-- Operatie -->
             <div class="col-6 col-sm-3 col-md-2">
@@ -51,7 +78,12 @@
             <!-- Tabel -->
             <div class="col-6 col-sm-3 col-md-2">
                 <label for="tabel" class="form-label small fw-semibold text-muted mb-1">Tabel</label>
-                <input type="text" class="form-control form-control-sm" id="tabel" name="tabel" value="{{ tabel }}" placeholder="Bijv. users...">
+                <select class="form-select form-select-sm" id="tabel" name="tabel">
+                    <option value="">-- Alle --</option>
+                    {% for t in beschikbare_tabellen %}
+                    <option value="{{ t }}" {% if tabel == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <!-- Platformbeheerder Organisatie Filter -->
             {% if current_user.rol == 'platformbeheerder' and organisaties %}
@@ -95,13 +127,13 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th class="ps-3" style="width:180px">Tijdstip</th>
-                        <th>Gebruiker</th>
-                        <th style="width:120px">Operatie</th>
-                        <th>Tabel</th>
-                        <th>Record ID</th>
+                        <th class="ps-3" style="width:180px">{{ sort_link('timestamp', 'Tijdstip') }}</th>
+                        <th>{{ sort_link('gebruiker', 'Gebruiker') }}</th>
+                        <th style="width:120px">{{ sort_link('operatie', 'Operatie') }}</th>
+                        <th>{{ sort_link('tabel', 'Tabel') }}</th>
+                        <th>{{ sort_link('record_id', 'Record ID') }}</th>
                         {% if current_user.rol == 'platformbeheerder' %}
-                        <th>Organisatie</th>
+                        <th>{{ sort_link('organisatie', 'Organisatie') }}</th>
                         {% endif %}
                         <th class="pe-3 text-end" style="width:100px">Details</th>
                     </tr>
@@ -148,21 +180,21 @@
         <nav class="d-flex justify-content-center p-3 border-top">
             <ul class="pagination pagination-sm mb-0">
                 <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('admin.audit_log', page=pagination.prev_num, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins) }}">
+                    <a class="page-link" href="{{ url_for('admin.audit_log', page=pagination.prev_num, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins, sort_by=sort_by, direction=direction) }}">
                         Vorige
                     </a>
                 </li>
                 {% for p in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
                     {% if p %}
                         <li class="page-item {% if p == pagination.page %}active{% endif %}">
-                            <a class="page-link" href="{{ url_for('admin.audit_log', page=p, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins) }}">{{ p }}</a>
+                            <a class="page-link" href="{{ url_for('admin.audit_log', page=p, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins, sort_by=sort_by, direction=direction) }}">{{ p }}</a>
                         </li>
                     {% else %}
                         <li class="page-item disabled"><span class="page-link">...</span></li>
                     {% endif %}
                 {% endfor %}
                 <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('admin.audit_log', page=pagination.next_num, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins) }}">
+                    <a class="page-link" href="{{ url_for('admin.audit_log', page=pagination.next_num, datum_van=datum_van, datum_tot=datum_tot, gebruiker=gebruiker, operatie=operatie, tabel=tabel, filter_organisatie_id=filter_organisatie_id, toon_logins=toon_logins, sort_by=sort_by, direction=direction) }}">
                         Volgende
                     </a>
                 </li>

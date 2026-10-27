@@ -1082,5 +1082,274 @@ def communicatie_log_detail(log_id):
     return render_template('platform/communicatie_detail.html', log=log)
 
 
+@platform_bp.route('/systeemmonitor')
+@login_required
+@platform_admin_required
+def systeemmonitor():
+    """Centraal dashboard voor platformbeheerders: gezondheid, live sessies, telemetrie en fouten."""
+    from utils.health import get_full_platform_health, get_friendly_endpoint_label
+    from models.telemetry import PageViewStat, SystemErrorLog
+    from models.organisatie import Organisatie
+    from models.user import User
+    from datetime import datetime, date, timedelta, timezone
+    from sqlalchemy import func, desc
+
+    actieve_tab = request.args.get('tab', 'gezondheid').strip().lower()
+    if actieve_tab not in ('gezondheid', 'live', 'gebruik', 'fouten'):
+        actieve_tab = 'gezondheid'
+
+    organisaties = Organisatie.query.filter(Organisatie.slug != 'sjabloon').order_by(Organisatie.naam).all()
+    now_utc = datetime.now(timezone.utc)
+    context = {
+        'actieve_tab': actieve_tab,
+        'organisaties': organisaties,
+        'now_utc': now_utc,
+    }
+
+    # 1. TAB GEZONDHEID
+    if actieve_tab == 'gezondheid':
+        context['health'] = get_full_platform_health()
+
+    # 2. TAB LIVE GEBRUIKERS
+    elif actieve_tab == 'live':
+        grens_15m = now_utc - timedelta(minutes=15)
+        actieve_gebruikers = (
+            User.query.filter(User.laatste_activiteit >= grens_15m)
+            .order_by(User.laatste_activiteit.desc())
+            .all()
+        )
+
+        vandaag_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
+        actief_vandaag_count = User.query.filter(
+            (User.laatste_activiteit >= vandaag_start) | (User.laatste_login >= vandaag_start)
+        ).count()
+
+        recente_logins = (
+            User.query.filter(User.laatste_login.isnot(None))
+            .order_by(User.laatste_login.desc())
+            .limit(20)
+            .all()
+        )
+
+        totaal_users = User.query.count()
+        totaal_actieve_accounts = User.query.filter_by(actief=True).count()
+
+        # Actieve gemeenten vandaag (op basis van gebruikers die vandaag actief waren)
+        active_users_today = User.query.filter(
+            (User.laatste_activiteit >= vandaag_start) | (User.laatste_login >= vandaag_start)
+        ).all()
+        actieve_gemeenten_vandaag = set()
+        for u in active_users_today:
+            for uo in u.user_organisaties:
+                if uo.actief and uo.organisatie and uo.organisatie.actief and uo.organisatie.slug != 'sjabloon':
+                    actieve_gemeenten_vandaag.add(uo.organisatie.naam)
+
+        context.update({
+            'actieve_gebruikers': actieve_gebruikers,
+            'actief_nu_count': len(actieve_gebruikers),
+            'actief_vandaag_count': actief_vandaag_count,
+            'actieve_gemeenten_telling': len(actieve_gemeenten_vandaag),
+            'recente_logins': recente_logins,
+            'totaal_users': totaal_users,
+            'totaal_actieve_accounts': totaal_actieve_accounts,
+        })
+
+    # 3. TAB PAGINAGEBRUIK & TELEMETRIE
+    elif actieve_tab == 'gebruik':
+        periode = request.args.get('periode', '7d').strip().lower()
+        geselecteerde_org_id = request.args.get('org_id', 'alle').strip()
+
+        vandaag = date.today()
+        start_datum = None
+        if periode == 'vandaag':
+            start_datum = vandaag
+        elif periode == '7d':
+            start_datum = vandaag - timedelta(days=7)
+        elif periode == '30d':
+            start_datum = vandaag - timedelta(days=30)
+        elif periode == 'jaar':
+            start_datum = vandaag - timedelta(days=365)
+        else:
+            periode = 'alles'
+
+        query = PageViewStat.query
+        if start_datum:
+            query = query.filter(PageViewStat.datum >= start_datum)
+
+        if geselecteerde_org_id != 'alle':
+            try:
+                org_filter_id = int(geselecteerde_org_id)
+                query = query.filter(PageViewStat.organisatie_id == org_filter_id)
+            except ValueError:
+                geselecteerde_org_id = 'alle'
+
+        totaal_views = query.with_entities(func.sum(PageViewStat.aantal_hits)).scalar() or 0
+
+        top_endpoints_raw = (
+            query.with_entities(
+                PageViewStat.endpoint,
+                PageViewStat.label,
+                func.sum(PageViewStat.aantal_hits).label('hits')
+            )
+            .group_by(PageViewStat.endpoint, PageViewStat.label)
+            .order_by(desc('hits'))
+            .limit(25)
+            .all()
+        )
+
+        top_endpoints = []
+        for ep, lbl, hits in top_endpoints_raw:
+            perc = round((hits / totaal_views * 100), 1) if totaal_views > 0 else 0
+            friendly = lbl or get_friendly_endpoint_label(ep)
+            top_endpoints.append({
+                'endpoint': ep,
+                'label': friendly,
+                'hits': hits,
+                'percentage': perc
+            })
+
+        trend_query = (
+            query.with_entities(
+                PageViewStat.datum,
+                func.sum(PageViewStat.aantal_hits).label('hits')
+            )
+            .group_by(PageViewStat.datum)
+            .order_by(PageViewStat.datum.asc())
+            .all()
+        )
+        chart_trend_labels = [row.datum.strftime('%d-%m-%Y') for row in trend_query]
+        chart_trend_data = [int(row.hits) for row in trend_query]
+
+        org_dist_query = (
+            db.session.query(
+                Organisatie.naam,
+                func.sum(PageViewStat.aantal_hits).label('hits')
+            )
+            .join(Organisatie, PageViewStat.organisatie_id == Organisatie.id)
+            .filter(Organisatie.slug != 'sjabloon')
+        )
+        if start_datum:
+            org_dist_query = org_dist_query.filter(PageViewStat.datum >= start_datum)
+        org_dist_rows = (
+            org_dist_query.group_by(Organisatie.naam)
+            .order_by(desc('hits'))
+            .limit(10)
+            .all()
+        )
+        chart_org_labels = [row.naam for row in org_dist_rows]
+        chart_org_data = [int(row.hits) for row in org_dist_rows]
+
+        context.update({
+            'periode': periode,
+            'geselecteerde_org_id': geselecteerde_org_id,
+            'totaal_views': totaal_views,
+            'top_endpoints': top_endpoints,
+            'chart_trend_labels': chart_trend_labels,
+            'chart_trend_data': chart_trend_data,
+            'chart_org_labels': chart_org_labels,
+            'chart_org_data': chart_org_data,
+        })
+
+    # 4. TAB BEVEILIGING & FOUTEN
+    elif actieve_tab == 'fouten':
+        status_filter = request.args.get('status', 'onopgelost').strip().lower()
+        if status_filter not in ('onopgelost', 'opgelost', 'alle'):
+            status_filter = 'onopgelost'
+
+        type_filter = request.args.get('type', 'alle').strip()
+        page = request.args.get('page', 1, type=int)
+
+        err_query = SystemErrorLog.query
+        if status_filter == 'onopgelost':
+            err_query = err_query.filter_by(is_opgelost=False)
+        elif status_filter == 'opgelost':
+            err_query = err_query.filter_by(is_opgelost=True)
+
+        if type_filter != 'alle':
+            err_query = err_query.filter(SystemErrorLog.type_fout == type_filter)
+
+        fouten_paginatie = err_query.order_by(SystemErrorLog.timestamp.desc()).paginate(
+            page=page, per_page=25, error_out=False
+        )
+
+        een_dag_geleden = now_utc - timedelta(hours=24)
+        onopgelost_count = SystemErrorLog.query.filter_by(is_opgelost=False).count()
+        fouten_500_24u = SystemErrorLog.query.filter(
+            SystemErrorLog.timestamp >= een_dag_geleden,
+            SystemErrorLog.status_code == 500
+        ).count()
+        fouten_429_24u = SystemErrorLog.query.filter(
+            SystemErrorLog.timestamp >= een_dag_geleden,
+            SystemErrorLog.status_code == 429
+        ).count()
+        login_failed_24u = SystemErrorLog.query.filter(
+            SystemErrorLog.timestamp >= een_dag_geleden,
+            SystemErrorLog.type_fout == 'LoginFailed'
+        ).count()
+
+        beschikbare_types = [
+            t[0] for t in db.session.query(SystemErrorLog.type_fout).distinct().all() if t[0]
+        ]
+
+        context.update({
+            'status_filter': status_filter,
+            'type_filter': type_filter,
+            'beschikbare_types': beschikbare_types,
+            'fouten_paginatie': fouten_paginatie,
+            'fouten': fouten_paginatie.items,
+            'onopgelost_count': onopgelost_count,
+            'fouten_500_24u': fouten_500_24u,
+            'fouten_429_24u': fouten_429_24u,
+            'login_failed_24u': login_failed_24u,
+        })
+
+    return render_template('platform/systeemmonitor.html', **context)
+
+
+@platform_bp.route('/systeemmonitor/fout/<int:error_id>/toggle-status', methods=['POST'])
+@login_required
+@platform_admin_required
+def systeemmonitor_toggle_error(error_id):
+    """Markeert een systeemfout als opgelost of onopgelost."""
+    from models.telemetry import SystemErrorLog
+    from flask import jsonify
+    err = SystemErrorLog.query.get_or_404(error_id)
+    now_utc = datetime.now(timezone.utc)
+    if err.is_opgelost:
+        err.is_opgelost = False
+        err.opgelost_op = None
+        err.opgelost_door = None
+        msg = 'Fout gemarkeerd als onopgelost.'
+    else:
+        err.is_opgelost = True
+        err.opgelost_op = now_utc
+        err.opgelost_door = current_user.naam
+        msg = 'Fout gemarkeerd als opgelost.'
+    db.session.commit()
+
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'is_opgelost': err.is_opgelost,
+            'opgelost_op': err.opgelost_op.isoformat() if err.opgelost_op else None,
+            'opgelost_door': err.opgelost_door,
+            'message': msg
+        })
+
+    flash(msg, 'success')
+    return redirect(request.referrer or url_for('platform.systeemmonitor', tab='fouten'))
+
+
+@platform_bp.route('/systeemmonitor/api/gezondheid', methods=['GET'])
+@login_required
+@platform_admin_required
+def systeemmonitor_api_gezondheid():
+    """Geeft de actuele platformgezondheid terug als JSON."""
+    from utils.health import get_full_platform_health
+    from flask import jsonify
+    health = get_full_platform_health()
+    return jsonify(health)
+
+
 
 

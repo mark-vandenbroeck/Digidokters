@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload, selectinload
@@ -290,7 +290,8 @@ def nieuw():
                     is_terugkerend=is_terugkerend,
                     interval=interval,
                     einddatum=einddatum,
-                    reeks_id=reeks_id
+                    reeks_id=reeks_id,
+                    gewijzigd_op=datetime.now(timezone.utc)
                 )
                 set_organisatie_id_op_model(item)
                 item.digidokters = selected_digidokters
@@ -320,6 +321,14 @@ def wijzigen(item_id):
 
     if item.organisatie_id != org_id:
         abort(403)
+
+    from utils.agenda_lock import acquire_or_check_lock, release_lock
+    kan_aanwezigheid_bewerken, active_lock = acquire_or_check_lock(item.id, current_user)
+    lock_user_naam = active_lock.user_naam if (active_lock and not kan_aanwezigheid_bewerken) else None
+    lock_warning = (
+        f"Aanwezigheden voor deze activiteit kunnen momenteel niet gewijzigd worden want gebruiker {lock_user_naam} is ze aan het wijzigen. Probeer later opnieuw."
+        if (not kan_aanwezigheid_bewerken and lock_user_naam) else None
+    )
 
     keuzes = _keuzelijsten()
 
@@ -370,19 +379,29 @@ def wijzigen(item_id):
             if not l or l.organisatie_id != org_id:
                 fouten.append('Ongeldige locatie geselecteerd.')
 
-        # Validatie digidokters
+        # Validatie digidokters (alleen nodig indien aanwezigheden bewerkt mogen worden)
         selected_digidokters = []
-        for d_id in digidokter_ids:
-            d = db.session.get(Digidokter, d_id)
-            if d and d.organisatie_id == org_id and d.actief:
-                selected_digidokters.append(d)
-            else:
-                fouten.append(f'Ongeldige of inactieve digidokter geselecteerd (ID: {d_id}).')
+        if kan_aanwezigheid_bewerken:
+            for d_id in digidokter_ids:
+                d = db.session.get(Digidokter, d_id)
+                if d and d.organisatie_id == org_id and d.actief:
+                    selected_digidokters.append(d)
+                else:
+                    fouten.append(f'Ongeldige of inactieve digidokter geselecteerd (ID: {d_id}).')
 
         if fouten:
             for f in fouten:
                 flash(f, 'danger')
-            return render_template('agenda/item_form.html', actie='Wijzigen', item=item, **keuzes, form_data=request.form)
+            return render_template(
+                'agenda/item_form.html',
+                actie='Wijzigen',
+                item=item,
+                **keuzes,
+                form_data=request.form,
+                kan_aanwezigheid_bewerken=kan_aanwezigheid_bewerken,
+                lock_warning=lock_warning,
+                lock_user_naam=lock_user_naam
+            )
 
         item.datum = datum
         item.uur_van = uur_van
@@ -390,19 +409,54 @@ def wijzigen(item_id):
         item.type_id = type_id
         item.locatie_id = locatie_id
         item.omschrijving = omschrijving
-        item.digidokters = selected_digidokters
+        item.gewijzigd_op = datetime.now(timezone.utc)
+        
+        if kan_aanwezigheid_bewerken:
+            item.digidokters = selected_digidokters
         
         try:
             db.session.commit()
-            flash('Agenda-item succesvol bijgewerkt.', 'success')
+            if kan_aanwezigheid_bewerken:
+                release_lock(item.id, current_user.id)
+            if not kan_aanwezigheid_bewerken and lock_user_naam:
+                flash(f'Agenda-item bijgewerkt. Aanwezigheden zijn ongewijzigd gebleven omdat gebruiker {lock_user_naam} ze momenteel bewerkt.', 'info')
+            else:
+                flash('Agenda-item succesvol bijgewerkt.', 'success')
             return redirect(url_for('agenda.lijst'))
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Fout bij bijwerken agenda-item {item_id}: {e}")
             flash('Er is een fout opgetreden bij het bijwerken van het agenda-item.', 'danger')
-            return render_template('agenda/item_form.html', actie='Wijzigen', item=item, **keuzes, form_data=request.form)
+            return render_template(
+                'agenda/item_form.html',
+                actie='Wijzigen',
+                item=item,
+                **keuzes,
+                form_data=request.form,
+                kan_aanwezigheid_bewerken=kan_aanwezigheid_bewerken,
+                lock_warning=lock_warning,
+                lock_user_naam=lock_user_naam
+            )
 
-    return render_template('agenda/item_form.html', actie='Wijzigen', item=item, **keuzes)
+    return render_template(
+        'agenda/item_form.html',
+        actie='Wijzigen',
+        item=item,
+        **keuzes,
+        kan_aanwezigheid_bewerken=kan_aanwezigheid_bewerken,
+        lock_warning=lock_warning,
+        lock_user_naam=lock_user_naam
+    )
+
+
+@agenda_bp.route('/agenda/<int:item_id>/annuleren')
+@login_required
+def annuleren(item_id):
+    """Geeft de eventuele vergrendeling op en keert terug naar de agendalijst."""
+    from utils.agenda_lock import release_lock
+    release_lock(item_id, current_user.id)
+    return redirect(url_for('agenda.lijst'))
+
 
 @agenda_bp.route('/agenda/<int:item_id>/verwijder', methods=['POST'])
 @login_required
@@ -417,6 +471,9 @@ def verwijderen(item_id):
     verwijder_reeks = request.form.get('verwijder_reeks') == 'true'
 
     try:
+        from utils.agenda_lock import release_lock
+        release_lock(item.id)
+
         if verwijder_reeks and item.reeks_id:
             # Verwijder de hele reeks
             AgendaItem.query.filter_by(organisatie_id=org_id, reeks_id=item.reeks_id).delete()

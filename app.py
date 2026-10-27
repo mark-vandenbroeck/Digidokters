@@ -126,8 +126,20 @@ def create_app(config_class=Config):
             return res
 
     # Controleer de organisatie-context voor authenticated requests
-    from flask import session, redirect, url_for, request, flash, g
+    from flask import session, redirect, url_for, request, flash, g, has_request_context
     from flask_login import current_user, login_required
+
+    def _update_user_activity():
+        if current_user and current_user.is_authenticated:
+            try:
+                from datetime import datetime, timezone, timedelta
+                now = datetime.now(timezone.utc)
+                last = getattr(current_user, 'laatste_activiteit', None)
+                if not last or (now - (last if last.tzinfo else last.replace(tzinfo=timezone.utc))) > timedelta(minutes=1):
+                    current_user.laatste_activiteit = now
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
 
     @app.before_request
     def check_organisatie_context():
@@ -144,12 +156,16 @@ def create_app(config_class=Config):
                 'auth.switch_organisatie',
             ]
             if request.endpoint in exempt_endpoints or request.endpoint.startswith('auth.') or request.endpoint.startswith('platform.') or request.endpoint.startswith('app_docs.'):
-                if current_user.is_authenticated and current_user.rol == 'platformbeheerder':
-                    from models.organisatie import Organisatie
-                    g.beschikbare_organisaties = Organisatie.query.filter_by(actief=True).all()
+                if current_user.is_authenticated:
+                    if current_user.rol == 'platformbeheerder':
+                        from models.organisatie import Organisatie
+                        g.beschikbare_organisaties = Organisatie.query.filter_by(actief=True).all()
+                    if not request.endpoint.startswith('static') and request.endpoint not in ('service_worker', 'ping'):
+                        _update_user_activity()
                 return
 
         if current_user.is_authenticated:
+            _update_user_activity()
             if current_user.rol == 'platformbeheerder':
                 from models.organisatie import Organisatie
                 g.beschikbare_organisaties = Organisatie.query.filter_by(actief=True).all()
@@ -272,6 +288,17 @@ def create_app(config_class=Config):
                 "img-src 'self' data:; "
                 "connect-src 'self';"
             )
+
+        # Telemetrie voor paginabezoeken registreren
+        try:
+            if request.endpoint and response.status_code < 400 and request.method == 'GET':
+                if not request.endpoint.startswith('static') and request.endpoint not in ('service_worker', 'ping'):
+                    from utils.health import record_page_view
+                    org_id = session.get('organisatie_id') if has_request_context() else None
+                    record_page_view(request.endpoint, request.path, org_id)
+        except Exception:
+            pass
+
         return response
 
     # Foutafhandeling
@@ -292,6 +319,23 @@ def create_app(config_class=Config):
 
     @app.errorhandler(429)
     def ratelimit_handler(e):
+        try:
+            from utils.health import record_system_error
+            org_id = session.get('organisatie_id') if has_request_context() else None
+            user_label = current_user.naam if (current_user and current_user.is_authenticated) else None
+            record_system_error(
+                status_code=429,
+                type_fout='RateLimitExceeded',
+                bericht='Te veel aanvragen (429 Too Many Requests)',
+                endpoint=request.endpoint,
+                pad=request.path,
+                methode=request.method,
+                ip_adres=request.remote_addr,
+                gebruiker=user_label,
+                organisatie_id=org_id
+            )
+        except Exception:
+            pass
         flash('Te veel aanvragen. Probeer het over enkele minuten opnieuw.', 'danger')
         return render_template('errors/429.html'), 429
 
@@ -300,6 +344,25 @@ def create_app(config_class=Config):
         db.session.rollback()
         real_ex = getattr(e, 'original_exception', e)
         app.logger.error(f"Internal Server Error: {real_ex}", exc_info=True)
+        try:
+            import traceback
+            from utils.health import record_system_error
+            org_id = session.get('organisatie_id') if has_request_context() else None
+            user_label = current_user.naam if (current_user and current_user.is_authenticated) else None
+            record_system_error(
+                status_code=500,
+                type_fout=type(real_ex).__name__,
+                bericht=str(real_ex),
+                stacktrace=traceback.format_exc(),
+                endpoint=request.endpoint,
+                pad=request.path,
+                methode=request.method,
+                ip_adres=request.remote_addr,
+                gebruiker=user_label,
+                organisatie_id=org_id
+            )
+        except Exception:
+            pass
         try:
             from utils.mail import stuur_fout_email
             stuur_fout_email(500, str(real_ex), exception=real_ex)
@@ -314,6 +377,25 @@ def create_app(config_class=Config):
             return e
         db.session.rollback()
         app.logger.error(f"Unhandled Exception: {e}", exc_info=True)
+        try:
+            import traceback
+            from utils.health import record_system_error
+            org_id = session.get('organisatie_id') if has_request_context() else None
+            user_label = current_user.naam if (current_user and current_user.is_authenticated) else None
+            record_system_error(
+                status_code=500,
+                type_fout=type(e).__name__,
+                bericht=str(e),
+                stacktrace=traceback.format_exc(),
+                endpoint=request.endpoint,
+                pad=request.path,
+                methode=request.method,
+                ip_adres=request.remote_addr,
+                gebruiker=user_label,
+                organisatie_id=org_id
+            )
+        except Exception:
+            pass
         try:
             from utils.mail import stuur_fout_email
             stuur_fout_email(500, str(e), exception=e)

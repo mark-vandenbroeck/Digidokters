@@ -44,7 +44,7 @@ pipeline {
                     steps {
                         sh '''
                             . ${VENV_DIR}/bin/activate
-                            pytest tests/ --junitxml=results.xml --cov=app --cov=config --cov=extensions --cov=models --cov=routes --cov=utils --cov-report=xml:coverage.xml --durations=10
+                            pytest tests/ --junitxml=results.xml --cov=. --cov-report=xml:coverage.xml --durations=10
                         '''
                     }
                 }

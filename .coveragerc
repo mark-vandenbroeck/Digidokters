@@ -1,14 +1,16 @@
 [run]
-source =
-    app.py
-    config.py
-    extensions.py
-    models
-    routes
-    utils
+source = .
 omit =
     tests/*
     scripts/*
     .venv/*
     venv/*
+    migrations/*
+    doc/*
+    docs/*
+    csv/*
+    uploads/*
+    instance/*
+    seed-data/*
+    sonar_issues/*
 

@@ -141,9 +141,14 @@
                             </div>
                         </td>
                         <td>
+                            {% set is_overgeslagen_door_mij = (item.id in overgeslagen_agenda_ids) if overgeslagen_agenda_ids else False %}
                             {% if is_ingevuld_door_mij %}
                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
                                     <i class="bi bi-check-circle-fill me-1"></i>Ingevuld
+                                </span>
+                            {% elif is_overgeslagen_door_mij %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1" title="Je hebt aangegeven deze evaluatie niet in te vullen">
+                                    <i class="bi bi-slash-circle me-1"></i>Overgeslagen
                                 </span>
                             {% elif is_mijn_sessie and item.datum <= date_today %}
                                 <span class="badge bg-warning text-dark border border-warning px-2 py-1">
@@ -172,9 +177,19 @@
                         </td>
                         <td class="pe-3 text-end text-nowrap">
                             <div class="d-inline-flex gap-1">
-                                {% if not is_ingevuld_door_mij and is_mijn_sessie and item.datum <= date_today %}
+                                {% if not is_ingevuld_door_mij and not is_overgeslagen_door_mij and is_mijn_sessie and item.datum <= date_today %}
                                 <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" class="btn btn-sm btn-warning fw-semibold" title="Formulier nu invullen via de app">
                                     <i class="bi bi-pencil-square me-1"></i>Invullen
+                                </a>
+                                <form method="POST" action="{{ url_for('eval.overslaan_sessie', agenda_id=item.id) }}" class="d-inline" onsubmit="return confirm('Weet je zeker dat je voor deze activiteit geen evaluatie wilt invullen?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Geen evaluatie invullen">
+                                        <i class="bi bi-slash-circle me-1"></i>Overslaan
+                                    </button>
+                                </form>
+                                {% elif is_overgeslagen_door_mij and is_mijn_sessie %}
+                                <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" class="btn btn-sm btn-outline-warning" title="Alsnog invullen">
+                                    <i class="bi bi-pencil-square me-1"></i>Alsnog invullen
                                 </a>
                                 {% elif is_ingevuld_door_mij %}
                                 <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" class="btn btn-sm btn-outline-secondary" title="Mijn evaluatie bewerken">

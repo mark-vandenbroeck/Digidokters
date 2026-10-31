@@ -12,7 +12,7 @@ from models.gender_identity import GenderIdentity
 from models.location import Location
 from models.resultaat import Resultaat
 from utils.decorators import writer_required
-from utils.helpers import safe_int, safe_date, safe_str
+from utils.helpers import safe_int, safe_date, safe_str, is_veilige_redirect
 from utils.tenant import filter_op_organisatie
 
 reg_bp = Blueprint('reg', __name__)
@@ -60,6 +60,23 @@ def lijst():
     from utils.permissions import is_alleen_eigen_registraties
     org_id = get_huidige_organisatie_id()
     alleen_eigen_registraties = is_alleen_eigen_registraties(current_user, org_id)
+
+    # Filters wissen
+    if request.args.get('reset'):
+        session.pop(f'reg_terug_url_{org_id}', None)
+        return redirect(url_for('reg.lijst'))
+
+    # Bewaar actieve filters en URL voor terugkeer vanaf detailweergave
+    has_active_filters = bool(
+        zoek or filter_digidokter or filter_locatie or filter_toestel or
+        filter_leeftijd or filter_geslacht or filter_resultaat or
+        filter_datum_van or filter_datum_tot or
+        sort_by != 'datum' or direction != 'desc' or pagina > 1
+    )
+    if has_active_filters and request.query_string:
+        session[f'reg_terug_url_{org_id}'] = request.full_path
+    elif request.args:
+        session.pop(f'reg_terug_url_{org_id}', None)
 
     query = (
         filter_op_organisatie(Registration.query, Registration)
@@ -581,11 +598,15 @@ def snel():
 @login_required
 def bekijken(reg_id):
     from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
     reg = db.get_or_404(Registration, reg_id)
-    if reg.organisatie_id != get_huidige_organisatie_id():
+    if reg.organisatie_id != org_id:
         from flask import abort
         abort(403)
-    return render_template('registrations/view.html', reg=reg)
+    terug_url = request.args.get('terug_url')
+    if not terug_url or not is_veilige_redirect(terug_url):
+        terug_url = session.get(f'reg_terug_url_{org_id}') or url_for('reg.lijst')
+    return render_template('registrations/view.html', reg=reg, terug_url=terug_url)
 
 
 @reg_bp.route('/registraties/<int:reg_id>/wijzig', methods=['GET', 'POST'])
@@ -601,6 +622,9 @@ def wijzigen(reg_id):
         abort(403)
         
     keuzes = _keuzelijsten()
+    terug_url = request.args.get('terug_url') or request.form.get('terug_url')
+    if not terug_url or not is_veilige_redirect(terug_url):
+        terug_url = session.get(f'reg_terug_url_{org_id}')
 
     if request.method == 'POST':
         datum_str = request.form.get('datum', str(reg.datum))
@@ -608,7 +632,7 @@ def wijzigen(reg_id):
             datum = date.fromisoformat(datum_str)
         except ValueError:
             flash('Ongeldige datum.', 'danger')
-            return render_template('registrations/edit.html', reg=reg, **keuzes)
+            return render_template('registrations/edit.html', reg=reg, **keuzes, terug_url=terug_url)
 
         client = request.form.get('client', '').strip()
         digidokter_id = request.form.get('digidokter_id', 0, type=int)
@@ -686,7 +710,7 @@ def wijzigen(reg_id):
         if fouten:
             for f in fouten:
                 flash(f, 'danger')
-            return render_template('registrations/edit.html', reg=reg, **keuzes)
+            return render_template('registrations/edit.html', reg=reg, **keuzes, terug_url=terug_url)
 
         oude_onderwerp = reg.onderwerp
         reg.datum = datum
@@ -707,7 +731,7 @@ def wijzigen(reg_id):
             db.session.rollback()
             current_app.logger.error(f"Fout bij bijwerken registratie {reg.id}: {e}")
             flash('Er is een fout opgetreden bij het bijwerken van de registratie.', 'danger')
-            return render_template('registrations/edit.html', reg=reg, **keuzes)
+            return render_template('registrations/edit.html', reg=reg, **keuzes, terug_url=terug_url)
 
         # Indien onderwerp gewijzigd of nog niet geclassificeerd, heranalyseer asynchroon
         if onderwerp != oude_onderwerp or not reg.classification:
@@ -718,9 +742,11 @@ def wijzigen(reg_id):
                 pass
 
         flash(f'Registratie {reg.registratienummer} succesvol bijgewerkt.', 'success')
+        if terug_url:
+            return redirect(url_for('reg.bekijken', reg_id=reg.id, terug_url=terug_url))
         return redirect(url_for('reg.bekijken', reg_id=reg.id))
 
-    return render_template('registrations/edit.html', reg=reg, **keuzes)
+    return render_template('registrations/edit.html', reg=reg, **keuzes, terug_url=terug_url)
 
 
 @reg_bp.route('/registraties/<int:reg_id>/verwijder', methods=['POST'])
@@ -735,6 +761,10 @@ def verwijderen(reg_id):
     if reg.organisatie_id != org_id:
         abort(403)
 
+    terug_url = request.args.get('terug_url') or request.form.get('terug_url')
+    if not terug_url or not is_veilige_redirect(terug_url):
+        terug_url = session.get(f'reg_terug_url_{org_id}') or url_for('reg.lijst')
+
     reg_nummer = reg.registratienummer
     try:
         db.session.delete(reg)
@@ -743,7 +773,7 @@ def verwijderen(reg_id):
         db.session.rollback()
         current_app.logger.error(f"Fout bij verwijderen registratie {reg_id}: {e}")
         flash('Er is een fout opgetreden bij het verwijderen van de registratie.', 'danger')
-        return redirect(url_for('reg.lijst'))
+        return redirect(terug_url)
     
     # GDPR: Verwijder ook alle audit logs die gekoppeld zijn aan deze registratie
     try:
@@ -755,4 +785,4 @@ def verwijderen(reg_id):
         current_app.logger.error(f"Fout bij het opschonen van audit logs voor registratie {reg_id}: {str(e)}")
 
     flash(f'Registratie {reg_nummer} is succesvol verwijderd.', 'success')
-    return redirect(url_for('reg.lijst'))
+    return redirect(terug_url)

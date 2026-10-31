@@ -761,6 +761,205 @@ class TestEvaluations(BaseTestCase):
         db.session.refresh(reactie)
         self.assertEqual(reactie.antwoorden.get(str(v1.id)), 'Goed')
 
+    def test_overslaan_evaluatie_via_sessie_route(self):
+        """Test dat een digidokter een evaluatie kan overslaan via de directe route."""
+        from routes.evaluations import get_openstaande_evaluaties_voor_user
+
+        self.login('UserTim', 'password123')
+        gisteren = date.today() - timedelta(days=1)
+        sessie = AgendaItem(
+            organisatie_id=self.org.id,
+            datum=gisteren,
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        # Vooraf: 1 openstaande evaluatie
+        openstaand_voor = get_openstaande_evaluaties_voor_user(self.medewerker_user, self.org.id)
+        self.assertEqual(len(openstaand_voor), 1)
+
+        # POST naar overslaan route
+        resp = self.client.post(f'/evaluaties/agenda/{sessie.id}/overslaan', follow_redirects=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('geen evaluatieformulier in te vullen', resp.get_data(as_text=True))
+
+        # Controleer response in db
+        reactie = EvaluationResponse.query.filter_by(agenda_item_id=sessie.id, digidokter_id=self.digidokter.id).first()
+        self.assertIsNotNone(reactie)
+        self.assertTrue(reactie.is_overgeslagen)
+
+        # Na overslaan: 0 openstaande evaluaties
+        openstaand_na = get_openstaande_evaluaties_voor_user(self.medewerker_user, self.org.id)
+        self.assertEqual(len(openstaand_na), 0)
+
+        # In agenda lijst met toon_verleden=on moet nu 'Overgeslagen' en 'alsnog invullen' te zien zijn
+        resp_lijst = self.client.get('/agenda?toon_verleden=on')
+        self.assertEqual(resp_lijst.status_code, 200)
+        self.assertIn('Overgeslagen', resp_lijst.get_data(as_text=True))
+        self.assertIn('alsnog invullen', resp_lijst.get_data(as_text=True))
+
+    def test_overslaan_evaluatie_via_formulier_knop(self):
+        """Test dat klikken op 'Geen evaluatie invullen' in het invulformulier de evaluatie markeert als overgeslagen."""
+        from routes.evaluations import get_openstaande_evaluaties_voor_user
+
+        self.login('UserTim', 'password123')
+        gisteren = date.today() - timedelta(days=1)
+        sessie = AgendaItem(
+            organisatie_id=self.org.id,
+            datum=gisteren,
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        # Formulier openen toont de 'Geen evaluatie invullen' knop
+        resp_get = self.client.get(f'/evaluaties/agenda/{sessie.id}/invullen')
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertIn('Geen evaluatie invullen', resp_get.get_data(as_text=True))
+
+        # POST met actie=overslaan (ook al zijn verplichte vragen leeg)
+        resp_post = self.client.post(f'/evaluaties/agenda/{sessie.id}/invullen', data={
+            'actie': 'overslaan'
+        }, follow_redirects=True)
+        self.assertEqual(resp_post.status_code, 200)
+
+        reactie = EvaluationResponse.query.filter_by(agenda_item_id=sessie.id, digidokter_id=self.digidokter.id).first()
+        self.assertIsNotNone(reactie)
+        self.assertTrue(reactie.is_overgeslagen)
+        self.assertEqual(len(get_openstaande_evaluaties_voor_user(self.medewerker_user, self.org.id)), 0)
+
+    def test_overslaan_evaluatie_via_token(self):
+        """Test dat een digidokter via e-mailtoken de evaluatie kan overslaan."""
+        gisteren = date.today() - timedelta(days=1)
+        sessie = AgendaItem(
+            organisatie_id=self.org.id,
+            datum=gisteren,
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        invitation = EvaluationInvitation(
+            agenda_item_id=sessie.id,
+            digidokter_id=self.digidokter.id,
+            token="token_skip_test",
+            is_ingevuld=False
+        )
+        db.session.add(invitation)
+        db.session.commit()
+
+        self.logout()
+
+        # POST naar /evaluaties/invullen/<token>/overslaan
+        resp = self.client.post('/evaluaties/invullen/token_skip_test/overslaan')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('Evaluatie overgeslagen', resp.get_data(as_text=True))
+        self.assertIn('geen evaluatieformulier in te vullen', resp.get_data(as_text=True))
+        self.assertIn('Toch alsnog invullen', resp.get_data(as_text=True))
+
+        db.session.refresh(invitation)
+        self.assertTrue(invitation.is_overgeslagen)
+        self.assertTrue(invitation.is_ingevuld)
+
+        reactie = EvaluationResponse.query.filter_by(agenda_item_id=sessie.id, digidokter_id=self.digidokter.id).first()
+        self.assertIsNotNone(reactie)
+        self.assertTrue(reactie.is_overgeslagen)
+
+        # GET op de tokenlink toont nu de bedankt-pagina met 'Evaluatie overgeslagen'
+        resp_get = self.client.get('/evaluaties/invullen/token_skip_test')
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertIn('Evaluatie overgeslagen', resp_get.get_data(as_text=True))
+        self.assertIn('Toch alsnog invullen', resp_get.get_data(as_text=True))
+
+    def test_alsnog_invullen_na_overslaan(self):
+        """Test dat een digidokter zich kan bedenken en de overgeslagen evaluatie alsnog kan invullen."""
+        from routes.evaluations import get_or_create_evaluation_form
+
+        self.login('UserTim', 'password123')
+        gisteren = date.today() - timedelta(days=1)
+        sessie = AgendaItem(
+            organisatie_id=self.org.id,
+            datum=gisteren,
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        form = get_or_create_evaluation_form(self.type_digicafe.id, self.org.id)
+        v1 = form.vragen[0] if form.vragen else EvaluationQuestion(form_id=form.id, vraag_tekst="Vraag 1", type="multiple_choice", opties=["Ja", "Nee"], volgorde=1, verplicht=True)
+        if not form.vragen:
+            db.session.add(v1)
+            db.session.commit()
+
+        # Eerst overslaan
+        self.client.post(f'/evaluaties/agenda/{sessie.id}/overslaan', follow_redirects=True)
+        reactie = EvaluationResponse.query.filter_by(agenda_item_id=sessie.id, digidokter_id=self.digidokter.id).first()
+        self.assertIsNotNone(reactie)
+        self.assertTrue(reactie.is_overgeslagen)
+
+        # Alsnog invullen via formulier POST
+        data = {'actie': 'opslaan'}
+        for vraag in form.vragen:
+            data[f'vraag_{vraag.id}'] = vraag.opties[0] if vraag.opties else "Antwoord"
+        resp_post = self.client.post(f'/evaluaties/agenda/{sessie.id}/invullen', data=data, follow_redirects=True)
+        self.assertEqual(resp_post.status_code, 200)
+
+        db.session.refresh(reactie)
+        self.assertFalse(reactie.is_overgeslagen)
+        self.assertTrue(len(reactie.antwoorden) > 0)
+
+    def test_herinneringen_negeren_overgeslagen_evaluaties(self):
+        """Test dat overgeslagen evaluaties geen herinneringsmails ontvangen."""
+        from routes.evaluations import verstuur_herinneringen_voor_sessie, get_or_create_evaluation_form
+
+        form = get_or_create_evaluation_form(self.type_digicafe.id, self.org.id)
+
+        gisteren = date.today() - timedelta(days=1)
+        sessie = AgendaItem(
+            organisatie_id=self.org.id,
+            datum=gisteren,
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_digicafe.id,
+            locatie_id=self.locatie.id
+        )
+        sessie.digidokters.append(self.digidokter)
+        db.session.add(sessie)
+        db.session.commit()
+
+        # Markeer als overgeslagen
+        reactie = EvaluationResponse(
+            organisatie_id=self.org.id,
+            agenda_item_id=sessie.id,
+            form_id=form.id,
+            digidokter_id=self.digidokter.id,
+            is_overgeslagen=True,
+            antwoorden={}
+        )
+        db.session.add(reactie)
+        db.session.commit()
+
+        aantal, namen, fouten = verstuur_herinneringen_voor_sessie(sessie)
+        self.assertEqual(aantal, 0)
+
+
 
 
 

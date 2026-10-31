@@ -6,7 +6,7 @@
 <div class="col-12 col-lg-8 col-xl-7">
 
     <div class="d-flex align-items-center gap-2 mb-3">
-        <a href="{{ url_for('reg.lijst') }}" class="btn btn-sm btn-outline-secondary">
+        <a href="{{ terug_url or url_for('reg.lijst') }}" class="btn btn-sm btn-outline-secondary" title="Terug naar overzicht">
             <i class="bi bi-arrow-left"></i>
         </a>
         <h1 class="dd-page-title mb-0">
@@ -14,12 +14,15 @@
         </h1>
         {% if not current_user.is_lezer() %}
         <div class="d-flex gap-2 ms-auto">
-            <a href="{{ url_for('reg.wijzigen', reg_id=reg.id) }}" class="btn btn-sm btn-outline-primary">
+            <a href="{{ url_for('reg.wijzigen', reg_id=reg.id, terug_url=terug_url) if terug_url else url_for('reg.wijzigen', reg_id=reg.id) }}" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-pencil me-1"></i>Wijzigen
             </a>
             <form action="{{ url_for('reg.verwijderen', reg_id=reg.id) }}" method="POST" class="d-inline"
                   onsubmit="return confirm('Weet u zeker dat u deze registratie wilt verwijderen?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if terug_url %}
+                <input type="hidden" name="terug_url" value="{{ terug_url }}">
+                {% endif %}
                 <button type="submit" class="btn btn-sm btn-outline-danger">
                     <i class="bi bi-trash me-1"></i>Verwijderen
                 </button>

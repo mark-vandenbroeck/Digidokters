@@ -283,4 +283,106 @@ class TestRegistrations(BaseTestCase):
         self.assertIn("De vraag betreft wifi-connectiviteit en netwerkproblemen.", html2)
         self.assertIn("Motivatie:", html2)
 
+    def test_filters_preserved_when_viewing_details_and_returning(self):
+        """Test dat ingestelde filters behouden blijven bij het bekijken van details en terugkeren."""
+        from models.digidokter import Digidokter
+
+        dd2 = Digidokter(naam="Tweede Dokter Test", actief=True, organisatie_id=self.org.id)
+        db.session.add(dd2)
+        db.session.commit()
+
+        # Registraties aanmaken
+        r1 = Registration(
+            registratienummer="2026-0301",
+            datum=date.today(),
+            client="Alice Filter",
+            digidokter_id=self.digidokter.id,
+            toestel_id=self.device.id,
+            leeftijdscategorie_id=self.age_category.id,
+            onderwerp="Filter test A",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        r2 = Registration(
+            registratienummer="2026-0302",
+            datum=date.today(),
+            client="Bob Filter",
+            digidokter_id=dd2.id,
+            toestel_id=self.device.id,
+            leeftijdscategorie_id=self.age_category.id,
+            onderwerp="Filter test B",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        db.session.add_all([r1, r2])
+        db.session.commit()
+
+        # 1. Pas filter toe in de registratielijst
+        filter_path = f"/registraties?digidokter={self.digidokter.id}&zoek=Alice"
+        res = self.client.get(filter_path)
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode("utf-8")
+        self.assertIn("Alice Filter", html)
+        self.assertNotIn("Bob Filter", html)
+
+        # Controleer dat de oogje-link in de HTML de terug_url bevat
+        self.assertIn(f"/registraties/{r1.id}?terug_url=", html)
+
+        # 2. Klik op het oogje (bekijk details van r1) met terug_url
+        from urllib.parse import quote
+        res_view = self.client.get(f"/registraties/{r1.id}?terug_url={quote(filter_path)}")
+        self.assertEqual(res_view.status_code, 200)
+        html_view = res_view.data.decode("utf-8")
+
+        # De terugknop in view.html moet verwijzen naar de gefilterde lijst (met HTML-escaping voor &amp;)
+        escaped_filter_path = filter_path.replace('&', '&amp;')
+        self.assertIn(escaped_filter_path, html_view)
+
+        # 3. Test ook bekijken zonder query parameter: fallback naar sessie
+        res_view_sess = self.client.get(f"/registraties/{r1.id}")
+        self.assertEqual(res_view_sess.status_code, 200)
+        html_view_sess = res_view_sess.data.decode("utf-8")
+        self.assertIn(escaped_filter_path, html_view_sess)
+
+        # 4. Keer terug naar de lijst via de terug_url
+        res_return = self.client.get(filter_path)
+        self.assertEqual(res_return.status_code, 200)
+        html_return = res_return.data.decode("utf-8")
+        self.assertIn("Alice Filter", html_return)
+        self.assertNotIn("Bob Filter", html_return)
+        # Filter velden zijn ingevuld
+        self.assertIn('value="Alice"', html_return)
+
+        # 5. Wijzigen met behoud van terug_url
+        res_edit_page = self.client.get(f"/registraties/{r1.id}/wijzig?terug_url={quote(filter_path)}")
+        self.assertEqual(res_edit_page.status_code, 200)
+        html_edit = res_edit_page.data.decode("utf-8")
+        self.assertIn(escaped_filter_path, html_edit)
+
+        # Post wijziging en controleer redirect naar detailpagina met terug_url
+        res_edit_post = self.client.post(f"/registraties/{r1.id}/wijzig", data={
+            'datum': str(date.today()),
+            'client': "Alice Aangepast",
+            'digidokter_id': str(self.digidokter.id),
+            'nieuwe_klant': 'nee',
+            'herkomst_id': str(self.herkomst.id),
+            'geslacht': 'vrouw',
+            'onderwerp': 'Aangepast onderwerp',
+            'leeftijdscategorie_id': str(self.age_category.id),
+            'toestel_id': str(self.device.id),
+            'terug_url': filter_path
+        })
+        self.assertEqual(res_edit_post.status_code, 302)
+        self.assertIn(f"/registraties/{r1.id}", res_edit_post.headers['Location'])
+        self.assertIn("terug_url=", res_edit_post.headers['Location'])
+
+        # 6. Reset via 'Filters wissen'
+        res_reset = self.client.get("/registraties?reset=1", follow_redirects=True)
+        self.assertEqual(res_reset.status_code, 200)
+        html_reset = res_reset.data.decode("utf-8")
+        # Nu zijn beide records weer zichtbaar
+        self.assertIn("Alice Aangepast", html_reset)
+        self.assertIn("Bob Filter", html_reset)
+
+
 

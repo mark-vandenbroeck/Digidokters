@@ -1,6 +1,20 @@
 """Algemene helper functies voor defensieve parameter parsing en validatie."""
 from datetime import date, datetime
 from typing import Any, Optional
+from urllib.parse import urlparse
+
+
+def is_veilige_redirect(url: str) -> bool:
+    """Controleer of url een relatief pad binnen deze app is (geen open redirect)."""
+    if not url:
+        return False
+    parsed = urlparse(url)
+    return (
+        parsed.scheme == ''
+        and parsed.netloc == ''
+        and url.startswith('/')
+        and not url.startswith('//')
+    )
 
 
 def safe_int(val: Any, default: Optional[int] = None) -> Optional[int]:

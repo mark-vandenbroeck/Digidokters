@@ -130,11 +130,12 @@ def lijst():
     if huidige_dd:
         filter_conds.append(EvaluationResponse.digidokter_id == huidige_dd.id)
 
-    ingevulde_records = db.session.query(EvaluationResponse.agenda_item_id).filter(
+    ingevulde_records = db.session.query(EvaluationResponse.agenda_item_id, EvaluationResponse.is_overgeslagen).filter(
         EvaluationResponse.organisatie_id == org_id,
         db.or_(*filter_conds)
     ).all()
-    ingevulde_agenda_ids = {r[0] for r in ingevulde_records}
+    ingevulde_agenda_ids = {r[0] for r in ingevulde_records if not r[1]}
+    overgeslagen_agenda_ids = {r[0] for r in ingevulde_records if r[1]}
 
     return render_template(
         'agenda/lijst.html',
@@ -151,6 +152,7 @@ def lijst():
         openstaande_evaluaties=openstaande_evaluaties,
         openstaande_agenda_ids=openstaande_agenda_ids,
         ingevulde_agenda_ids=ingevulde_agenda_ids,
+        overgeslagen_agenda_ids=overgeslagen_agenda_ids,
         huidige_dd=huidige_dd,
         vandaag=date.today(),
         **keuzes

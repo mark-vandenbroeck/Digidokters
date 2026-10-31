@@ -74,6 +74,7 @@ class EvaluationResponse(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
     ingediend_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     antwoorden = db.Column(db.JSON, nullable=False)  # Dict: {"<vraag_id>": "antwoord"}
+    is_overgeslagen = db.Column(db.Boolean, default=False, nullable=False, server_default=db.false())
 
     __table_args__ = (
         db.UniqueConstraint('agenda_item_id', 'digidokter_id', name='uq_eval_response_agenda_digidokter'),
@@ -100,6 +101,7 @@ class EvaluationInvitation(db.Model):
     token = db.Column(db.String(64), unique=True, nullable=False, index=True)
     verzonden_op = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     is_ingevuld = db.Column(db.Boolean, default=False, nullable=False)
+    is_overgeslagen = db.Column(db.Boolean, default=False, nullable=False, server_default=db.false())
     herinnering_verzonden_op = db.Column(db.DateTime, nullable=True)
     herinnering_aantal = db.Column(db.Integer, default=0, nullable=False)
 

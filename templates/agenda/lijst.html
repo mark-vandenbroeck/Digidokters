@@ -161,11 +161,26 @@
                                        class="badge bg-success-subtle text-success text-decoration-none border border-success-subtle" title="Je hebt deze evaluatie ingevuld (totaal {{ resp_count }} reactie(s))">
                                         <i class="bi bi-check-circle me-1"></i>Ingevuld ({{ resp_count }})
                                     </a>
+                                {% elif item.id in overgeslagen_agenda_ids %}
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="Je hebt aangegeven deze evaluatie niet in te vullen">
+                                        <i class="bi bi-slash-circle me-1"></i>Overgeslagen
+                                    </span>
+                                    {% if is_mijn_sessie %}
+                                    <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" class="small text-muted text-decoration-underline ms-1" title="Toch nog invullen">alsnog invullen</a>
+                                    {% endif %}
                                 {% elif is_mijn_sessie and item.datum <= vandaag %}
-                                    <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" 
-                                       class="badge bg-warning text-dark text-decoration-none border border-warning shadow-sm" title="Evaluatieformulier nu invullen">
-                                        <i class="bi bi-pencil-square me-1"></i>Evaluatie invullen
-                                    </a>
+                                    <div class="d-inline-flex align-items-center gap-1">
+                                        <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}" 
+                                           class="badge bg-warning text-dark text-decoration-none border border-warning shadow-sm" title="Evaluatieformulier nu invullen">
+                                            <i class="bi bi-pencil-square me-1"></i>Evaluatie invullen
+                                        </a>
+                                        <form method="POST" action="{{ url_for('eval.overslaan_sessie', agenda_id=item.id) }}" class="d-inline" onsubmit="return confirm('Weet je zeker dat je voor deze activiteit geen evaluatie wilt invullen?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="badge bg-light text-muted border text-decoration-none p-1" style="cursor: pointer;" title="Niet invullen (overslaan)">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 {% elif resp_count > 0 %}
                                     <a href="{{ url_for('eval.sessie_detail', agenda_id=item.id) }}" 
                                        class="badge bg-info-subtle text-info text-decoration-none border border-info-subtle" title="Evaluatieresultaten bekijken">
@@ -197,7 +212,7 @@
                         <td class="pe-3 text-end text-nowrap">
                             {% if item.type.heeft_evaluatie %}
                                 {% set is_mijn_sessie = (huidige_dd and (huidige_dd in item.digidokters)) %}
-                                {% if item.id not in ingevulde_agenda_ids and is_mijn_sessie and item.datum <= vandaag %}
+                                {% if item.id not in ingevulde_agenda_ids and item.id not in overgeslagen_agenda_ids and is_mijn_sessie and item.datum <= vandaag %}
                                 <a href="{{ url_for('eval.invullen_sessie', agenda_id=item.id) }}"
                                    class="btn btn-sm btn-warning me-1" title="Evaluatieformulier invullen">
                                     <i class="bi bi-pencil-square"></i>

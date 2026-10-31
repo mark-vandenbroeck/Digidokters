@@ -6,7 +6,7 @@
 <div class="col-12 col-lg-8 col-xl-7">
 
     <div class="d-flex align-items-center gap-2 mb-1">
-        <a href="{{ url_for('reg.bekijken', reg_id=reg.id) }}" class="btn btn-sm btn-outline-secondary">
+        <a href="{{ url_for('reg.bekijken', reg_id=reg.id, terug_url=terug_url) if terug_url else url_for('reg.bekijken', reg_id=reg.id) }}" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-arrow-left"></i>
         </a>
         <h1 class="dd-page-title mb-0">
@@ -21,6 +21,9 @@
         <div class="card-body p-4">
             <form method="POST" action="{{ url_for('reg.wijzigen', reg_id=reg.id) }}" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if terug_url %}
+                <input type="hidden" name="terug_url" value="{{ terug_url }}">
+                {% endif %}
 
                 <div class="row g-3">
                     <div class="col-12 col-sm-6">
@@ -150,7 +153,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-lg me-1"></i>Opslaan
                     </button>
-                    <a href="{{ url_for('reg.bekijken', reg_id=reg.id) }}" class="btn btn-outline-secondary">Annuleren</a>
+                    <a href="{{ url_for('reg.bekijken', reg_id=reg.id, terug_url=terug_url) if terug_url else url_for('reg.bekijken', reg_id=reg.id) }}" class="btn btn-outline-secondary">Annuleren</a>
                 </div>
             </form>
         </div>

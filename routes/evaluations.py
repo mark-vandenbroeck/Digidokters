@@ -441,7 +441,7 @@ def overzicht():
         .all()
     )
 
-    totaal_reacties = EvaluationResponse.query.filter_by(organisatie_id=org_id).count()
+    totaal_reacties = EvaluationResponse.query.filter_by(organisatie_id=org_id, is_overgeslagen=False).count()
 
     return render_template(
         'admin/evaluaties/overzicht.html',
@@ -723,22 +723,29 @@ def resultaten():
 
     all_sessies = query.order_by(AgendaItem.datum.desc(), AgendaItem.uur_van.desc()).all()
 
-    # Bepaal welke sessies al zijn ingevuld door de ingelogde gebruiker
+    # Bepaal welke sessies al zijn ingevuld of overgeslagen door de ingelogde gebruiker
     ingevulde_agenda_ids = set()
+    overgeslagen_agenda_ids = set()
     if all_sessies:
         sessie_ids = [s.id for s in all_sessies]
         filter_conds = [EvaluationResponse.user_id == current_user.id]
         if dd_id:
             filter_conds.append(EvaluationResponse.digidokter_id == dd_id)
-        resp_records = db.session.query(EvaluationResponse.agenda_item_id).filter(
+        resp_records = db.session.query(EvaluationResponse.agenda_item_id, EvaluationResponse.is_overgeslagen).filter(
             EvaluationResponse.agenda_item_id.in_(sessie_ids),
             db.or_(*filter_conds)
         ).all()
-        ingevulde_agenda_ids = {r[0] for r in resp_records}
+        for r in resp_records:
+            if r[1]:
+                overgeslagen_agenda_ids.add(r[0])
+            else:
+                ingevulde_agenda_ids.add(r[0])
 
-    # Openstaande sessies voor de huidige medewerker (enkel sessies waar de medewerker aan gekoppeld is)
+    beantwoorde_of_overgeslagen_ids = ingevulde_agenda_ids | overgeslagen_agenda_ids
+
+    # Openstaande sessies voor de huidige medewerker (enkel sessies waar de medewerker aan gekoppeld is die NIET ingevuld en NIET overgeslagen zijn)
     if huidige_dd:
-        openstaande_sessies = [s for s in all_sessies if s.datum <= date.today() and s.id not in ingevulde_agenda_ids and (huidige_dd in s.digidokters)]
+        openstaande_sessies = [s for s in all_sessies if s.datum <= date.today() and s.id not in beantwoorde_of_overgeslagen_ids and (huidige_dd in s.digidokters)]
     else:
         openstaande_sessies = []
 
@@ -756,6 +763,7 @@ def resultaten():
         enkel_ingevuld=enkel_ingevuld,
         mijn_openstaand=mijn_openstaand,
         ingevulde_agenda_ids=ingevulde_agenda_ids,
+        overgeslagen_agenda_ids=overgeslagen_agenda_ids,
         openstaande_sessies=openstaande_sessies,
         huidige_dd=huidige_dd,
         date_today=date.today()
@@ -796,6 +804,8 @@ def sessie_detail(agenda_id):
 
     form = EvaluationForm.query.filter_by(activity_type_id=item.type_id, organisatie_id=org_id).first()
     reacties = EvaluationResponse.query.filter_by(agenda_item_id=item.id).order_by(EvaluationResponse.ingediend_op.desc()).all()
+    ingevulde_reacties = [r for r in reacties if not r.is_overgeslagen]
+    overgeslagen_reacties = [r for r in reacties if r.is_overgeslagen]
     uitnodigingen = EvaluationInvitation.query.filter_by(agenda_item_id=item.id).all()
     uitnodigingen_map = {inv.digidokter_id: inv for inv in uitnodigingen}
     huidige_dd = get_huidige_digidokter_voor_user(current_user, org_id)
@@ -805,6 +815,8 @@ def sessie_detail(agenda_id):
         item=item,
         form=form,
         reacties=reacties,
+        ingevulde_reacties=ingevulde_reacties,
+        overgeslagen_reacties=overgeslagen_reacties,
         uitnodigingen=uitnodigingen,
         uitnodigingen_map=uitnodigingen_map,
         huidige_dd=huidige_dd
@@ -937,6 +949,93 @@ def reactie_bewerken(response_id):
     )
 
 
+def markeer_evaluatie_overgeslagen(agenda_item, digidokter_id=None, user=None):
+    """Markeert een evaluatie als overgeslagen voor een digidokter of gebruiker."""
+    form = get_or_create_evaluation_form(agenda_item.type_id, agenda_item.organisatie_id)
+
+    bestaand = None
+    if digidokter_id:
+        bestaand = EvaluationResponse.query.filter_by(
+            agenda_item_id=agenda_item.id,
+            digidokter_id=digidokter_id
+        ).first()
+    if not bestaand and user and user.is_authenticated:
+        bestaand = EvaluationResponse.query.filter_by(
+            agenda_item_id=agenda_item.id,
+            user_id=user.id
+        ).first()
+
+    if bestaand:
+        bestaand.is_overgeslagen = True
+        bestaand.antwoorden = {}
+        bestaand.ingediend_op = datetime.now(timezone.utc)
+        if digidokter_id and not bestaand.digidokter_id:
+            bestaand.digidokter_id = digidokter_id
+    else:
+        reactie = EvaluationResponse(
+            organisatie_id=agenda_item.organisatie_id,
+            agenda_item_id=agenda_item.id,
+            form_id=form.id,
+            digidokter_id=digidokter_id,
+            user_id=user.id if user and user.is_authenticated else None,
+            ingediend_op=datetime.now(timezone.utc),
+            antwoorden={},
+            is_overgeslagen=True
+        )
+        db.session.add(reactie)
+
+    if digidokter_id:
+        invitation = EvaluationInvitation.query.filter_by(
+            agenda_item_id=agenda_item.id,
+            digidokter_id=digidokter_id
+        ).first()
+        if invitation:
+            invitation.is_ingevuld = True
+            invitation.is_overgeslagen = True
+
+    db.session.commit()
+
+
+@eval_bp.route('/evaluaties/agenda/<int:agenda_id>/overslaan', methods=['POST'])
+@login_required
+def overslaan_sessie(agenda_id):
+    """Markeert de evaluatie voor de huidige gebruiker/digidokter als overgeslagen."""
+    org_id = get_huidige_organisatie_id()
+    item = db.session.get(AgendaItem, agenda_id)
+    if not item or item.organisatie_id != org_id:
+        abort(404)
+
+    huidige_dd = get_huidige_digidokter_voor_user(current_user, org_id)
+    dd_id = huidige_dd.id if huidige_dd else None
+
+    markeer_evaluatie_overgeslagen(item, digidokter_id=dd_id, user=current_user)
+    flash('U heeft ervoor gekozen om voor deze activiteit geen evaluatieformulier in te vullen.', 'info')
+    return redirect(request.referrer or url_for('agenda.lijst'))
+
+
+@eval_bp.route('/evaluaties/invullen/<token>/overslaan', methods=['POST'])
+@limiter.limit("30 per minute")
+def overslaan_token(token):
+    """Markeert de evaluatie via e-mailtoken als overgeslagen."""
+    invitation = EvaluationInvitation.query.filter_by(token=token).first()
+    if not invitation:
+        flash('Ongeldige of verlopen evaluatielink.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    item = invitation.agenda_item
+    dd = invitation.digidokter
+    markeer_evaluatie_overgeslagen(item, digidokter_id=dd.id, user=dd.user if dd else None)
+
+    return render_template(
+        'evaluaties/bedankt.html',
+        item=item,
+        dd=dd,
+        is_overgeslagen=True,
+        reeds_ingevuld=False,
+        token=token
+    )
+
+
 @eval_bp.route('/evaluaties/agenda/<int:agenda_id>/invullen', methods=['GET', 'POST'])
 @login_required
 def invullen_sessie(agenda_id):
@@ -967,6 +1066,12 @@ def invullen_sessie(agenda_id):
         if dd_id and not bestaand:
             bestaand = EvaluationResponse.query.filter_by(agenda_item_id=item.id, digidokter_id=dd_id).first()
 
+        actie = request.form.get('actie', 'opslaan')
+        if actie == 'overslaan':
+            markeer_evaluatie_overgeslagen(item, digidokter_id=dd_id, user=current_user)
+            flash('U heeft ervoor gekozen om voor deze activiteit geen evaluatieformulier in te vullen.', 'info')
+            return redirect(url_for('agenda.lijst'))
+
         # Verwerk antwoorden
         antwoorden = {}
         ontbrekende_vragen = []
@@ -985,7 +1090,7 @@ def invullen_sessie(agenda_id):
                 form=form,
                 huidige_dd=huidige_dd,
                 antwoorden=antwoorden,
-                is_edit=bool(bestaand),
+                is_edit=bool(bestaand and not bestaand.is_overgeslagen),
                 reactie=bestaand
             )
 
@@ -994,11 +1099,21 @@ def invullen_sessie(agenda_id):
                 flash('U heeft geen rechten om deze evaluatie te bewerken.', 'danger')
                 return redirect(url_for('agenda.lijst'))
 
+            was_overgeslagen = bestaand.is_overgeslagen
             bestaand.antwoorden = antwoorden
+            bestaand.is_overgeslagen = False
+            bestaand.ingediend_op = datetime.now(timezone.utc)
             if dd_id:
                 bestaand.digidokter_id = dd_id
+                invitation = EvaluationInvitation.query.filter_by(agenda_item_id=item.id, digidokter_id=dd_id).first()
+                if invitation:
+                    invitation.is_ingevuld = True
+                    invitation.is_overgeslagen = False
             db.session.commit()
-            flash('Evaluatie succesvol bijgewerkt.', 'success')
+            if was_overgeslagen:
+                flash('Bedankt voor het invullen van de evaluatie!', 'success')
+            else:
+                flash('Evaluatie succesvol bijgewerkt.', 'success')
             return redirect(url_for('agenda.lijst'))
 
         reactie = EvaluationResponse(
@@ -1008,7 +1123,8 @@ def invullen_sessie(agenda_id):
             digidokter_id=dd_id,
             user_id=current_user.id if current_user.is_authenticated else None,
             ingediend_op=datetime.now(timezone.utc),
-            antwoorden=antwoorden
+            antwoorden=antwoorden,
+            is_overgeslagen=False
         )
         db.session.add(reactie)
 
@@ -1017,18 +1133,20 @@ def invullen_sessie(agenda_id):
             invitation = EvaluationInvitation.query.filter_by(agenda_item_id=item.id, digidokter_id=dd_id).first()
             if invitation:
                 invitation.is_ingevuld = True
+                invitation.is_overgeslagen = False
 
         db.session.commit()
         flash('Bedankt voor het invullen van de evaluatie!', 'success')
         return redirect(url_for('agenda.lijst'))
 
+    is_edit = bool(bestaand and not bestaand.is_overgeslagen)
     return render_template(
         'evaluaties/invullen.html',
         item=item,
         form=form,
         huidige_dd=huidige_dd,
         antwoorden=bestaand.antwoorden if bestaand else {},
-        is_edit=bool(bestaand),
+        is_edit=is_edit,
         reactie=bestaand
     )
 
@@ -1049,20 +1167,34 @@ def invullen_token(token):
 
     dd = invitation.digidokter
 
-    # Check of al ingevuld
+    # Check of al ingevuld of overgeslagen
     bestaand = EvaluationResponse.query.filter_by(agenda_item_id=item.id, digidokter_id=dd.id).first()
     is_bewerken = request.args.get('bewerken') == '1' or request.args.get('wijzigen') == '1'
 
+    reeds_overgeslagen = (bestaand and bestaand.is_overgeslagen) or invitation.is_overgeslagen
     if (bestaand or invitation.is_ingevuld) and not is_bewerken and request.method == 'GET':
         return render_template(
             'evaluaties/bedankt.html',
             item=item,
             dd=dd,
-            reeds_ingevuld=True,
+            reeds_ingevuld=not reeds_overgeslagen,
+            reeds_overgeslagen=reeds_overgeslagen,
             token=token
         )
 
     if request.method == 'POST':
+        actie = request.form.get('actie', 'opslaan')
+        if actie == 'overslaan':
+            markeer_evaluatie_overgeslagen(item, digidokter_id=dd.id, user=dd.user if dd else None)
+            return render_template(
+                'evaluaties/bedankt.html',
+                item=item,
+                dd=dd,
+                is_overgeslagen=True,
+                reeds_ingevuld=False,
+                token=token
+            )
+
         antwoorden = {}
         ontbrekende = []
         for vraag in form.vragen:
@@ -1081,13 +1213,16 @@ def invullen_token(token):
                 huidige_dd=dd,
                 token=token,
                 antwoorden=antwoorden,
-                is_edit=bool(bestaand),
+                is_edit=bool(bestaand and not bestaand.is_overgeslagen),
                 reactie=bestaand
             )
 
         if bestaand:
             bestaand.antwoorden = antwoorden
+            bestaand.is_overgeslagen = False
+            bestaand.ingediend_op = datetime.now(timezone.utc)
             invitation.is_ingevuld = True
+            invitation.is_overgeslagen = False
             db.session.commit()
             return render_template(
                 'evaluaties/bedankt.html',
@@ -1105,10 +1240,12 @@ def invullen_token(token):
             digidokter_id=dd.id,
             user_id=dd.user_id if dd else None,
             ingediend_op=datetime.now(timezone.utc),
-            antwoorden=antwoorden
+            antwoorden=antwoorden,
+            is_overgeslagen=False
         )
         db.session.add(reactie)
         invitation.is_ingevuld = True
+        invitation.is_overgeslagen = False
         db.session.commit()
 
         return render_template(
@@ -1119,6 +1256,7 @@ def invullen_token(token):
             token=token
         )
 
+    is_edit = bool(bestaand and not bestaand.is_overgeslagen)
     return render_template(
         'evaluaties/invullen.html',
         item=item,
@@ -1126,6 +1264,6 @@ def invullen_token(token):
         huidige_dd=dd,
         token=token,
         antwoorden=bestaand.antwoorden if bestaand else {},
-        is_edit=bool(bestaand),
+        is_edit=is_edit,
         reactie=bestaand
     )

@@ -7,21 +7,11 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db, limiter
 from models.user import User
+from utils.helpers import is_veilige_redirect
 
 auth_bp = Blueprint('auth', __name__)
 
-
-def _is_veilige_redirect(url: str) -> bool:
-    """Controleer of url een relatief pad binnen deze app is (geen open redirect)."""
-    if not url:
-        return False
-    parsed = urlparse(url)
-    return (
-        parsed.scheme == ''
-        and parsed.netloc == ''
-        and url.startswith('/')
-        and not url.startswith('//')
-    )
+_is_veilige_redirect = is_veilige_redirect
 
 
 def _valideer_wachtwoord(wachtwoord: str) -> list[str]:

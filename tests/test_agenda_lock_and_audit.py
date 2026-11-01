@@ -317,3 +317,256 @@ class TestAgendaLockAndAudit(BaseTestCase):
         new_lock = AgendaItemLock.query.filter_by(agenda_item_id=item_id).first()
         self.assertIsNotNone(new_lock)
         self.assertEqual(new_lock.user_id, self.medewerker_user.id)
+
+
+from unittest.mock import patch
+from utils.agenda_lock import (
+    clean_expired_locks,
+    get_active_lock,
+    acquire_or_check_lock,
+    release_lock
+)
+
+
+class TestAgendaLockUnit(BaseTestCase):
+    def setUp(self):
+        super().setUp()
+        self.type_workshop = ActivityType(naam="Workshop AI", actief=True, organisatie_id=self.org.id)
+        self.locatie1 = Location(naam="Bibliotheek Centrum", actief=True, organisatie_id=self.org.id)
+        db.session.add_all([self.type_workshop, self.locatie1])
+        db.session.commit()
+
+        self.item = AgendaItem(
+            datum=date.today(),
+            uur_van='10:00',
+            uur_tot='12:00',
+            type_id=self.type_workshop.id,
+            locatie_id=self.locatie1.id,
+            omschrijving='Unit lock test item',
+            organisatie_id=self.org.id
+        )
+        self.item2 = AgendaItem(
+            datum=date.today(),
+            uur_van='14:00',
+            uur_tot='16:00',
+            type_id=self.type_workshop.id,
+            locatie_id=self.locatie1.id,
+            omschrijving='Unit lock test item 2',
+            organisatie_id=self.org.id
+        )
+        db.session.add_all([self.item, self.item2])
+        db.session.commit()
+
+    def test_clean_expired_locks_success_and_exception(self):
+        now = datetime.now(timezone.utc)
+        expired_lock = AgendaItemLock(
+            agenda_item_id=self.item.id,
+            user_id=self.admin_user.id,
+            user_naam=self.admin_user.naam,
+            locked_at=now - timedelta(minutes=10),
+            expires_at=now - timedelta(minutes=1)
+        )
+        active_lock = AgendaItemLock(
+            agenda_item_id=self.item2.id,
+            user_id=self.medewerker_user.id,
+            user_naam=self.medewerker_user.naam,
+            locked_at=now,
+            expires_at=now + timedelta(minutes=5)
+        )
+        db.session.add_all([expired_lock, active_lock])
+        db.session.commit()
+
+        clean_expired_locks()
+        self.assertIsNone(AgendaItemLock.query.filter_by(agenda_item_id=self.item.id).first())
+        self.assertIsNotNone(AgendaItemLock.query.filter_by(agenda_item_id=self.item2.id).first())
+
+        # Test exception path (rollback)
+        with patch.object(db.session, 'commit', side_effect=Exception('DB Error')):
+            with patch.object(db.session, 'rollback') as mock_rollback:
+                clean_expired_locks()
+                mock_rollback.assert_called_once()
+
+    def test_get_active_lock_all_paths(self):
+        # 1. Geen lock
+        self.assertIsNone(get_active_lock(self.item.id))
+
+        # 2. Actieve lock
+        now = datetime.now(timezone.utc)
+        lock = AgendaItemLock(
+            agenda_item_id=self.item.id,
+            user_id=self.admin_user.id,
+            user_naam=self.admin_user.naam,
+            locked_at=now,
+            expires_at=now + timedelta(minutes=5)
+        )
+        db.session.add(lock)
+        db.session.commit()
+
+        retrieved = get_active_lock(self.item.id)
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.id, lock.id)
+
+        # 3. Verlopen lock (met clean_expired_locks gepatcht om regels 21-27 te testen)
+        lock.expires_at = now - timedelta(minutes=2)
+        db.session.commit()
+
+        with patch('utils.agenda_lock.clean_expired_locks'):
+            expired_retrieved = get_active_lock(self.item.id)
+            self.assertIsNone(expired_retrieved)
+            self.assertIsNone(AgendaItemLock.query.filter_by(agenda_item_id=self.item.id).first())
+
+        # 4. Verlopen lock met rollback bij fout tijdens delete
+        lock2 = AgendaItemLock(
+            agenda_item_id=self.item.id,
+            user_id=self.admin_user.id,
+            user_naam=self.admin_user.naam,
+            locked_at=now - timedelta(minutes=10),
+            expires_at=now - timedelta(minutes=2)
+        )
+        db.session.add(lock2)
+        db.session.commit()
+
+        with patch('utils.agenda_lock.clean_expired_locks'):
+            with patch.object(db.session, 'commit', side_effect=Exception("Delete error")):
+                with patch.object(db.session, 'rollback') as mock_rollback:
+                    res = get_active_lock(self.item.id)
+                    self.assertIsNone(res)
+                    self.assertTrue(mock_rollback.called)
+
+    def test_acquire_or_check_lock_all_paths(self):
+        now = datetime.now(timezone.utc)
+
+        # 1. Geen lock -> claim nieuwe lock
+        can_edit, lock = acquire_or_check_lock(self.item.id, self.admin_user, timeout_minutes=5)
+        self.assertTrue(can_edit)
+        self.assertEqual(lock.user_id, self.admin_user.id)
+        self.assertEqual(lock.user_naam, self.admin_user.naam)
+
+        # 2. Reeds in bezit van zelfde gebruiker -> verleng lock
+        can_edit2, lock2 = acquire_or_check_lock(self.item.id, self.admin_user, timeout_minutes=15)
+        self.assertTrue(can_edit2)
+        self.assertEqual(lock2.id, lock.id)
+
+        # 2b. Reeds in bezit van zelfde gebruiker met commit fout -> rollback en alsnog True
+        with patch.object(db.session, 'commit', side_effect=Exception("Extend error")):
+            with patch.object(db.session, 'rollback') as mock_rollback:
+                can_edit_err, lock_err = acquire_or_check_lock(self.item.id, self.admin_user, timeout_minutes=15)
+                self.assertTrue(can_edit_err)
+                self.assertTrue(mock_rollback.called)
+
+        # 3. Andere gebruiker probeert actieve lock te claimen -> geweigerd
+        can_edit_other, lock_other = acquire_or_check_lock(self.item.id, self.medewerker_user)
+        self.assertFalse(can_edit_other)
+        self.assertEqual(lock_other.user_id, self.admin_user.id)
+
+        # 4. Verlopen lock van andere gebruiker overnemen (clean_expired_locks gepatcht om regels 76-87 te triggeren)
+        lock.expires_at = now - timedelta(minutes=1)
+        db.session.commit()
+
+        with patch('utils.agenda_lock.clean_expired_locks'):
+            can_edit_takeover, lock_takeover = acquire_or_check_lock(self.item.id, self.medewerker_user, timeout_minutes=5)
+            self.assertTrue(can_edit_takeover)
+            self.assertEqual(lock_takeover.user_id, self.medewerker_user.id)
+            self.assertEqual(lock_takeover.user_naam, self.medewerker_user.naam)
+
+        # 4b. Verlopen lock overnemen met commit fout -> rollback
+        lock_takeover.expires_at = now - timedelta(minutes=1)
+        db.session.commit()
+        with patch('utils.agenda_lock.clean_expired_locks'):
+            with patch.object(db.session, 'commit', side_effect=Exception("Takeover error")):
+                with patch.object(db.session, 'rollback') as mock_rollback:
+                    can_edit_to_err, lock_to_err = acquire_or_check_lock(self.item.id, self.admin_user)
+                    self.assertTrue(can_edit_to_err)
+                    self.assertTrue(mock_rollback.called)
+
+        # 5. Nieuwe lock claimen race condition: fout bij add/commit -> herprobeer ophalen en weiger
+        AgendaItemLock.query.delete()
+        db.session.commit()
+
+        other_user_lock = AgendaItemLock(
+            agenda_item_id=self.item.id,
+            user_id=self.medewerker_user.id,
+            user_naam=self.medewerker_user.naam,
+            locked_at=now,
+            expires_at=now + timedelta(minutes=5)
+        )
+
+        with patch('utils.agenda_lock.clean_expired_locks'):
+            with patch.object(AgendaItemLock, 'query') as mock_query:
+                mock_query.filter_by.return_value.first.side_effect = [None, other_user_lock]
+                with patch.object(db.session, 'commit', side_effect=Exception("Simulated unique constraint error")):
+                    can_edit_race, lock_race = acquire_or_check_lock(self.item.id, self.admin_user)
+                    self.assertFalse(can_edit_race)
+                    self.assertIsNotNone(lock_race)
+                    self.assertEqual(lock_race.user_id, self.medewerker_user.id)
+
+    def test_release_lock_all_paths(self):
+        now = datetime.now(timezone.utc)
+        lock = AgendaItemLock(
+            agenda_item_id=self.item.id,
+            user_id=self.admin_user.id,
+            user_naam=self.admin_user.naam,
+            locked_at=now,
+            expires_at=now + timedelta(minutes=5)
+        )
+        db.session.add(lock)
+        db.session.commit()
+
+        # 1. Release met verkeerde user_id -> False, lock blijft bestaan
+        released_wrong = release_lock(self.item.id, user_id=self.medewerker_user.id)
+        self.assertFalse(released_wrong)
+        self.assertIsNotNone(AgendaItemLock.query.filter_by(agenda_item_id=self.item.id).first())
+
+        # 2. Release met juiste user_id -> True, lock verwijderd
+        released_right = release_lock(self.item.id, user_id=self.admin_user.id)
+        self.assertTrue(released_right)
+        self.assertIsNone(AgendaItemLock.query.filter_by(agenda_item_id=self.item.id).first())
+
+        # 3. Release zonder user_id (None)
+        lock2 = AgendaItemLock(
+            agenda_item_id=self.item.id,
+            user_id=self.medewerker_user.id,
+            user_naam=self.medewerker_user.naam,
+            locked_at=now,
+            expires_at=now + timedelta(minutes=5)
+        )
+        db.session.add(lock2)
+        db.session.commit()
+
+        released_any = release_lock(self.item.id, user_id=None)
+        self.assertTrue(released_any)
+        self.assertIsNone(AgendaItemLock.query.filter_by(agenda_item_id=self.item.id).first())
+
+        # 4. Release foutafhandeling (rollback)
+        with patch.object(db.session, 'commit', side_effect=Exception("Release error")):
+            with patch.object(db.session, 'rollback') as mock_rollback:
+                res = release_lock(self.item.id)
+                self.assertFalse(res)
+                mock_rollback.assert_called_once()
+
+    def test_agenda_item_lock_model_methods(self):
+        now = datetime.now(timezone.utc)
+        # Timezone-aware
+        lock_active = AgendaItemLock(
+            agenda_item_id=self.item.id,
+            user_id=self.admin_user.id,
+            user_naam='Admin',
+            locked_at=now,
+            expires_at=now + timedelta(minutes=5)
+        )
+        self.assertFalse(lock_active.is_expired())
+
+        # Timezone-naive
+        lock_naive = AgendaItemLock(
+            agenda_item_id=self.item.id,
+            user_id=self.admin_user.id,
+            user_naam='Admin',
+            locked_at=now,
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=5)
+        )
+        self.assertTrue(lock_naive.is_expired())
+
+        # __repr__
+        repr_str = repr(lock_active)
+        self.assertIn('AgendaItemLock', repr_str)
+        self.assertIn('Admin', repr_str)

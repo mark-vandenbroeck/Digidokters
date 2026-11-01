@@ -1,5 +1,5 @@
 from datetime import date, datetime, timezone
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app, session
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload, selectinload
 from extensions import db
@@ -11,7 +11,7 @@ from utils.decorators import writer_required
 from utils.permissions import can_write
 from models.constants import FEATURE_AGENDA
 from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model, filter_op_organisatie
-from utils.helpers import safe_int, safe_date, safe_str
+from utils.helpers import safe_int, safe_date, safe_str, is_veilige_redirect
 
 agenda_bp = Blueprint('agenda', __name__)
 
@@ -35,6 +35,11 @@ def lijst():
     except Exception:
         pass
     
+    # Reset actieve filters
+    if request.args.get('reset'):
+        session.pop(f'agenda_terug_url_{org_id}', None)
+        return redirect(url_for('agenda.lijst'))
+    
     # Haal filter parameters op
     toon_verleden = request.args.get('toon_verleden') == 'on'
     datum_van = safe_str(request.args.get('datum_van'))
@@ -46,6 +51,16 @@ def lijst():
     # Haal sorteer parameters op
     sort_by = safe_str(request.args.get('sort_by'), default='datum') or 'datum'
     direction = safe_str(request.args.get('direction'), default='asc') or 'asc'
+
+    # Bewaar actieve filters en URL voor terugkeer vanaf bewerken
+    has_active_filters = bool(
+        toon_verleden or datum_van or datum_tot or type_id or locatie_id or digidokter_id or
+        sort_by != 'datum' or direction != 'asc'
+    )
+    if has_active_filters and request.query_string:
+        session[f'agenda_terug_url_{org_id}'] = request.full_path
+    elif request.args:
+        session.pop(f'agenda_terug_url_{org_id}', None)
     
     # Bouw query op met eager loading voor optimale performance (voorkomt N+1 queries)
     query = (
@@ -164,6 +179,10 @@ def lijst():
 def nieuw():
     keuzes = _keuzelijsten()
     org_id = get_huidige_organisatie_id()
+
+    terug_url = request.args.get('terug_url') or request.form.get('terug_url')
+    if not terug_url or not is_veilige_redirect(terug_url):
+        terug_url = session.get(f'agenda_terug_url_{org_id}')
 
     if request.method == 'POST':
         datum_str = request.form.get('datum', '').strip()
@@ -304,15 +323,17 @@ def nieuw():
             db.session.rollback()
             current_app.logger.error(f"Fout bij toevoegen agenda-item: {e}")
             flash('Er is een fout opgetreden bij het opslaan van het agenda-item.', 'danger')
-            return render_template('agenda/item_form.html', actie='Toevoegen', item=None, **keuzes, form_data=request.form)
+            return render_template('agenda/item_form.html', actie='Toevoegen', item=None, **keuzes, form_data=request.form, terug_url=terug_url)
 
         if is_terugkerend:
             flash(f'{len(items_to_save)} agenda-items succesvol toegevoegd aan de reeks.', 'success')
         else:
             flash('Agenda-item succesvol toegevoegd.', 'success')
+        if terug_url and is_veilige_redirect(terug_url):
+            return redirect(terug_url)
         return redirect(url_for('agenda.lijst'))
 
-    return render_template('agenda/item_form.html', actie='Toevoegen', item=None, **keuzes)
+    return render_template('agenda/item_form.html', actie='Toevoegen', item=None, **keuzes, terug_url=terug_url)
 
 @agenda_bp.route('/agenda/<int:item_id>/wijzig', methods=['GET', 'POST'])
 @login_required
@@ -323,6 +344,10 @@ def wijzigen(item_id):
 
     if item.organisatie_id != org_id:
         abort(403)
+
+    terug_url = request.args.get('terug_url') or request.form.get('terug_url')
+    if not terug_url or not is_veilige_redirect(terug_url):
+        terug_url = session.get(f'agenda_terug_url_{org_id}')
 
     from utils.agenda_lock import acquire_or_check_lock, release_lock
     kan_aanwezigheid_bewerken, active_lock = acquire_or_check_lock(item.id, current_user)
@@ -402,7 +427,8 @@ def wijzigen(item_id):
                 form_data=request.form,
                 kan_aanwezigheid_bewerken=kan_aanwezigheid_bewerken,
                 lock_warning=lock_warning,
-                lock_user_naam=lock_user_naam
+                lock_user_naam=lock_user_naam,
+                terug_url=terug_url
             )
 
         item.datum = datum
@@ -424,6 +450,8 @@ def wijzigen(item_id):
                 flash(f'Agenda-item bijgewerkt. Aanwezigheden zijn ongewijzigd gebleven omdat gebruiker {lock_user_naam} ze momenteel bewerkt.', 'info')
             else:
                 flash('Agenda-item succesvol bijgewerkt.', 'success')
+            if terug_url and is_veilige_redirect(terug_url):
+                return redirect(terug_url)
             return redirect(url_for('agenda.lijst'))
         except Exception as e:
             db.session.rollback()
@@ -437,7 +465,8 @@ def wijzigen(item_id):
                 form_data=request.form,
                 kan_aanwezigheid_bewerken=kan_aanwezigheid_bewerken,
                 lock_warning=lock_warning,
-                lock_user_naam=lock_user_naam
+                lock_user_naam=lock_user_naam,
+                terug_url=terug_url
             )
 
     return render_template(
@@ -447,7 +476,8 @@ def wijzigen(item_id):
         **keuzes,
         kan_aanwezigheid_bewerken=kan_aanwezigheid_bewerken,
         lock_warning=lock_warning,
-        lock_user_naam=lock_user_naam
+        lock_user_naam=lock_user_naam,
+        terug_url=terug_url
     )
 
 
@@ -457,6 +487,12 @@ def annuleren(item_id):
     """Geeft de eventuele vergrendeling op en keert terug naar de agendalijst."""
     from utils.agenda_lock import release_lock
     release_lock(item_id, current_user.id)
+    org_id = get_huidige_organisatie_id()
+    terug_url = request.args.get('terug_url')
+    if not terug_url or not is_veilige_redirect(terug_url):
+        terug_url = session.get(f'agenda_terug_url_{org_id}')
+    if terug_url and is_veilige_redirect(terug_url):
+        return redirect(terug_url)
     return redirect(url_for('agenda.lijst'))
 
 

@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from tests.base import BaseTestCase
 from extensions import db
 from models.functie import Functie, user_functies
@@ -81,15 +82,16 @@ class TestFuncties(BaseTestCase):
         fn_les = Functie.query.filter_by(organisatie_id=self.org.id, naam='Lesgever').first()
 
         # Maak nieuwe gebruiker aan met 2 functies en een telefoonnummer
-        res = self.client.post('/beheer/gebruikers/nieuw', data={
-            'naam': 'Karel Vrijwilliger',
-            'email': 'karel@test.com',
-            'telefoonnummer': '+32 470 99 88 77',
-            'rol': 'medewerker',
-            'wachtwoord': 'Tijdelijk123!',
-            'actief': 'on',
-            'functie_ids': [str(fn_dok.id), str(fn_les.id)]
-        }, follow_redirects=True)
+        with patch('utils.mail.stuur_welkomst_email', return_value=(True, "OK")):
+            res = self.client.post('/beheer/gebruikers/nieuw', data={
+                'naam': 'Karel Vrijwilliger',
+                'email': 'karel@test.com',
+                'telefoonnummer': '+32 470 99 88 77',
+                'rol': 'medewerker',
+                'wachtwoord': 'Tijdelijk123!',
+                'actief': 'on',
+                'functie_ids': [str(fn_dok.id), str(fn_les.id)]
+            }, follow_redirects=True)
         self.assertEqual(res.status_code, 200)
 
         user = User.query.filter_by(email='karel@test.com').first()

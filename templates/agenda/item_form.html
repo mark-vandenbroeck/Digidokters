@@ -6,7 +6,7 @@
 <div class="col-12 col-md-10 col-lg-8">
 
     <div class="d-flex align-items-center gap-2 mb-1">
-        <a href="{{ url_for('agenda.annuleren', item_id=item.id) if item else url_for('agenda.lijst') }}" class="btn btn-sm btn-outline-secondary">
+        <a href="{{ url_for('agenda.annuleren', item_id=item.id, terug_url=terug_url) if item else (terug_url or url_for('agenda.lijst')) }}" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-arrow-left"></i>
         </a>
         <h1 class="dd-page-title mb-0">{{ actie }} Agenda-item</h1>
@@ -17,6 +17,9 @@
         <div class="card-body p-4">
             <form method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if terug_url %}
+                <input type="hidden" name="terug_url" value="{{ terug_url }}">
+                {% endif %}
 
                 <div class="row">
                     <div class="col-md-4 mb-3">
@@ -228,7 +231,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-circle me-1"></i>Opslaan
                     </button>
-                    <a href="{{ url_for('agenda.annuleren', item_id=item.id) if item else url_for('agenda.lijst') }}" class="btn btn-outline-secondary">Annuleren</a>
+                    <a href="{{ url_for('agenda.annuleren', item_id=item.id, terug_url=terug_url) if item else (terug_url or url_for('agenda.lijst')) }}" class="btn btn-outline-secondary">Annuleren</a>
                 </div>
             </form>
         </div>

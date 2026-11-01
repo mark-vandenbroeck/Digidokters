@@ -8,7 +8,7 @@
         <p class="dd-page-subtitle mb-0">Activiteiten en bijeenkomsten</p>
     </div>
     {% if kan_schrijven %}
-    <a href="{{ url_for('agenda.nieuw') }}" class="btn btn-primary">
+    <a href="{{ url_for('agenda.nieuw', terug_url=request.full_path) }}" class="btn btn-primary">
         <i class="bi bi-plus-circle me-1"></i>Nieuwe activiteit
     </a>
     {% endif %}
@@ -93,7 +93,7 @@
                     <button type="submit" class="btn btn-primary btn-sm flex-fill">
                         <i class="bi bi-funnel me-1"></i>Filteren
                     </button>
-                    <a href="{{ url_for('agenda.lijst') }}" class="btn btn-outline-secondary btn-sm" title="Filters resetten">
+                    <a href="{{ url_for('agenda.lijst', reset=1) }}" class="btn btn-outline-secondary btn-sm" title="Filters resetten">
                         <i class="bi bi-x-lg"></i>
                     </a>
                 </div>
@@ -224,7 +224,7 @@
                                 </a>
                                 {% endif %}
                             {% endif %}
-                            <a href="{{ url_for('agenda.wijzigen', item_id=item.id) }}"
+                            <a href="{{ url_for('agenda.wijzigen', item_id=item.id, terug_url=request.full_path) }}"
                                class="btn btn-sm btn-outline-primary" title="Wijzigen">
                                 <i class="bi bi-pencil"></i>
                             </a>

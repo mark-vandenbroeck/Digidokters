@@ -58,6 +58,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   **Resultaat van het bezoek (Afloop):** Onder 'Hulpvraag/onderwerp' kan de digidokter het resultaat van de consultatie selecteren (bijv. *Vraag beantwoord*, *Bezoeker komt later terug*, *Bezoeker doorverwezen*, *Vraag onmogelijk te beantwoorden*, *Andere*). Dit veld is conditioneel en verschijnt uitsluitend indien de organisatie minstens één resultaat heeft ingesteld in de stamgegevens.
 *   **Opslaan & Volgende bezoeker:** Eén opvallende actieknop slaat de consultatie op en zet het scherm direct klaar voor de volgende bezoeker.
 *   **Detailpagina & AI-Inzage:** Op de detailpagina van een registratie worden alle gegevens overzichtelijk getoond, inclusief het geregistreerde resultaat en de AI-vraagclassificatie (toegewezen categorie, zekerheidsscore in % en de toelichting/motivatie van het model).
+*   **Filterbehoud bij Navigatie:** Bij het doorklikken naar de detailpagina (oogje) of het wijzigingsformulier (potloodje) en het vervolgens terugkeren naar het registratieoverzicht blijven alle actieve filters en zoekopdrachten bewaard.
 *   **Dynamische Genderidentiteit:** Het geslacht van de bezoeker wordt gekozen uit de geconfigureerde genderidentiteiten van de organisatie (standaard 'Man' en 'Vrouw', uitbreidbaar via stamgegevens).
 *   **Consultatielocaties:** Indien er binnen de organisatie meerdere locaties zijn gemarkeerd als *"Gebruikt voor consultaties"*, kan de specifieke locatie direct worden geselecteerd. Bij exact één consultatielocatie wordt deze automatisch zonder extra dropdown toegekend.
 *   **Realtime Asynchrone AI-classificatie:** Zodra een consultatie wordt opgeslagen of bewerkt, wordt de vraag op de achtergrond binnen 1-2 seconden geanalyseerd via Google Gemini AI en toegekend aan de passende categorie.
@@ -66,6 +67,8 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 
 ### 2. Agenda & Planning
 *   Ondersteunt eenmalige en terugkerende activiteiten (dagelijks, wekelijks, maandelijks) met een optionele einddatum.
+*   **Filterbehoud bij Navigatie:** Ingestelde filters (zoals datumperiode, type, locatie, digidokter) blijven behouden wanneer men doorklikt naar het wijzigings-, detail- of annuleringsformulier en terugkeert naar de lijst (`terug_url`).
+*   **Gelijktijdige Bewerkingsvergrendeling (Pessimistic Locking):** Voorkomt dat twee beheerders gelijktijdig hetzelfde agenda-item bewerken (`AgendaItemLock`) met automatische timeout en verlenging.
 *   Uur- en datumfilters (toekomstige vs. voorbije activiteiten tonen).
 *   Sorteerbare kolommen op alle eigenschappen (datum, tijd, locatie, type, etc.).
 *   Aanpasbare status (actief/gedeactiveerd) en badgekleur per activiteitstype (Blauw, Teal, Paars, Oranje) die direct in de agenda-lijst worden getoond.
@@ -100,7 +103,8 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 *   **In-App Formulier Invullen & Notificaties:** Vrijwilligers en medewerkers kunnen hun evaluaties niet alleen via de e-maillink, maar ook direct later via de webapplicatie invullen (`/evaluaties/agenda/<id>/invullen`):
     *   *Agenda Attentiebanners & Actieknoppen:* In de agenda verschijnt een waarschuwingsbanner met het aantal openstaande evaluaties en een knop "Evaluatie invullen" bij voltooide activiteiten waar de vrijwilliger aanwezig was.
     *   *Menu-notificatiebadge:* Naast het menu-item "Evaluaties" toont een opvallende badge het aantal nog in te vullen formulieren voor de ingelogde gebruiker.
-    *   *Snelfilter & Statusoverzicht:* Op het evaluatie-overzicht kunnen medewerkers met één klik filteren op "Enkel mijn openstaande evaluaties", met duidelijke statusindicatoren (*Ingevuld*, *Nog invullen*, *Niet aanwezig*).
+    *   *Snelfilter & Statusoverzicht:* Op het evaluatie-overzicht kunnen medewerkers met één klik filteren op "Enkel mijn openstaande evaluaties", met duidelijke statusindicatoren (*Ingevuld*, *Nog invullen*, *Overgeslagen*, *Niet aanwezig*).
+*   **Evaluatie Overslaan (`is_overgeslagen`):** Vrijwilligers en deelnemers kunnen er via de applicatie of de uitnodigingslink expliciet voor kiezen om een evaluatie voor een sessie over te slaan ("Deze evaluatie overslaan"). De openstaande status en notificatiebanners verdwijnen dan direct en er worden geen herinneringsmails meer verstuurd.
 *   **Wijzigen na Inzending (Auteurs, Beheerders & Platformbeheerders):** Ingevulde evaluatieformulieren kunnen na verzending flexibel worden aangepast:
     *   *Auteurs:* Kunnen hun ingediende reactie heropenen en bijwerken via de in-app bewerkknop of via de unieke e-mail tokenlink (*"Antwoorden wijzigen"*).
     *   *Beheerders & Platformbeheerders:* Kunnen evaluatiereacties van alle sessies binnen hun organisatie (of platformbreed) inzien en corrigeren via de sessiedetailpagina (`/evaluaties/reactie/<id>/bewerken`).
@@ -160,7 +164,7 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
     *   Een geavanceerd controle- en telemetriedashboard exclusief voor platformbeheerders, opgedeeld in vier gerichte realtime tabbladen:
         *   *Gezondheid (Health):* Realtime status- en responstijdcontroles van kerndiensten (database, Brevo mail/SMTP-connectiviteit, sessies, schijfruimte en achtergrondtaken) met duidelijke statusbadges (Gezond, Let op, Fout).
         *   *Gebruik & Sessies:* Live inzicht in gelijktijdig actieve ingelogde gebruikers (afgelopen 15 en 30 minuten op basis van `users.laatste_activiteit`), actieve sessies per aangesloten gemeente en een gedetailleerde gebruikerslijst met actuele tijdstippen.
-        *   *Telemetrie & Pagina-activiteit:* Statistieken over pageviews per pagina/endpoint (vandaag en over de afgelopen 30 dagen) en gebruiksintensiteit per organisatie.
+        *   *Telemetrie & Pagina-activiteit:* Statistieken over pageviews per pagina/endpoint (vandaag en over de afgelopen 30 dagen), gebruiksintensiteit per organisatie en een interactieve activiteitstrendgrafiek met duidelijke verticale as-titel ("Aantal paginabezoeken").
         *   *Systeemfoutenlogboek:* Centraal overzicht van geregistreerde applicatiefouten (HTTP 500 serverfouten, mislukte inlogpogingen, 429 rate limits), inclusief technische details, endpoint, IP-adres en stacktrace, met de mogelijkheid om fouten te markeren als "Opgelost" of te "Heropenen".
 *   **Aanpasbare E-mailsjablonen (`/platform/emailsjablonen`):**
     *   Platformbeheerders kunnen de standaardteksten en onderwerpen van uitnodigings- (`evaluatie_uitnodiging`) en herinneringsmails (`evaluatie_herinnering`) direct via de beheerinterface aanpassen.
@@ -251,7 +255,7 @@ Een robuust CLI-script om historische CSV-bestanden met agenda-items en aanwezig
     *   *Veilige Proefmail-functie:* Met de knop **"Testmail naar mezelf"** kan de beheerder het bericht eerst uitsluitend naar zijn/haar eigen e-mailadres sturen ter controle (voorzien van het herkenbare voorvoegsel `[PROEFMAIL]`), zonder de officiële verzendhistoriek te vervuilen.
     *   *Uitgebreide Verzendhistoriek & Audit:* Alle verzonden mededelingen worden opgeslagen in `communicatie_logs` met tijdstip, afzender, onderwerp, berichttekst en een JSON-snapshot van alle geadresseerden (inclusief naam, e-mailadres en groepen).
     *   *Strikte Tenant-Isolatie:* Lokale beheerders hebben uitsluitend inzage in de verzendhistoriek van hun eigen organisatie.
-    *   *Veiligheidsvangnet voor Ontwikkeling:* Ondersteuning voor de omgevingsvariabele `MAIL_OVERRIDE_RECIPIENT` om tijdens lokale ontwikkeling of tests te garanderen dat testmails nooit naar echte gebruikers gaan.
+    *   *Veiligheidsvangnet voor Ontwikkeling & Tests:* Ondersteuning voor de omgevingsvariabele `MAIL_OVERRIDE_RECIPIENT` om tijdens lokale ontwikkeling te garanderen dat testmails altijd veilig naar de ontwikkelaar worden omgeleid in plaats van naar echte gebruikers. Bovendien onderdrukt het mailsysteem in geautomatiseerde testmodus (`TESTING=True`) automatisch alle uitgaande netwerkoproepen naar Brevo en SMTP tenzij deze expliciet gemockt zijn.
 *   **Platformbrede Aankondigingen (`/platform/communicatie`):**
     *   Platformbeheerders kunnen centrale aankondigingen of belangrijke software-updates in één keer versturen naar alle actieve beheerders van alle aangesloten gemeenten.
     *   Centraal platform-overzicht van alle verzonden mededelingen en platformbrede historiek.
@@ -333,7 +337,7 @@ Zie de volledige [Handleiding: Agenda Import Script](file:///Users/mark/Python/D
 
 ## 🧪 Unit Tests Uitvoeren
 
-Het platform is uitgerust met een geautomatiseerde test-suite van **295 tests** verdeeld over 38 testbestanden die draaien op een in-memory SQLite database.
+Het platform is uitgerust met een geautomatiseerde test-suite van **318 tests** verdeeld over 39 testbestanden die draaien op een in-memory SQLite database.
 
 **Met pytest (aanbevolen):**
 ```bash

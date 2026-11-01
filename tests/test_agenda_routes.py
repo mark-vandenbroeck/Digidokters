@@ -446,3 +446,63 @@ class TestAgendaRoutes(BaseTestCase):
 
         res_lezer_post = self.client.post('/agenda/nieuw', data={}, follow_redirects=True)
         self.assertIn("geen schrijfrechten", res_lezer_post.get_data(as_text=True).lower())
+
+    def test_agenda_filter_preservation_on_edit_and_cancel(self):
+        """Test dat filterwaarden op de agendalijst behouden blijven bij het openen van wijzigen en terugkeren via annuleren of opslaan."""
+        self.login_admin()
+
+        item = AgendaItem(
+            datum=date.today() + timedelta(days=2),
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_workshop.id,
+            locatie_id=self.locatie1.id,
+            omschrijving="Test item filterbehoud",
+            organisatie_id=self.org.id
+        )
+        db.session.add(item)
+        db.session.commit()
+
+        # 1. Bezoek agendalijst met specifieke filters
+        filtered_url = f'/agenda?locatie_id={self.locatie1.id}&type_id={self.type_workshop.id}&toon_verleden=on'
+        res_list = self.client.get(filtered_url)
+        self.assertEqual(res_list.status_code, 200)
+
+        # Controleer dat de wijzig-knop de terug_url bevat
+        from urllib.parse import quote
+        expected_terug = quote(filtered_url, safe='/?')
+        self.assertIn(f'/agenda/{item.id}/wijzig?terug_url={expected_terug}', res_list.get_data(as_text=True))
+
+        # 2. Open formulier voor wijzigen met terug_url
+        res_edit_get = self.client.get(f'/agenda/{item.id}/wijzig?terug_url={quote(filtered_url, safe="")}')
+        self.assertEqual(res_edit_get.status_code, 200)
+        self.assertIn('name="terug_url"', res_edit_get.get_data(as_text=True))
+
+        # 3. Annuleren keert terug naar de gefilterde lijst
+        res_cancel = self.client.get(f'/agenda/{item.id}/annuleren?terug_url={quote(filtered_url, safe="")}')
+        self.assertEqual(res_cancel.status_code, 302)
+        self.assertEqual(res_cancel.location, filtered_url)
+
+        # 4. Opslaan van wijzigingen keert terug naar de gefilterde lijst
+        res_edit_post = self.client.post(f'/agenda/{item.id}/wijzig', data={
+            'datum': (date.today() + timedelta(days=2)).isoformat(),
+            'uur_van': '14:30',
+            'uur_tot': '16:30',
+            'type_id': self.type_workshop.id,
+            'locatie_id': self.locatie1.id,
+            'omschrijving': 'Bijgewerkte omschrijving',
+            'terug_url': filtered_url
+        })
+        self.assertEqual(res_edit_post.status_code, 302)
+        self.assertEqual(res_edit_post.location, filtered_url)
+
+        # 5. Test sessie-fallback wanneer geen terug_url expliciet meegegeven is
+        self.client.get(filtered_url)
+        res_cancel_fallback = self.client.get(f'/agenda/{item.id}/annuleren')
+        self.assertEqual(res_cancel_fallback.status_code, 302)
+        self.assertEqual(res_cancel_fallback.location, filtered_url)
+
+        # 6. Reset verwijdert opgeslagen terugkeer-URL en gaat naar schone agendalijst
+        res_reset = self.client.get('/agenda?reset=1')
+        self.assertEqual(res_reset.status_code, 302)
+        self.assertEqual(res_reset.location, '/agenda')

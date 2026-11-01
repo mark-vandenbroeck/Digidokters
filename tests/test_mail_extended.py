@@ -29,6 +29,25 @@ class TestMailExtended(BaseTestCase):
                 req = mock_urlopen.call_args[0][0]
                 self.assertIn(b"override@example.com", req.data)
 
+    def test_verstuur_email_dev_auto_override(self):
+        """Test dat in development (wanneer TESTING False is) niet-geconfigureerde overrides automatisch naar mark.vandenbroeck@gmail.com gaan."""
+        with patch.dict(os.environ, {
+            'FLASK_ENV': 'development',
+            'BREVO_API_KEY': 'test-key'
+        }, clear=False):
+            os.environ.pop('MAIL_OVERRIDE_RECIPIENT', None)
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = b'{"messageId": "msg-dev-123"}'
+            mock_resp.__enter__.return_value = mock_resp
+
+            with patch.dict(self.app.config, {'TESTING': False}):
+                with patch('urllib.request.urlopen', return_value=mock_resp) as mock_urlopen:
+                    success, msg = verstuur_email('echte_gebruiker@digidokters.be', 'Test Onderwerp', 'Inhoud')
+                    self.assertTrue(success)
+                    req = mock_urlopen.call_args[0][0]
+                    self.assertIn(b"mark.vandenbroeck@gmail.com", req.data)
+                    self.assertNotIn(b'"email": "echte_gebruiker@digidokters.be"', req.data)
+
     def test_verstuur_email_brevo_api_with_attachments_and_bcc(self):
         with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as tmp:
             tmp.write(b"bestandsinhoud")
@@ -220,3 +239,30 @@ class TestMailExtended(BaseTestCase):
                 self.assertIn("Hallo Jan", kwargs['inhoud_tekst'])
                 self.assertEqual(len(kwargs['bijlagen']), 1)
                 self.assertEqual(kwargs['bijlagen'][0]['naam'], "Digidokters_Gebruikershandleiding.docx")
+
+    def test_verstuur_email_suppressed_in_testing_mode_brevo(self):
+        """Test dat in TESTING mode zonder gemockte urlopen geen externe HTTP call naar Brevo wordt gemaakt."""
+        with patch.dict(os.environ, {
+            'BREVO_API_KEY': 'dummy-brevo-key'
+        }):
+            # Zorg dat urlopen NIET gemockt is
+            self.assertFalse(hasattr(urllib.request.urlopen, 'mock_calls'))
+            success, msg = verstuur_email('user@example.com', 'Onderwerp', 'Inhoud')
+            self.assertTrue(success)
+            self.assertIn("externe netwerkoproep voorkomen", msg)
+
+    def test_verstuur_email_suppressed_in_testing_mode_smtp(self):
+        """Test dat in TESTING mode zonder gemockte SMTP geen externe socketverbinding wordt gemaakt."""
+        import smtplib
+        with patch.dict(os.environ, {
+            'BREVO_API_KEY': '',
+            'BREVO_KEY': '',
+            'SMTP_SERVER': 'smtp.dummy.org',
+            'SMTP_PORT': '587',
+            'SMTP_USERNAME': 'user@dummy.org',
+            'SMTP_PASSWORD': 'password123'
+        }, clear=False):
+            self.assertFalse(hasattr(smtplib.SMTP, 'mock_calls'))
+            success, msg = verstuur_email('user@example.com', 'Onderwerp', 'Inhoud')
+            self.assertTrue(success)
+            self.assertIn("externe netwerkoproep voorkomen", msg)

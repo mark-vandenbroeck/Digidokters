@@ -458,12 +458,13 @@ class TestAdminRoutes(BaseTestCase):
         self.login_admin()
 
         # 1. Nieuwe gebruiker aanmaken met uitsluitend groep_ids (zonder 'rol' veld)
-        res_post = self.client.post('/beheer/gebruikers/nieuw', data={
-            'naam': 'GroepOnlyUser',
-            'email': 'groeponly@test.com',
-            'wachtwoord': 'Password123!',
-            'groep_ids': [str(groepen['lezers'].id)]
-        }, follow_redirects=True)
+        with patch('utils.mail.stuur_welkomst_email', return_value=(True, "OK")):
+            res_post = self.client.post('/beheer/gebruikers/nieuw', data={
+                'naam': 'GroepOnlyUser',
+                'email': 'groeponly@test.com',
+                'wachtwoord': 'Password123!',
+                'groep_ids': [str(groepen['lezers'].id)]
+            }, follow_redirects=True)
         self.assertEqual(res_post.status_code, 200)
 
         created_user = User.query.filter_by(email='groeponly@test.com').first()

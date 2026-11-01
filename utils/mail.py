@@ -28,7 +28,21 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None, bcc=None,
     if isinstance(ontvangers, str):
         ontvangers = [ontvangers]
 
+    is_testing = False
+    try:
+        if current_app:
+            is_testing = bool(current_app.config.get('TESTING', False))
+    except Exception:
+        pass
+
     mail_override = (os.environ.get('MAIL_OVERRIDE_RECIPIENT') or '').strip()
+    if not mail_override:
+        # Veiligheidswaarborg: in lokale ontwikkelomgeving (FLASK_ENV != 'production' en niet in TESTING)
+        # worden alle uitgaande e-mails altijd standaard omgeleid naar mark.vandenbroeck@gmail.com
+        is_production = os.environ.get('FLASK_ENV') == 'production'
+        if not is_production and not is_testing:
+            mail_override = 'mark.vandenbroeck@gmail.com'
+
     if mail_override:
         orig_recipients_str = ", ".join(ontvangers)
         try:
@@ -55,6 +69,13 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None, bcc=None,
 
     # 1. Probeer Brevo HTTPS REST API (Poort 443 - immuun voor Render outbound port blocks)
     if brevo_api_key:
+        if is_testing and not hasattr(urllib.request.urlopen, 'mock_calls'):
+            try:
+                current_app.logger.info("[TESTING] E-mailverzending via Brevo onderdrukt (geen externe netwerkoproepen tijdens geautomatiseerde tests).")
+            except Exception:
+                pass
+            return True, "Geen e-mail verzonden (TESTING=True, externe netwerkoproep voorkomen)"
+
         try:
             url = "https://api.brevo.com/v3/smtp/email"
             headers = {
@@ -157,6 +178,15 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None, bcc=None,
             envelope_recipients.append(bcc)
         else:
             envelope_recipients.extend(bcc)
+
+    if is_testing:
+        smtp_target = smtplib.SMTP_SSL if smtp_port == 465 else smtplib.SMTP
+        if not hasattr(smtp_target, 'mock_calls'):
+            try:
+                current_app.logger.info("[TESTING] E-mailverzending via SMTP onderdrukt (geen externe netwerkoproepen tijdens geautomatiseerde tests).")
+            except Exception:
+                pass
+            return True, "Geen e-mail verzonden (TESTING=True, externe netwerkoproep voorkomen)"
 
     if smtp_port == 465:
         server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)

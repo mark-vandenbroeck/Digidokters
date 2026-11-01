@@ -29,6 +29,20 @@ def verstuur_email(ontvangers, onderwerp, inhoud_tekst, bijlagen=None, bcc=None,
         ontvangers = [ontvangers]
 
     mail_override = (os.environ.get('MAIL_OVERRIDE_RECIPIENT') or '').strip()
+    if not mail_override:
+        # Veiligheidswaarborg: in lokale ontwikkelomgeving (FLASK_ENV != 'production' en niet in TESTING)
+        # worden alle uitgaande e-mails altijd standaard omgeleid naar mark.vandenbroeck@gmail.com
+        is_testing = False
+        try:
+            if current_app:
+                is_testing = bool(current_app.config.get('TESTING', False))
+        except Exception:
+            pass
+
+        is_production = os.environ.get('FLASK_ENV') == 'production'
+        if not is_production and not is_testing:
+            mail_override = 'mark.vandenbroeck@gmail.com'
+
     if mail_override:
         orig_recipients_str = ", ".join(ontvangers)
         try:

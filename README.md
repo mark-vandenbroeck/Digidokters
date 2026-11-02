@@ -403,3 +403,5 @@ Het platform is geconfigureerd om direct te deployen naar Render.com.
 *   **Database:** PostgreSQL (Render PostgreSQL add-on). De `DATABASE_URL` omgevingsvariabele wordt door Render automatisch gekoppeld.
 *   **AI-integratie:** Voeg in het Render Dashboard onder **Environment Variables** de variabele `GEMINI_API_KEY` toe voor automatische vraagcategorisatie via Google Gemini AI.
 *   **Historische AI-seeding:** Voer eenmalig in de Render Shell `flask seed-vragenanalyse` uit om alle historische consultaties te analyseren.
+
+

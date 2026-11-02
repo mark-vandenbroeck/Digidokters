@@ -30,12 +30,12 @@ def _bepaal_extensie(bestandsnaam: str, mime_type: str = '') -> str:
     mime = (mime_type or '').lower()
     if 'pdf' in mime:
         return 'pdf'
-    if 'word' in mime or 'document' in mime:
-        return 'docx'
     if 'opendocument.text' in mime or 'odt' in mime:
         return 'odt'
-    if 'excel' in mime or 'sheet' in mime:
+    if 'excel' in mime or 'sheet' in mime or 'spreadsheet' in mime:
         return 'xlsx'
+    if 'word' in mime or 'document' in mime:
+        return 'docx'
     if 'csv' in mime:
         return 'csv'
     if 'markdown' in mime or 'md' in mime:
@@ -95,7 +95,8 @@ def _render_odt(inhoud_bytes: bytes) -> dict:
                     fs = t_prop.attrib.get(f'{{{NS["fo"]}}}font-style', '')
                     if 'italic' in fs or 'oblique' in fs:
                         props['italic'] = True
-                    if 'underline' in str(t_prop.attrib.get(f'{{{NS["style"]}}}text-underline-style', '')):
+                    ul_style = str(t_prop.attrib.get(f'{{{NS["style"]}}}text-underline-style', '')).lower()
+                    if 'underline' in ul_style or (ul_style and ul_style != 'none'):
                         props['underline'] = True
                     if t_prop.attrib.get(f'{{{NS["style"]}}}text-line-through-style'):
                         props['strike'] = True

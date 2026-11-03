@@ -316,3 +316,80 @@ class TestFeedbackNotifications(BaseTestCase):
         res_admin = self.client.get("/registraties")
         self.assertIn("Gemeente B voorstel", res_admin.data.decode("utf-8"))
 
+
+    def test_feedback_tracker_edge_cases(self):
+        """Test alle ontbrekende edge cases in utils.feedback_tracker."""
+        from unittest.mock import patch
+        from utils.feedback_tracker import (
+            markeer_feedback_bekeken, get_feedback_meldingen, markeer_melding_gelezen
+        )
+
+        # 1. markeer_feedback_bekeken met user_id=None
+        self.assertIsNone(markeer_feedback_bekeken(None))
+
+        # 2. markeer_feedback_bekeken commit exceptie
+        with patch('extensions.db.session.commit') as mock_commit:
+            mock_commit.side_effect = Exception("DB error")
+            with self.assertRaises(Exception):
+                markeer_feedback_bekeken(self.admin_user.id)
+
+        # 3. get_feedback_meldingen met anonieme/None user
+        self.assertEqual(get_feedback_meldingen(None), [])
+
+        # 4. Feedback item met MEERDERE nieuwe reacties (> 1)
+        nu = datetime.now(timezone.utc)
+        self.admin_user.aangemaakt_op = nu - timedelta(days=2)
+        fb = FeedbackItem(
+            organisatie_id=self.org.id,
+            user_id=self.admin_user.id,
+            type="voorstel",
+            onderwerp="Meerdere reacties test",
+            beschrijving="Test",
+            aangemaakt_op=nu - timedelta(hours=5)
+        )
+        db.session.add(fb)
+        db.session.commit()
+
+        # Voeg 2 reacties toe van Karel
+        c1 = FeedbackComment(feedback_id=fb.id, user_id=self.collega_user.id, tekst="Eerste reactie", aangemaakt_op=nu - timedelta(hours=3))
+        c2 = FeedbackComment(feedback_id=fb.id, user_id=self.collega_user.id, tekst="Tweede reactie", aangemaakt_op=nu - timedelta(hours=1))
+        db.session.add_all([c1, c2])
+        db.session.commit()
+
+        with self.app.test_request_context('/'):
+            meldingen = get_feedback_meldingen(self.admin_user, self.org.id)
+            comment_melds = [m for m in meldingen if m['code'] == 'comment']
+            self.assertTrue(len(comment_melds) >= 1)
+            self.assertIn("2 nieuwe reacties op", comment_melds[0]['tekst'])
+
+        # 5. Ongeziene items: exact 2 items (dekt regels 132-146)
+        fb2 = FeedbackItem(organisatie_id=self.org.id, user_id=self.collega_user.id, type="bug", onderwerp="Bug 2", beschrijving="Test", aangemaakt_op=nu - timedelta(minutes=5))
+        fb3 = FeedbackItem(organisatie_id=self.org.id, user_id=self.collega_user.id, type="voorstel", onderwerp="Voorstel 3", beschrijving="Test", aangemaakt_op=nu - timedelta(minutes=4))
+        db.session.add_all([fb2, fb3])
+        db.session.commit()
+
+        with self.app.test_request_context('/'):
+            meldingen2 = get_feedback_meldingen(self.admin_user, self.org.id)
+            new_fb_melds = [m for m in meldingen2 if m['code'] == 'new_feedback']
+            self.assertGreaterEqual(len(new_fb_melds), 2)
+
+        # 6. Ongeziene items: meer dan 2 items (dekt regels 148-158)
+        fb4 = FeedbackItem(organisatie_id=self.org.id, user_id=self.collega_user.id, type="voorstel", onderwerp="Voorstel 4", beschrijving="Test", aangemaakt_op=nu - timedelta(minutes=3))
+        fb5 = FeedbackItem(organisatie_id=self.org.id, user_id=self.collega_user.id, type="voorstel", onderwerp="Voorstel 5", beschrijving="Test", aangemaakt_op=nu - timedelta(minutes=2))
+        db.session.add_all([fb4, fb5])
+        db.session.commit()
+
+        with self.app.test_request_context('/'):
+            meldingen_veel = get_feedback_meldingen(self.admin_user, self.org.id)
+            list_melds = [m for m in meldingen_veel if m['code'] == 'new_feedback_list']
+            self.assertEqual(len(list_melds), 1)
+            self.assertIn("nieuwe feedback-items ingediend", list_melds[0]['tekst'])
+
+        # 7. markeer_melding_gelezen voor comment en new_feedback_list
+        markeer_melding_gelezen(self.admin_user.id, 'comment', item_id=fb.id)
+        view_comment = FeedbackView.query.filter_by(user_id=self.admin_user.id, feedback_id=fb.id).first()
+        self.assertIsNotNone(view_comment)
+
+        markeer_melding_gelezen(self.admin_user.id, 'new_feedback_list', item_id=None)
+        view_list = FeedbackView.query.filter_by(user_id=self.admin_user.id, feedback_id=None).first()
+        self.assertIsNotNone(view_list)

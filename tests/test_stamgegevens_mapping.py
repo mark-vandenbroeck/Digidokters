@@ -358,4 +358,94 @@ class TestStamgegevensMapping(BaseTestCase):
         self.assertLess(html.index("Zaal Noord"), html.index("Zaal Zuid"))
         self.assertLess(html.index("Inloop"), html.index("Workshop"))
 
+    def test_stamgegevens_helpers_extended(self):
+        """Test edge cases in utils.stamgegevens: get_usage_counts, toggle_stamgegeven_status, wijzig_stamgegeven_volgorde."""
+        from werkzeug.exceptions import HTTPException
+        from models.location import Location
+        from models.agenda import AgendaItem
+        from models.activity_type import ActivityType
+        from utils.stamgegevens import get_usage_counts, toggle_stamgegeven_status, wijzig_stamgegeven_volgorde
+
+        # 1. get_usage_counts voor Location (registraties + agenda)
+        act_type = ActivityType(naam="ActType", actief=True, organisatie_id=self.org.id, volgorde=0)
+        loc = Location(naam="Bib Hoofd", actief=True, organisatie_id=self.org.id, volgorde=0)
+        db.session.add_all([act_type, loc])
+        db.session.flush()
+
+        ag = AgendaItem(
+            datum=date(2026, 6, 1),
+            uur_van="10:00",
+            uur_tot="12:00",
+            type_id=act_type.id,
+            locatie_id=loc.id,
+            organisatie_id=self.org.id
+        )
+        reg = Registration(
+            registratienummer="2026-LOC1",
+            datum=date(2026, 6, 1),
+            client="Loc Client",
+            digidokter_id=self.digidokter.id,
+            toestel_id=self.actief_toestel.id,
+            leeftijdscategorie_id=self.actieve_leeftijd.id,
+            locatie_id=loc.id,
+            onderwerp="Locatie test",
+            organisatie_id=self.org.id,
+            aangemaakt_door_id=self.admin_user.id
+        )
+        db.session.add_all([ag, reg])
+        db.session.commit()
+
+        loc_counts = get_usage_counts(Location, self.org.id)
+        self.assertEqual(loc_counts.get(loc.id), 2)
+
+        # Usage counts voor Herkomst, GenderIdentity, Digidokter, Functie, Resultaat
+        from models.herkomst import Herkomst
+        from models.gender_identity import GenderIdentity
+        from models.digidokter import Digidokter
+        from models.functie import Functie
+        from models.resultaat import Resultaat
+        self.assertIsInstance(get_usage_counts(Herkomst, self.org.id), dict)
+        self.assertIsInstance(get_usage_counts(GenderIdentity, self.org.id), dict)
+        self.assertIsInstance(get_usage_counts(Digidokter, self.org.id), dict)
+        self.assertIsInstance(get_usage_counts(Functie, self.org.id), dict)
+        self.assertIsInstance(get_usage_counts(Resultaat, self.org.id), dict)
+
+        # Onbekend model -> {}
+        class FakeModel(db.Model):
+            __tablename__ = 'fake_table'
+            id = db.Column(db.Integer, primary_key=True)
+
+        self.assertEqual(get_usage_counts(FakeModel, self.org.id), {})
+
+        # 2. toggle_stamgegeven_status met andere organisatie (moet 403 geven)
+        with self.assertRaises(HTTPException) as cm:
+            toggle_stamgegeven_status(Location, loc.id, org_id=999999)
+        self.assertEqual(cm.exception.code, 403)
+
+        # 3. toggle_stamgegeven_status met activering van gemapt item
+        self.oud_toestel.mapped_to_id = self.actief_toestel.id
+        self.oud_toestel.actief = False
+        db.session.commit()
+        naam, is_actief = toggle_stamgegeven_status(Device, self.oud_toestel.id, self.org.id)
+        self.assertTrue(is_actief)
+        self.assertIsNone(self.oud_toestel.mapped_to_id)
+
+        # 4. wijzig_stamgegeven_volgorde met andere organisatie (403)
+        with self.assertRaises(HTTPException) as cm:
+            wijzig_stamgegeven_volgorde(Location, loc.id, 'omhoog', org_id=999999)
+        self.assertEqual(cm.exception.code, 403)
+
+        # 5. wijzig_stamgegeven_volgorde met gelijke volgordes (omhoog en omlaag branch)
+        d1 = Device(naam="A_Device", actief=True, organisatie_id=self.org.id, volgorde=5)
+        d2 = Device(naam="B_Device", actief=True, organisatie_id=self.org.id, volgorde=5)
+        d3 = Device(naam="C_Device", actief=True, organisatie_id=self.org.id, volgorde=5)
+        db.session.add_all([d1, d2, d3])
+        db.session.commit()
+
+        # omhoog met gelijke volgorde
+        wijzig_stamgegeven_volgorde(Device, d2.id, 'omhoog', self.org.id)
+        # omlaag met gelijke volgorde
+        wijzig_stamgegeven_volgorde(Device, d2.id, 'omlaag', self.org.id)
+
+
 

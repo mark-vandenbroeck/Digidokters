@@ -154,3 +154,66 @@ class TestImportExport(BaseTestCase):
             row_values = [cell.value for cell in ws[2]]
             self.assertIn("Hardware & Toestellen", row_values)
 
+
+    def test_import_and_export_routes_extended(self):
+        """Test alle ontbrekende paden in routes.import_export: upload validaties, verwerk_import flash messages, en ongeldige datums."""
+        import io
+        from unittest.mock import patch
+
+        self.login("AdminMark", "password123")
+        self.select_organisatie(self.org.id)
+
+        # 1. GET /importeer
+        res_get = self.client.get('/importeer')
+        self.assertEqual(res_get.status_code, 200)
+
+        # 2. POST /importeer zonder bestand
+        res_empty = self.client.post('/importeer', data={}, follow_redirects=True)
+        self.assertIn('Geen bestand geselecteerd.', res_empty.data.decode('utf-8'))
+
+        # 3. POST /importeer met ongeldige extensie
+        bad_file = (io.BytesIO(b"dummy data"), "bestand.pdf")
+        res_bad = self.client.post('/importeer', data={'bestand': bad_file}, follow_redirects=True)
+        self.assertIn('Ongeldig bestandsformaat.', res_bad.data.decode('utf-8'))
+
+        # 4. POST /importeer met waarschuwingen
+        csv_file = (io.BytesIO(b"col1,col2\nval1,val2"), "import_data.csv")
+        with patch('routes.import_export.verwerk_import') as mock_import:
+            mock_import.return_value = {'fouten': ['Waarschuwing 1', 'Waarschuwing 2'], 'toegevoegd': 2}
+            res_warn = self.client.post('/importeer', data={'bestand': csv_file}, follow_redirects=True)
+            self.assertIn('Import voltooid met 2 waarschuwingen.', res_warn.data.decode('utf-8'))
+
+        # 5. POST /importeer succesvol
+        csv_file_ok = (io.BytesIO(b"col1,col2\nval1,val2"), "import_data_ok.csv")
+        with patch('routes.import_export.verwerk_import') as mock_import:
+            mock_import.return_value = {'fouten': [], 'toegevoegd': 4}
+            res_ok = self.client.post('/importeer', data={'bestand': csv_file_ok}, follow_redirects=True)
+            self.assertIn('Import geslaagd: 4 registraties toegevoegd.', res_ok.data.decode('utf-8'))
+
+        # 6. GET logbestand dat niet bestaat (404)
+        res_404 = self.client.get(f'/importeer/log/import_{self.org.id}_nietbestaand.log')
+        self.assertEqual(res_404.status_code, 404)
+
+        # 7. POST /exporteer met ongeldige datums (ValueError)
+        res_invalid_date = self.client.post('/exporteer', data={
+            'datum_van': 'geen-geldige-datum',
+            'formaat': 'csv'
+        }, follow_redirects=True)
+        self.assertIn('Ongeldige datumnotatie.', res_invalid_date.data.decode('utf-8'))
+
+        # 8. POST /exporteer met geldige filters (csv en xlsx)
+        res_csv = self.client.post('/exporteer', data={
+            'datum_van': '2026-01-01',
+            'datum_tot': '2026-12-31',
+            'formaat': 'csv'
+        })
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertEqual(res_csv.mimetype, 'text/csv')
+
+        res_xlsx = self.client.post('/exporteer', data={
+            'datum_van': '2026-01-01',
+            'datum_tot': '2026-12-31',
+            'formaat': 'xlsx'
+        })
+        self.assertEqual(res_xlsx.status_code, 200)
+        self.assertEqual(res_xlsx.mimetype, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

@@ -570,3 +570,70 @@ class TestCommunicatieRoutes(BaseTestCase):
                 assert 'admin.org_a@test.be' not in msg_str.split('\n\n')[0] # Niet in headers!
 
 
+class TestCommunicatieLogModel(BaseTestCase):
+    """Unit tests voor CommunicatieLog model properties en methods."""
+
+    def test_ontvangers_lijst_and_preview(self):
+        # 1. Leeg of None
+        log_empty = CommunicatieLog(ontvangers_json="")
+        self.assertEqual(log_empty.ontvangers_lijst, [])
+        self.assertEqual(log_empty.ontvangers_preview, "Geen ontvangers")
+
+        log_none = CommunicatieLog(ontvangers_json=None)
+        self.assertEqual(log_none.ontvangers_lijst, [])
+        self.assertEqual(log_none.ontvangers_preview, "Geen ontvangers")
+
+        # 2. Corrupt / niet-JSON string: fallback naar komma-gescheiden lijst
+        log_csv = CommunicatieLog(ontvangers_json="test1@test.be, test2@test.be, ")
+        self.assertEqual(log_csv.ontvangers_lijst, ["test1@test.be", "test2@test.be"])
+        self.assertEqual(log_csv.ontvangers_preview, "test1@test.be, test2@test.be")
+
+        # 3. JSON lijst met dicts bevattende 'naam'
+        import json
+        ontvangers_dict = [
+            {"naam": "Alice", "email": "alice@test.be"},
+            {"naam": "Bob", "email": "bob@test.be"}
+        ]
+        log_dict = CommunicatieLog(ontvangers_json=json.dumps(ontvangers_dict))
+        self.assertEqual(len(log_dict.ontvangers_lijst), 2)
+        self.assertEqual(log_dict.ontvangers_preview, "Alice, Bob")
+
+        # 4. JSON lijst met dicts ZONDER 'naam', enkel 'email'
+        ontvangers_no_name = [{"email": "charlie@test.be"}]
+        log_no_name = CommunicatieLog(ontvangers_json=json.dumps(ontvangers_no_name))
+        self.assertEqual(log_no_name.ontvangers_preview, "charlie@test.be")
+
+        # 5. Meer dan 3 ontvangers
+        veel_ontvangers = [
+            {"naam": "User1"},
+            {"naam": "User2"},
+            {"naam": "User3"},
+            {"naam": "User4"},
+            {"naam": "User5"},
+        ]
+        log_veel = CommunicatieLog(ontvangers_json=json.dumps(veel_ontvangers))
+        self.assertEqual(log_veel.ontvangers_preview, "User1, User2, User3 en 2 andere(n)")
+
+    def test_geformatteerde_datum_en_repr(self):
+        from datetime import datetime
+        log = CommunicatieLog(
+            id=42,
+            type='organisatie',
+            onderwerp='Belangrijke update over het digipunt',
+            verzonden_op=None
+        )
+        # Datum is None
+        self.assertEqual(log.geformatteerde_datum, "")
+
+        # Datum is ingesteld
+        log.verzonden_op = datetime(2026, 11, 3, 14, 45)
+        self.assertEqual(log.geformatteerde_datum, "03-11-2026 om 14:45")
+
+        # __repr__ test
+        repr_str = repr(log)
+        self.assertIn("id=42", repr_str)
+        self.assertIn("type=organisatie", repr_str)
+        self.assertIn("Belangrijke update", repr_str)
+
+
+

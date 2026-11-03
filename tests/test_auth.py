@@ -1,6 +1,7 @@
 from unittest.mock import patch
-from tests.base import BaseTestCase
+from tests.base import BaseTestCase, TEST_PASSWORD_HASH
 from flask import session
+from extensions import db
 from models.user import User
 
 class TestAuth(BaseTestCase):
@@ -323,3 +324,192 @@ class TestAuth(BaseTestCase):
         }, follow_redirects=False)
         self.assertEqual(res.status_code, 302)
         self.assertEqual(res.headers['Location'], '/registraties')
+
+        # 12. Platformbeheerder switcht naar niet-bestaande organisatie
+        res_invalid_org = self.client.post('/switch-organisatie', data={
+            'organisatie_id': 999999,
+        }, follow_redirects=True)
+        self.assertIn('Ongeldige organisatie.', res_invalid_org.data.decode('utf-8'))
+        self.logout()
+
+        # 13. Reguliere gebruiker switcht naar organisatie waar hij wel en geen lid van is
+        self.login("AdminMark", "password123")
+        res_user_switch = self.client.post('/switch-organisatie', data={
+            'organisatie_id': self.org.id,
+        }, follow_redirects=True)
+        self.assertIn('Gewisseld naar organisatie', res_user_switch.data.decode('utf-8'))
+
+        res_unauth_switch = self.client.post('/switch-organisatie', data={
+            'organisatie_id': org2.id,
+        }, follow_redirects=True)
+        self.assertIn('U heeft geen toegang tot deze organisatie.', res_unauth_switch.data.decode('utf-8'))
+
+    def test_wachtwoord_vergeten_en_verifieer_volledige_flow(self):
+        """Test alle scenario's van wachtwoord vergeten en verificatiecode validatie."""
+        from datetime import datetime, timezone, timedelta
+        from unittest.mock import patch
+
+        # 1. Al ingelogd -> redirect naar /registraties
+        self.login("AdminMark", "password123")
+        res = self.client.get('/wachtwoord-vergeten', follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/registraties', res.headers['Location'])
+
+        res_v = self.client.get('/wachtwoord-vergeten/verifieer', follow_redirects=False)
+        self.assertEqual(res_v.status_code, 302)
+        self.assertIn('/registraties', res_v.headers['Location'])
+        self.logout()
+
+        # 2. POST /wachtwoord-vergeten zonder email
+        res_no_email = self.client.post('/wachtwoord-vergeten', data={'email': ''}, follow_redirects=True)
+        self.assertIn('Vul uw e-mailadres in.', res_no_email.data.decode('utf-8'))
+
+        # 3. POST /wachtwoord-vergeten met onbekend email
+        res_unknown = self.client.post('/wachtwoord-vergeten', data={'email': 'onbekend@test.be'}, follow_redirects=True)
+        self.assertIn('E-mailadres is niet bekend.', res_unknown.data.decode('utf-8'))
+
+        # 4. POST /wachtwoord-vergeten met gedeactiveerde gebruiker
+        inactieve_u = User(
+            naam="InactiefVoorReset",
+            email="inactief_reset@test.com",
+            wachtwoord_hash=TEST_PASSWORD_HASH,
+            rol="medewerker",
+            actief=False
+        )
+        db.session.add(inactieve_u)
+        db.session.commit()
+        res_inactief = self.client.post('/wachtwoord-vergeten', data={'email': 'inactief_reset@test.com'}, follow_redirects=True)
+        self.assertIn('Uw account is gedeactiveerd.', res_inactief.data.decode('utf-8'))
+
+        # 5. POST /wachtwoord-vergeten waarbij e-mail versturen faalt
+        with patch('utils.mail.verstuur_email') as mock_mail:
+            mock_mail.side_effect = Exception("SMTP Offline")
+            res_fail = self.client.post('/wachtwoord-vergeten', data={'email': 'tim@test.com'}, follow_redirects=True)
+            self.assertIn('Fout bij het versturen van de e-mail.', res_fail.data.decode('utf-8'))
+
+        # 6. POST /wachtwoord-vergeten succesvol
+        with patch('utils.mail.verstuur_email') as mock_mail:
+            mock_mail.return_value = (True, "OK")
+            res_succes = self.client.post('/wachtwoord-vergeten', data={'email': 'tim@test.com'}, follow_redirects=False)
+            self.assertEqual(res_succes.status_code, 302)
+            self.assertIn('/wachtwoord-vergeten/verifieer', res_succes.headers['Location'])
+
+        # 7. GET /wachtwoord-vergeten/verifieer zonder reset_username in sessie
+        with self.client.session_transaction() as sess:
+            sess.pop('reset_username', None)
+        res_no_sess = self.client.get('/wachtwoord-vergeten/verifieer', follow_redirects=False)
+        self.assertEqual(res_no_sess.status_code, 302)
+        self.assertIn('/wachtwoord-vergeten', res_no_sess.headers['Location'])
+
+        # 8. POST /wachtwoord-vergeten/verifieer ontbrekende velden en mismatch
+        with self.client.session_transaction() as sess:
+            sess['reset_username'] = self.medewerker_user.naam
+
+        res_miss = self.client.post('/wachtwoord-vergeten/verifieer', data={'code': '123456'}, follow_redirects=True)
+        self.assertIn('Vul alle velden in.', res_miss.data.decode('utf-8'))
+
+        res_mismatch = self.client.post('/wachtwoord-vergeten/verifieer', data={
+            'code': '123456',
+            'nieuw_wachtwoord': 'Wachtwoord1!',
+            'bevestig_wachtwoord': 'Wachtwoord2!'
+        }, follow_redirects=True)
+        self.assertIn('De nieuwe wachtwoorden komen niet overeen.', res_mismatch.data.decode('utf-8'))
+
+        # 9. Verlopen code
+        self.medewerker_user.reset_code = '123456'
+        self.medewerker_user.reset_code_verloopt_op = datetime.now(timezone.utc) - timedelta(minutes=5)
+        db.session.commit()
+        res_expired = self.client.post('/wachtwoord-vergeten/verifieer', data={
+            'code': '123456',
+            'nieuw_wachtwoord': 'NieuwPass123!',
+            'bevestig_wachtwoord': 'NieuwPass123!'
+        }, follow_redirects=True)
+        self.assertIn('De herstelcode is verlopen.', res_expired.data.decode('utf-8'))
+
+        # 10. Verkeerde code en mislukte pogingen teller
+        self.medewerker_user.reset_code_verloopt_op = datetime.now(timezone.utc) + timedelta(minutes=15)
+        self.medewerker_user.reset_pogingen = 0
+        db.session.commit()
+        res_wrong = self.client.post('/wachtwoord-vergeten/verifieer', data={
+            'code': '999999',
+            'nieuw_wachtwoord': 'NieuwPass123!',
+            'bevestig_wachtwoord': 'NieuwPass123!'
+        }, follow_redirects=True)
+        self.assertIn('Ongeldige herstelcode.', res_wrong.data.decode('utf-8'))
+
+        # 11. Te veel mislukte pogingen (>= 5)
+        self.medewerker_user.reset_pogingen = 4
+        db.session.commit()
+        res_locked = self.client.post('/wachtwoord-vergeten/verifieer', data={
+            'code': '999999',
+            'nieuw_wachtwoord': 'NieuwPass123!',
+            'bevestig_wachtwoord': 'NieuwPass123!'
+        }, follow_redirects=True)
+        self.assertIn('Te veel mislukte pogingen.', res_locked.data.decode('utf-8'))
+
+        # 12. Succesvol wachtwoord herstellen
+        with self.client.session_transaction() as sess:
+            sess['reset_username'] = self.medewerker_user.naam
+        self.medewerker_user.reset_code = '654321'
+        self.medewerker_user.reset_code_verloopt_op = datetime.now(timezone.utc) + timedelta(minutes=15)
+        self.medewerker_user.reset_pogingen = 0
+        db.session.commit()
+
+        # Te zwak wachtwoord
+        res_weak = self.client.post('/wachtwoord-vergeten/verifieer', data={
+            'code': '654321',
+            'nieuw_wachtwoord': 'kort',
+            'bevestig_wachtwoord': 'kort'
+        }, follow_redirects=True)
+        self.assertIn('minstens 8 tekens', res_weak.data.decode('utf-8'))
+
+        # Sterk wachtwoord
+        res_success = self.client.post('/wachtwoord-vergeten/verifieer', data={
+            'code': '654321',
+            'nieuw_wachtwoord': 'VeiligWachtwoord123!',
+            'bevestig_wachtwoord': 'VeiligWachtwoord123!'
+        }, follow_redirects=False)
+        self.assertEqual(res_success.status_code, 302)
+        self.assertIn('/login', res_success.headers['Location'])
+
+    def test_login_extra_scenarios(self):
+        """Test extra scenario's bij login: inactieve gebruiker, geen lidmaatschap, 2 lidmaatschappen."""
+        from models.organisatie import Organisatie, UserOrganisatie
+        # 1. Inloggen met inactieve gebruiker
+        inactief_u = User(
+            naam="InactiefLogin",
+            email="inactief_login@test.com",
+            wachtwoord_hash=TEST_PASSWORD_HASH,
+            rol="medewerker",
+            actief=False
+        )
+        db.session.add(inactief_u)
+        db.session.commit()
+        res_inactief = self.client.post('/login', data={'email': 'inactief_login@test.com', 'wachtwoord': 'password123'}, follow_redirects=True)
+        self.assertIn('Uw account is gedeactiveerd.', res_inactief.data.decode('utf-8'))
+
+        # 2. Gebruiker zonder actieve organisatielidmaatschappen
+        geen_org_u = User(
+            naam="GeenOrgUser",
+            email="geen_org@test.com",
+            wachtwoord_hash=TEST_PASSWORD_HASH,
+            rol="medewerker",
+            actief=True
+        )
+        db.session.add(geen_org_u)
+        db.session.commit()
+        res_no_org = self.client.post('/login', data={'email': 'geen_org@test.com', 'wachtwoord': 'password123'}, follow_redirects=True)
+        self.assertIn('niet gekoppeld aan een actieve organisatie', res_no_org.data.decode('utf-8'))
+
+        # 3. Gebruiker met 2 organisatielidmaatschappen -> redirect naar select_org
+        org2 = Organisatie(naam="Gemeente Twee", slug="gemeente-twee", actief=True)
+        db.session.add(org2)
+        db.session.commit()
+        uo1 = UserOrganisatie(user_id=geen_org_u.id, organisatie_id=self.org.id, rol="medewerker", actief=True)
+        uo2 = UserOrganisatie(user_id=geen_org_u.id, organisatie_id=org2.id, rol="medewerker", actief=True)
+        db.session.add_all([uo1, uo2])
+        db.session.commit()
+
+        res_two_orgs = self.client.post('/login', data={'email': 'geen_org@test.com', 'wachtwoord': 'password123'}, follow_redirects=False)
+        self.assertEqual(res_two_orgs.status_code, 302)
+        self.assertIn('/select-organisatie', res_two_orgs.headers['Location'])

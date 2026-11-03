@@ -236,3 +236,118 @@ class TestPlatformMonitor(BaseTestCase):
             self.assertIn('Geconfigureerd', html)
 
 
+
+    def test_health_module_extended_coverage(self):
+        """Test alle edge cases en foutcondities in utils.health."""
+        from utils.health import (
+            get_friendly_endpoint_label, record_page_view, record_system_error,
+            check_database_health, check_email_health, check_ai_health,
+            check_storage_health, get_full_platform_health
+        )
+
+        # 1. get_friendly_endpoint_label leeg
+        self.assertEqual(get_friendly_endpoint_label(""), "Onbekende pagina")
+        self.assertEqual(get_friendly_endpoint_label(None), "Onbekende pagina")
+        self.assertEqual(get_friendly_endpoint_label("custom.mijn_route"), "Custom Mijn route")
+
+        # 2. record_page_view: genegeerde endpoints
+        record_page_view("static.file", "/static/test.css")
+        record_page_view("ping", "/ping")
+        record_page_view("service_worker", "/sw.js")
+
+        # 3. record_page_view: reeds bestaande stat updaten
+        record_page_view("mijn.test.pagina", "/mijn/test", org_id=self.org.id)
+        # Tweede keer aanroepen -> stat.aantal_hits += 1
+        record_page_view("mijn.test.pagina", "/mijn/test/nieuw", org_id=self.org.id)
+
+        # record_page_view exception rollback
+        with patch('extensions.db.session.commit') as mock_commit:
+            mock_commit.side_effect = Exception("DB error")
+            record_page_view("mijn.fout.pagina", "/fout")
+
+        # 4. record_system_error exception rollback
+        with patch('extensions.db.session.commit') as mock_commit:
+            mock_commit.side_effect = Exception("DB error")
+            record_system_error(500, "Error", "Test")
+
+        # 5. check_database_health: latency warning & exception
+        with patch.object(db.engine.dialect, 'name', 'postgresql'):
+            with patch('extensions.db.session.execute') as mock_exec:
+                mock_scalar = MagicMock()
+                mock_scalar.scalar.return_value = 'test_db'
+                mock_exec.return_value = mock_scalar
+                res_pg = check_database_health()
+                self.assertEqual(res_pg['db_type'], 'PostgreSQL')
+
+        with patch('extensions.db.session.execute') as mock_exec:
+            mock_exec.side_effect = Exception("DB connection timeout")
+            res_err = check_database_health()
+            self.assertEqual(res_err['status'], 'danger')
+            self.assertIn("DB connection timeout", res_err['error'])
+
+        # 6. check_email_health: Brevo socket fout
+        import os
+        with patch.dict(os.environ, {'BREVO_API_KEY': 'test-key'}):
+            with patch('socket.create_connection') as mock_sock:
+                mock_sock.side_effect = Exception("Network unreachable")
+                res_brevo_err = check_email_health()
+                self.assertEqual(res_brevo_err['status'], 'warning')
+                self.assertIn("niet bereikbaar", res_brevo_err['error'])
+
+        # check_email_health: SMTP geconfigureerd met connectie-fout
+        with patch.dict(os.environ, {'BREVO_API_KEY': '', 'BREVO_KEY': '', 'SMTP_PASSWORD': ''}):
+            with self.app.test_request_context('/'):
+                self.app.config['MAIL_SERVER'] = 'smtp.example.org'
+                self.app.config['MAIL_PORT'] = 587
+                with patch('socket.create_connection') as mock_sock:
+                    mock_sock.side_effect = Exception("Connection refused")
+                    res_smtp_err = check_email_health()
+                    self.assertEqual(res_smtp_err['status'], 'warning')
+                    self.assertIn("niet bereikbaar", res_smtp_err['error'])
+
+        # 7. check_ai_health: OpenAI & Custom model
+        with patch.dict(os.environ, {
+            'OPENAI_API_KEY': 'sk-test',
+            'AI_MODEL': 'custom-gpt-5',
+            'GEMINI_API_KEY': ''
+        }):
+            res_ai_custom = check_ai_health()
+            self.assertEqual(res_ai_custom['model'], 'custom-gpt-5')
+            self.assertEqual(res_ai_custom['status'], 'ok')
+
+        with patch.dict(os.environ, {
+            'OPENAI_API_KEY': 'sk-test',
+            'AI_MODEL': '',
+            'GEMINI_API_KEY': ''
+        }):
+            res_ai_openai = check_ai_health()
+            self.assertEqual(res_ai_openai['model'], 'gpt-4o-mini')
+
+        with patch('utils.ai_classifier.get_actieve_provider') as mock_prov:
+            mock_prov.side_effect = Exception("AI crash")
+            res_ai_err = check_ai_health()
+            self.assertEqual(res_ai_err['status'], 'info')
+            self.assertIn("AI crash", res_ai_err['error'])
+
+        # 8. check_storage_health: percentage waarschuwingen en niet-schrijfbaar
+        from collections import namedtuple
+        DiskUsage = namedtuple('DiskUsage', ['total', 'used', 'free'])
+        with patch('shutil.disk_usage') as mock_usage:
+            # 96% vol
+            mock_usage.return_value = DiskUsage(100 * 1024**3, 96 * 1024**3, 4 * 1024**3)
+            with patch('os.access', return_value=False):
+                res_storage = check_storage_health()
+                self.assertEqual(res_storage['status'], 'danger')
+
+        with patch('shutil.disk_usage') as mock_usage:
+            mock_usage.side_effect = Exception("Disk error")
+            res_storage_err = check_storage_health()
+            self.assertEqual(res_storage_err['status'], 'warning')
+
+        # 9. get_full_platform_health aanroepen
+        with self.app.test_request_context('/'):
+            full_health = get_full_platform_health()
+            self.assertIn('overall_status', full_health)
+            self.assertIn('database', full_health)
+            self.assertIn('email', full_health)
+            self.assertIn('storage', full_health)

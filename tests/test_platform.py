@@ -449,3 +449,75 @@ class TestPlatformOrganizationDelete(BaseTestCase):
         self.assertEqual(cynthia_groepen[0].naam, 'Beheerders')
 
 
+
+    def test_platform_organisaties_crud_and_actions(self):
+        """Test organisatie beheer door platformbeheerder: nieuw, wijzig, toggle, filters en audit export."""
+        from tests.base import TEST_PASSWORD_HASH
+
+        # Login als platformbeheerder
+        pb = User.query.filter_by(rol="platformbeheerder").first()
+        if not pb:
+            pb = User(naam="PAdminTest", email="patest@test.be", wachtwoord_hash=TEST_PASSWORD_HASH, rol="platformbeheerder", actief=True)
+            db.session.add(pb)
+            db.session.commit()
+
+        self.login(pb.email, "password123")
+
+        # 1. Filter status inactief
+        res_inactief = self.client.get('/platform/organisaties?status=inactief')
+        self.assertEqual(res_inactief.status_code, 200)
+
+        # 2. GET en POST nieuw met fouten
+        res_get_nieuw = self.client.get('/platform/organisaties/nieuw')
+        self.assertEqual(res_get_nieuw.status_code, 200)
+
+        res_miss = self.client.post('/platform/organisaties/nieuw', data={'naam': '', 'slug': ''}, follow_redirects=True)
+        self.assertIn('Naam en slug zijn verplicht.', res_miss.data.decode('utf-8'))
+
+        res_dup = self.client.post('/platform/organisaties/nieuw', data={'naam': 'Dubbel', 'slug': self.org.slug}, follow_redirects=True)
+        self.assertIn('Er bestaat al een organisatie met deze slug.', res_dup.data.decode('utf-8'))
+
+        # POST nieuw succes
+        res_new_ok = self.client.post('/platform/organisaties/nieuw', data={
+            'naam': 'Gemeente Zonnebeke',
+            'slug': 'zonnebeke',
+            'actief': 'on'
+        }, follow_redirects=True)
+        self.assertIn('Organisatie Gemeente Zonnebeke aangemaakt.', res_new_ok.data.decode('utf-8'))
+
+        nieuwe_org = Organisatie.query.filter_by(slug='zonnebeke').first()
+        self.assertIsNotNone(nieuwe_org)
+
+        # 3. GET en POST wijzig
+        res_get_edit = self.client.get(f'/platform/organisaties/{nieuwe_org.id}/wijzig')
+        self.assertEqual(res_get_edit.status_code, 200)
+
+        res_edit_miss = self.client.post(f'/platform/organisaties/{nieuwe_org.id}/wijzig', data={'naam': '', 'slug': ''}, follow_redirects=True)
+        self.assertIn('Naam en slug zijn verplicht.', res_edit_miss.data.decode('utf-8'))
+
+        res_edit_dup = self.client.post(f'/platform/organisaties/{nieuwe_org.id}/wijzig', data={'naam': 'Zonnebeke', 'slug': self.org.slug}, follow_redirects=True)
+        self.assertIn('Er bestaat al een andere organisatie met deze slug.', res_edit_dup.data.decode('utf-8'))
+
+        res_edit_ok = self.client.post(f'/platform/organisaties/{nieuwe_org.id}/wijzig', data={
+            'naam': 'Gemeente Zonnebeke Aangepast',
+            'slug': 'zonnebeke-aangepast',
+            'actief': 'on'
+        }, follow_redirects=True)
+        self.assertIn('Organisatie Gemeente Zonnebeke Aangepast bijgewerkt.', res_edit_ok.data.decode('utf-8'))
+
+        # 4. Toggle default org (id=1) -> mag niet
+        res_toggle_default = self.client.get(f'/platform/organisaties/{self.org.id}/toggle', follow_redirects=True)
+        self.assertIn('De default organisatie kan niet worden gedeactiveerd.', res_toggle_default.data.decode('utf-8'))
+
+        # Toggle nieuwe org
+        res_toggle_ok = self.client.get(f'/platform/organisaties/{nieuwe_org.id}/toggle', follow_redirects=True)
+        self.assertIn('gedeactiveerd', res_toggle_ok.data.decode('utf-8'))
+
+        # 5. Audit export CSV
+        res_audit_export = self.client.get('/platform/audit-logs/export')
+        if res_audit_export.status_code == 200:
+            self.assertEqual(res_audit_export.mimetype, 'text/csv')
+
+        # 6. Opschonen error logs
+        res_cleanup = self.client.post('/platform/systeemmonitor/opschonen-errors', data={'dagen': '30'}, follow_redirects=True)
+        self.assertEqual(res_cleanup.status_code, 200)

@@ -89,7 +89,15 @@ def seed_organisatie_defaults(org_id):
         
         if active_types:
             for i, at in enumerate(active_types):
-                db.session.add(ActivityType(naam=at.naam, actief=True, heeft_evaluatie=getattr(at, 'heeft_evaluatie', False), kleur=at.kleur, volgorde=i, organisatie_id=org_id))
+                db.session.add(ActivityType(
+                    naam=at.naam,
+                    actief=True,
+                    heeft_evaluatie=getattr(at, 'heeft_evaluatie', False),
+                    registreer_deelnemers=getattr(at, 'registreer_deelnemers', False),
+                    kleur=at.kleur,
+                    volgorde=i,
+                    organisatie_id=org_id
+                ))
         else:
             for i, name in enumerate(['Digidokters', 'Digicafé', 'Lunchvergadering']):
                 heeft_eval = (name.lower() == 'digicafé')

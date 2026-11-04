@@ -152,6 +152,13 @@
                             {% if item.is_terugkerend %}
                             <i class="bi bi-arrow-repeat ms-1 text-primary" title="Terugkerend ({{ item.interval }})"></i>
                             {% endif %}
+                            {% if item.type.registreer_deelnemers %}
+                            <div class="mt-1">
+                                <span class="badge bg-light text-secondary border" title="{% if item.deelnemers %}Deelnemers: {{ item.deelnemers|map(attribute='naam')|join(', ') }}{% else %}Nog geen deelnemers geregistreerd{% endif %}">
+                                    <i class="bi bi-people me-1 text-primary"></i>{{ item.deelnemers|length }} deelnemer{% if item.deelnemers|length != 1 %}s{% endif %}
+                                </span>
+                            </div>
+                            {% endif %}
                             {% if item.type.heeft_evaluatie %}
                             <div class="mt-1">
                                 {% set resp_count = item.evaluatie_reacties|length %}

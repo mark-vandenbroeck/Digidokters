@@ -3,7 +3,7 @@ from typing import Type
 from flask import abort
 from extensions import db
 from models.registration import Registration
-from models.agenda import AgendaItem
+from models.agenda import AgendaItem, agenda_item_deelnemers
 from utils.tenant import filter_op_organisatie
 
 
@@ -74,6 +74,14 @@ def get_usage_counts(model: Type[db.Model], org_id: int) -> dict[int, int]:
             db.session.query(Registration.resultaat_id, db.func.count(Registration.id))
             .filter_by(organisatie_id=org_id)
             .group_by(Registration.resultaat_id)
+            .all()
+        )
+    if name == 'Deelnemer':
+        return dict(
+            db.session.query(agenda_item_deelnemers.c.deelnemer_id, db.func.count(agenda_item_deelnemers.c.agenda_item_id))
+            .join(AgendaItem, AgendaItem.id == agenda_item_deelnemers.c.agenda_item_id)
+            .filter(AgendaItem.organisatie_id == org_id)
+            .group_by(agenda_item_deelnemers.c.deelnemer_id)
             .all()
         )
     return {}

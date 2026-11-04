@@ -16,6 +16,7 @@ from models.resultaat import Resultaat
 from models.activity_type import ActivityType
 from models.location import Location
 from models.agenda import AgendaItem
+from models.deelnemer import Deelnemer
 
 
 def maak_backup(org_id: int) -> dict:
@@ -153,10 +154,24 @@ def maak_backup(org_id: int) -> dict:
         for r in registrations
     ]
 
+    # 6b. Deelnemers
+    deelnemers = Deelnemer.query.filter_by(organisatie_id=org_id).order_by(Deelnemer.naam).all()
+    deelnemers_data = [
+        {'naam': d.naam, 'actief': d.actief}
+        for d in deelnemers
+    ]
+
     # 7. Activity types
     activity_types = ActivityType.query.filter_by(organisatie_id=org_id).order_by(ActivityType.volgorde).all()
     activity_types_data = [
-        {'naam': at.naam, 'actief': at.actief, 'volgorde': at.volgorde}
+        {
+            'naam': at.naam,
+            'actief': at.actief,
+            'volgorde': at.volgorde,
+            'heeft_evaluatie': getattr(at, 'heeft_evaluatie', False),
+            'registreer_deelnemers': getattr(at, 'registreer_deelnemers', False),
+            'kleur': at.kleur
+        }
         for at in activity_types
     ]
 
@@ -178,7 +193,8 @@ def maak_backup(org_id: int) -> dict:
         .options(
             joinedload(AgendaItem.type),
             joinedload(AgendaItem.locatie),
-            selectinload(AgendaItem.digidokters)
+            selectinload(AgendaItem.digidokters),
+            selectinload(AgendaItem.deelnemers)
         )
         .filter_by(organisatie_id=org_id)
         .order_by(AgendaItem.datum.desc())
@@ -192,7 +208,8 @@ def maak_backup(org_id: int) -> dict:
             'type_name': a.type.naam if a.type else '',
             'locatie_name': a.locatie.naam if a.locatie else '',
             'omschrijving': a.omschrijving,
-            'digidokter_namen': [d.naam for d in a.digidokters]
+            'digidokter_namen': [d.naam for d in a.digidokters],
+            'deelnemer_namen': [d.naam for d in a.deelnemers]
         }
         for a in agenda_items
     ]
@@ -208,6 +225,7 @@ def maak_backup(org_id: int) -> dict:
         },
         'users': users_data,
         'digidokters': digidokters_data,
+        'deelnemers': deelnemers_data,
         'age_categories': age_cats_data,
         'devices': devices_data,
         'herkomsten': herkomsten_data,
@@ -246,6 +264,7 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
             Resultaat.query.filter_by(organisatie_id=org_id).delete()
             ActivityType.query.filter_by(organisatie_id=org_id).delete()
             Location.query.filter_by(organisatie_id=org_id).delete()
+            Deelnemer.query.filter_by(organisatie_id=org_id).delete()
 
             # Verwijder lidmaatschappen behalve huidige hersteller
             UserOrganisatie.query.filter(
@@ -392,6 +411,18 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                     db.session.flush()
                     resultaten_map[res.omschrijving] = res.id
 
+            # 5e. Herstel deelnemers
+            deelnemers_map = {}
+            for d_data in data.get('deelnemers', []):
+                dn = Deelnemer(
+                    naam=d_data['naam'],
+                    actief=d_data.get('actief', True),
+                    organisatie_id=org_id
+                )
+                db.session.add(dn)
+                db.session.flush()
+                deelnemers_map[dn.naam] = dn
+
             # 6. Herstel gebruikers & lidmaatschappen
             users_map = {}
             for u_data in data.get('users', []):
@@ -494,6 +525,9 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                         naam=at_data['naam'],
                         actief=at_data.get('actief', True),
                         volgorde=at_data.get('volgorde', 0),
+                        heeft_evaluatie=at_data.get('heeft_evaluatie', False),
+                        registreer_deelnemers=at_data.get('registreer_deelnemers', False),
+                        kleur=at_data.get('kleur', 'blue'),
                         organisatie_id=org_id
                     )
                     db.session.add(at)
@@ -552,6 +586,13 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                             if d:
                                 selected_dds.append(d)
                     item.digidokters = selected_dds
+
+                    selected_dns = []
+                    for dn_name in item_data.get('deelnemer_namen', []):
+                        dn = deelnemers_map.get(dn_name)
+                        if dn:
+                            selected_dns.append(dn)
+                    item.deelnemers = selected_dns
                     db.session.add(item)
 
         db.session.commit()

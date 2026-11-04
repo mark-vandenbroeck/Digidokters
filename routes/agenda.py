@@ -7,6 +7,7 @@ from models.agenda import AgendaItem
 from models.activity_type import ActivityType
 from models.location import Location
 from models.digidokter import Digidokter
+from models.deelnemer import Deelnemer
 from utils.decorators import writer_required
 from utils.permissions import can_write
 from models.constants import FEATURE_AGENDA
@@ -21,6 +22,7 @@ def _keuzelijsten():
         'types': filter_op_organisatie(ActivityType.query.filter_by(actief=True), ActivityType).order_by(ActivityType.volgorde, ActivityType.naam).all(),
         'locaties': filter_op_organisatie(Location.query.filter_by(actief=True), Location).order_by(Location.volgorde, Location.naam).all(),
         'digidokters': filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.volgorde, Digidokter.naam).all(),
+        'beschikbare_deelnemers': filter_op_organisatie(Deelnemer.query.filter_by(actief=True), Deelnemer).order_by(Deelnemer.naam.asc()).all(),
     }
 
 @agenda_bp.route('/agenda')
@@ -68,7 +70,8 @@ def lijst():
         .options(
             joinedload(AgendaItem.type),
             joinedload(AgendaItem.locatie),
-            selectinload(AgendaItem.digidokters)
+            selectinload(AgendaItem.digidokters),
+            selectinload(AgendaItem.deelnemers)
         )
     )
     
@@ -241,6 +244,16 @@ def nieuw():
             else:
                 fouten.append(f'Ongeldige of inactieve digidokter geselecteerd (ID: {d_id}).')
 
+        # Validatie deelnemers (enkel indien type.registreer_deelnemers actief is)
+        act_type = db.session.get(ActivityType, type_id) if type_id else None
+        selected_deelnemers = []
+        if act_type and act_type.registreer_deelnemers:
+            deelnemer_ids = request.form.getlist('deelnemer_ids', type=int)
+            for dn_id in deelnemer_ids:
+                dn = db.session.get(Deelnemer, dn_id)
+                if dn and dn.organisatie_id == org_id:
+                    selected_deelnemers.append(dn)
+
         is_terugkerend = request.form.get('is_terugkerend') == 'on'
         interval = request.form.get('interval') if is_terugkerend else None
         einddatum_str = request.form.get('einddatum', '').strip() if is_terugkerend else ''
@@ -316,6 +329,7 @@ def nieuw():
                 )
                 set_organisatie_id_op_model(item)
                 item.digidokters = selected_digidokters
+                item.deelnemers = selected_deelnemers
                 db.session.add(item)
                 
             db.session.commit()
@@ -441,6 +455,18 @@ def wijzigen(item_id):
         
         if kan_aanwezigheid_bewerken:
             item.digidokters = selected_digidokters
+
+        act_type = db.session.get(ActivityType, type_id) if type_id else None
+        if act_type and act_type.registreer_deelnemers:
+            deelnemer_ids = request.form.getlist('deelnemer_ids', type=int)
+            selected_deelnemers = []
+            for dn_id in deelnemer_ids:
+                dn = db.session.get(Deelnemer, dn_id)
+                if dn and dn.organisatie_id == org_id:
+                    selected_deelnemers.append(dn)
+            item.deelnemers = selected_deelnemers
+        else:
+            item.deelnemers = []
         
         try:
             db.session.commit()

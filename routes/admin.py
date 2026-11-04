@@ -9,6 +9,7 @@ from models.age_category import AgeCategory
 from models.device import Device
 from models.activity_type import ActivityType
 from models.location import Location
+from models.deelnemer import Deelnemer
 from models.herkomst import Herkomst
 from models.gender_identity import GenderIdentity
 from models.functie import Functie, user_functies
@@ -1636,8 +1637,9 @@ def activiteitstype_nieuw():
         max_volgorde = db.session.query(db.func.max(ActivityType.volgorde)).filter_by(organisatie_id=org_id).scalar() or 0
         actief = request.form.get('actief') == 'on' if 'actief' in request.form else True
         heeft_evaluatie = request.form.get('heeft_evaluatie') == 'on'
+        registreer_deelnemers = request.form.get('registreer_deelnemers') == 'on'
         kleur = request.form.get('kleur', 'blue')
-        item = ActivityType(naam=naam, actief=actief, heeft_evaluatie=heeft_evaluatie, kleur=kleur, volgorde=max_volgorde + 1)
+        item = ActivityType(naam=naam, actief=actief, heeft_evaluatie=heeft_evaluatie, registreer_deelnemers=registreer_deelnemers, kleur=kleur, volgorde=max_volgorde + 1)
         set_organisatie_id_op_model(item)
         db.session.add(item)
         db.session.commit()
@@ -1663,6 +1665,7 @@ def activiteitstype_wijzigen(item_id):
         item.naam = request.form.get('naam', item.naam).strip()
         item.actief = request.form.get('actief') == 'on'
         item.heeft_evaluatie = request.form.get('heeft_evaluatie') == 'on'
+        item.registreer_deelnemers = request.form.get('registreer_deelnemers') == 'on'
         item.kleur = request.form.get('kleur', 'blue')
         db.session.commit()
         flash(f'{item.naam} bijgewerkt.', 'success')
@@ -2410,3 +2413,220 @@ def communicatie_log_detail(log_id):
             'ontvangers': log.ontvangers_lijst
         })
     return render_template('admin/communicatie_detail.html', log=log)
+
+
+# ─── Deelnemers ─────────────────────────────────────────────────────────────
+
+@admin_bp.route('/deelnemers')
+@login_required
+@admin_required
+def deelnemers():
+    from utils.tenant import filter_op_organisatie, get_huidige_organisatie_id
+    from utils.stamgegevens import get_usage_counts
+    org_id = get_huidige_organisatie_id()
+    status_filter = request.args.get('status', 'alle').strip().lower()
+    if status_filter not in ('actief', 'inactief', 'alle'):
+        status_filter = 'alle'
+    zoekterm = request.args.get('q', '').strip()
+
+    query = filter_op_organisatie(Deelnemer.query, Deelnemer)
+    if status_filter == 'actief':
+        query = query.filter(Deelnemer.actief == True)
+    elif status_filter == 'inactief':
+        query = query.filter(Deelnemer.actief == False)
+
+    if zoekterm:
+        query = query.filter(Deelnemer.naam.ilike(f'%{zoekterm}%'))
+
+    items = query.order_by(Deelnemer.naam.asc()).all()
+    usage_counts = get_usage_counts(Deelnemer, org_id)
+    return render_template('admin/deelnemers.html', items=items, usage_counts=usage_counts, status_filter=status_filter, zoekterm=zoekterm)
+
+
+@admin_bp.route('/deelnemers/nieuw', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def deelnemer_nieuw():
+    from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model
+    org_id = get_huidige_organisatie_id()
+
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        if not naam:
+            flash('Naam is verplicht.', 'danger')
+            return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, form_data=request.form, terug_url=url_for('admin.deelnemers'))
+
+        existing = Deelnemer.query.filter_by(organisatie_id=org_id, naam=naam).first()
+        if existing:
+            flash(f'Er bestaat al een deelnemer met de naam "{naam}".', 'danger')
+            return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, form_data=request.form, terug_url=url_for('admin.deelnemers'))
+
+        actief = request.form.get('actief') == 'on' if 'actief' in request.form else True
+        item = Deelnemer(naam=naam, actief=actief)
+        set_organisatie_id_op_model(item)
+        db.session.add(item)
+        db.session.commit()
+        flash(f'Deelnemer {naam} succesvol toegevoegd.', 'success')
+        return redirect(url_for('admin.deelnemers'))
+
+    return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, terug_url=url_for('admin.deelnemers'))
+
+
+@admin_bp.route('/deelnemers/<int:item_id>/wijzig', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def deelnemer_wijzigen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from flask import abort
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Deelnemer, item_id)
+
+    if item.organisatie_id != org_id:
+        abort(403)
+
+    if request.method == 'POST':
+        naam = request.form.get('naam', '').strip()
+        if not naam:
+            flash('Naam is verplicht.', 'danger')
+            return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, form_data=request.form, terug_url=url_for('admin.deelnemers'))
+
+        existing = Deelnemer.query.filter(Deelnemer.organisatie_id == org_id, Deelnemer.naam == naam, Deelnemer.id != item_id).first()
+        if existing:
+            flash(f'Er bestaat al een andere deelnemer met de naam "{naam}".', 'danger')
+            return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, form_data=request.form, terug_url=url_for('admin.deelnemers'))
+
+        item.naam = naam
+        item.actief = request.form.get('actief') == 'on'
+        db.session.commit()
+        flash(f'Deelnemer {item.naam} bijgewerkt.', 'success')
+        return redirect(url_for('admin.deelnemers'))
+
+    return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, terug_url=url_for('admin.deelnemers'))
+
+
+@admin_bp.route('/deelnemers/<int:item_id>/toggle')
+@login_required
+@admin_required
+def deelnemer_toggle(item_id):
+    from utils.stamgegevens import toggle_stamgegeven_status
+    from utils.tenant import get_huidige_organisatie_id
+    org_id = get_huidige_organisatie_id()
+    naam, actief = toggle_stamgegeven_status(Deelnemer, item_id, org_id)
+    status_msg = 'geactiveerd' if actief else 'gedeactiveerd'
+    flash(f'Deelnemer {naam} {status_msg}.', 'info')
+    status_param = request.args.get('status')
+    q_param = request.args.get('q')
+    return redirect(url_for('admin.deelnemers', status=status_param, q=q_param))
+
+
+@admin_bp.route('/deelnemers/<int:item_id>/verwijderen', methods=['POST'])
+@login_required
+@admin_required
+def deelnemer_verwijderen(item_id):
+    from utils.tenant import get_huidige_organisatie_id
+    from utils.stamgegevens import get_usage_counts
+    from flask import abort
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Deelnemer, item_id)
+
+    if item.organisatie_id != org_id:
+        abort(403)
+
+    usage = get_usage_counts(Deelnemer, org_id).get(item.id, 0)
+    if usage > 0:
+        flash(f'Kan deelnemer {item.naam} niet verwijderen omdat deze gekoppeld is aan {usage} activiteit(en). Deactiveer de deelnemer in de plaats.', 'warning')
+        return redirect(url_for('admin.deelnemers'))
+
+    naam = item.naam
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Deelnemer {naam} is verwijderd.', 'success')
+    return redirect(url_for('admin.deelnemers'))
+
+
+# ─── AJAX / LOV endpoints voor Deelnemers ─────────────────────────────────
+
+@admin_bp.route('/deelnemers/api/snel-toevoegen', methods=['POST'])
+@login_required
+def deelnemer_snel_toevoegen():
+    """Snelle endpoint om direct vanuit de agenda LOV een nieuwe deelnemer aan te maken."""
+    from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model
+    from flask import jsonify
+    org_id = get_huidige_organisatie_id()
+
+    naam = (request.json.get('naam') if request.is_json else request.form.get('naam')) or ''
+    naam = naam.strip()
+    if not naam:
+        return jsonify({'success': False, 'error': 'Naam is verplicht'}), 400
+
+    existing = Deelnemer.query.filter_by(organisatie_id=org_id, naam=naam).first()
+    if existing:
+        if not existing.actief:
+            existing.actief = True
+            db.session.commit()
+        return jsonify({
+            'success': True,
+            'id': existing.id,
+            'naam': existing.naam,
+            'bestaand': True
+        })
+
+    nieuw = Deelnemer(naam=naam, actief=True)
+    set_organisatie_id_op_model(nieuw)
+    db.session.add(nieuw)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'id': nieuw.id,
+        'naam': nieuw.naam,
+        'bestaand': False
+    }), 201
+
+
+@admin_bp.route('/deelnemers/api/<int:item_id>/wijzig_ajax', methods=['POST'])
+@login_required
+def deelnemer_wijzig_ajax(item_id):
+    """Snelle endpoint om vanuit de agenda widget een deelnemer te hernoemen."""
+    from utils.tenant import get_huidige_organisatie_id
+    from flask import jsonify
+    org_id = get_huidige_organisatie_id()
+    item = db.get_or_404(Deelnemer, item_id)
+
+    if item.organisatie_id != org_id:
+        return jsonify({'success': False, 'error': 'Geen toegang'}), 403
+
+    naam = (request.json.get('naam') if request.is_json else request.form.get('naam')) or ''
+    naam = naam.strip()
+    if not naam:
+        return jsonify({'success': False, 'error': 'Naam is verplicht'}), 400
+
+    existing = Deelnemer.query.filter(Deelnemer.organisatie_id == org_id, Deelnemer.naam == naam, Deelnemer.id != item_id).first()
+    if existing:
+        return jsonify({'success': False, 'error': f'Er bestaat al een andere deelnemer met de naam "{naam}".'}), 400
+
+    item.naam = naam
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'id': item.id,
+        'naam': item.naam
+    })
+
+
+@admin_bp.route('/deelnemers/api/zoeken')
+@login_required
+def deelnemers_api_zoeken():
+    """Realtime LOV zoekendpoint voor actieve deelnemers in huidige organisatie."""
+    from utils.tenant import filter_op_organisatie
+    from flask import jsonify
+    q = request.args.get('q', '').strip()
+    query = filter_op_organisatie(Deelnemer.query.filter_by(actief=True), Deelnemer)
+    if q:
+        query = query.filter(Deelnemer.naam.ilike(f'%{q}%'))
+    deelnemers = query.order_by(Deelnemer.naam.asc()).limit(30).all()
+    return jsonify([
+        {'id': d.id, 'naam': d.naam}
+        for d in deelnemers
+    ])

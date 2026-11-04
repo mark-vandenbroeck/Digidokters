@@ -7,6 +7,12 @@ agenda_digidokters = db.Table(
     db.Column('digidokter_id', db.Integer, db.ForeignKey('digidokters.id', ondelete='CASCADE'), primary_key=True)
 )
 
+agenda_item_deelnemers = db.Table(
+    'agenda_item_deelnemers',
+    db.Column('agenda_item_id', db.Integer, db.ForeignKey('agenda_items.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('deelnemer_id', db.Integer, db.ForeignKey('deelnemers.id', ondelete='CASCADE'), primary_key=True)
+)
+
 class AgendaItem(db.Model):
     """Agenda-item / Activiteit."""
     __tablename__ = 'agenda_items'
@@ -31,6 +37,7 @@ class AgendaItem(db.Model):
     type = db.relationship('ActivityType', backref=db.backref('agenda_items', lazy=True))
     locatie = db.relationship('Location', backref=db.backref('agenda_items', lazy=True))
     digidokters = db.relationship('Digidokter', secondary=agenda_digidokters, backref=db.backref('agenda_items', lazy='dynamic'))
+    deelnemers = db.relationship('Deelnemer', secondary=agenda_item_deelnemers, backref=db.backref('agenda_items', lazy='dynamic'))
     edit_lock = db.relationship('AgendaItemLock', back_populates='agenda_item', uselist=False, cascade='all, delete-orphan')
 
     __table_args__ = (

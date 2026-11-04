@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}Beheer Deelnemers – Digidokters{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="dd-page-title mb-0"><i class="bi bi-people me-2 text-primary"></i>Deelnemers</h1>
+        <p class="dd-page-subtitle mb-0">Beheer de lijst met geregistreerde deelnemers aan activiteiten</p>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <form method="GET" action="{{ url_for('admin.deelnemers') }}" class="d-flex gap-1 align-items-center">
+            {% if status_filter and status_filter != 'alle' %}
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            {% endif %}
+            <div class="input-group input-group-sm" style="min-width: 200px;">
+                <input type="text" name="q" class="form-control" placeholder="Zoek op naam..." value="{{ zoekterm or '' }}">
+                {% if zoekterm %}
+                <a href="{{ url_for('admin.deelnemers', status=status_filter) }}" class="btn btn-outline-secondary" title="Zoekopdracht wissen">
+                    <i class="bi bi-x"></i>
+                </a>
+                {% endif %}
+                <button type="submit" class="btn btn-outline-primary"><i class="bi bi-search"></i></button>
+            </div>
+        </form>
+
+        <div class="btn-group btn-group-sm" role="group" aria-label="Status filter">
+            <a href="{{ url_for('admin.deelnemers', status='alle', q=zoekterm) }}"
+               class="btn {% if status_filter == 'alle' or not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Alle
+            </a>
+            <a href="{{ url_for('admin.deelnemers', status='actief', q=zoekterm) }}"
+               class="btn {% if status_filter == 'actief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-check-circle me-1"></i>Enkel actieve
+            </a>
+            <a href="{{ url_for('admin.deelnemers', status='inactief', q=zoekterm) }}"
+               class="btn {% if status_filter == 'inactief' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-eye-slash me-1"></i>Enkel gedeactiveerde
+            </a>
+        </div>
+        <a href="{{ url_for('admin.deelnemer_nieuw') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Nieuwe Deelnemer
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if items %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-3">Naam</th>
+                        <th>Status</th>
+                        <th>Activiteiten</th>
+                        <th>Toegevoegd op</th>
+                        <th class="pe-3 text-end">Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="ps-3 fw-medium">
+                            <i class="bi bi-person me-2 text-muted"></i>{{ item.naam }}
+                            <span class="text-muted" style="font-size: 0.75rem; opacity: 0.6; font-weight: normal; margin-left: 4px;">#{{ item.id }}</span>
+                        </td>
+                        <td>
+                            {% if item.actief %}
+                            <span class="badge bg-success">Actief</span>
+                            {% else %}
+                            <span class="badge bg-dark">Gedeactiveerd</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set count = usage_counts.get(item.id, 0) if usage_counts is defined else item.agenda_items.count() %}
+                            {% if count > 0 %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" title="Aanwezig bij {{ count }} activiteit(en)">
+                                <i class="bi bi-calendar-event me-1"></i>{{ count }} activiteit{% if count != 1 %}en{% endif %}
+                            </span>
+                            {% else %}
+                            <span class="text-muted small">0 activiteiten</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">
+                            {{ item.aangemaakt_op.strftime('%d/%m/%Y') if item.aangemaakt_op else '—' }}
+                        </td>
+                        <td class="pe-3 text-end text-nowrap">
+                            <a href="{{ url_for('admin.deelnemer_wijzigen', item_id=item.id) }}"
+                                class="btn btn-sm btn-outline-primary" title="Wijzigen">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{{ url_for('admin.deelnemer_toggle', item_id=item.id, status=status_filter, q=zoekterm) }}"
+                               class="btn btn-sm {% if item.actief %}btn-outline-danger{% else %}btn-outline-success{% endif %} ms-1"
+                               title="{% if item.actief %}Deactiveren{% else %}Activeren{% endif %}">
+                                <i class="bi {% if item.actief %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
+                            </a>
+                            {% if count == 0 %}
+                            <form action="{{ url_for('admin.deelnemer_verwijderen', item_id=item.id) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Weet u zeker dat u deelnemer {{ item.naam }} wilt verwijderen?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Verwijderen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary ms-1" disabled title="Kan niet worden verwijderd: deze deelnemer is gekoppeld aan {{ count }} activiteit(en). U kunt de deelnemer wel deactiveren.">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-people fs-1 text-muted mb-3 d-block"></i>
+            {% if zoekterm %}
+            <p class="text-muted">Geen deelnemers gevonden die overeenkomen met "{{ zoekterm }}".</p>
+            <a href="{{ url_for('admin.deelnemers', status=status_filter) }}" class="btn btn-sm btn-outline-secondary">Zoekopdracht wissen</a>
+            {% elif status_filter and status_filter != 'alle' %}
+            <p class="text-muted">Geen deelnemers gevonden met status "{{ status_filter }}".</p>
+            <a href="{{ url_for('admin.deelnemers', status='alle') }}" class="btn btn-sm btn-outline-secondary">Toon alle deelnemers</a>
+            {% else %}
+            <p class="text-muted">Nog geen deelnemers toegevoegd.</p>
+            <a href="{{ url_for('admin.deelnemer_nieuw') }}" class="btn btn-sm btn-primary">Eerste deelnemer toevoegen</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

@@ -509,3 +509,275 @@ class TestDeelnemers(BaseTestCase):
         self.assertEqual(len(restored_item.deelnemers), 1)
         self.assertEqual(restored_item.deelnemers[0].naam, "Anna Peeters")
 
+    def test_agenda_max_deelnemers_creatie_en_validatie(self):
+        """Test aanmaken van een agenda-item met max_deelnemers en validaties."""
+        self.login_admin()
+        vandaag = date.today()
+
+        # 1. Geldig maximum aantal deelnemers (bijv. 5) met 1 deelnemer
+        res = self.client.post('/agenda/nieuw', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '10:00',
+            'uur_tot': '12:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Workshop met max',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '5',
+            'deelnemer_ids': [self.deelnemer1.id]
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        item = AgendaItem.query.filter_by(omschrijving='Workshop met max').first()
+        self.assertIsNotNone(item)
+        self.assertEqual(item.max_deelnemers, 5)
+        self.assertEqual(len(item.deelnemers), 1)
+
+        # 2. Validatiefout: max_deelnemers <= 0
+        res_neg = self.client.post('/agenda/nieuw', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '13:00',
+            'uur_tot': '14:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Workshop negatief',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '0',
+            'deelnemer_ids': [self.deelnemer1.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_neg.status_code, 200)
+        self.assertIn('Het maximaal aantal deelnemers moet minimaal 1 zijn.', res_neg.data.decode('utf-8'))
+        self.assertIsNone(AgendaItem.query.filter_by(omschrijving='Workshop negatief').first())
+
+        # 3. Validatiefout: ongeldig getal
+        res_ongeldig = self.client.post('/agenda/nieuw', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '13:00',
+            'uur_tot': '14:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Workshop ongeldig',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': 'abc',
+            'deelnemer_ids': [self.deelnemer1.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_ongeldig.status_code, 200)
+        self.assertIn('Ongeldig getal voor het maximaal aantal deelnemers.', res_ongeldig.data.decode('utf-8'))
+
+        # 4. Validatiefout: aantal deelnemers (2) overschrijdt max_deelnemers (1)
+        res_teveel = self.client.post('/agenda/nieuw', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '13:00',
+            'uur_tot': '14:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Workshop te vol',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '1',
+            'deelnemer_ids': [self.deelnemer1.id, self.deelnemer2.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_teveel.status_code, 200)
+        self.assertIn('mag het maximum aantal (1) niet overschrijden', res_teveel.data.decode('utf-8'))
+        self.assertIsNone(AgendaItem.query.filter_by(omschrijving='Workshop te vol').first())
+
+        # 5. Geen max_deelnemers opgegeven -> None
+        res_leeg = self.client.post('/agenda/nieuw', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '15:00',
+            'uur_tot': '16:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Workshop zonder limiet',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '',
+            'deelnemer_ids': [self.deelnemer1.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_leeg.status_code, 200)
+        item_leeg = AgendaItem.query.filter_by(omschrijving='Workshop zonder limiet').first()
+        self.assertIsNotNone(item_leeg)
+        self.assertIsNone(item_leeg.max_deelnemers)
+
+    def test_agenda_max_deelnemers_wijzigen_en_reeds_ingeschreven_beperking(self):
+        """Test dat max_deelnemers gewijzigd mag worden, maar niet minder mag worden dan reeds ingeschreven deelnemers."""
+        self.login_admin()
+        vandaag = date.today()
+
+        # Maak item aan met 2 deelnemers en max_deelnemers = 2
+        item = AgendaItem(
+            datum=vandaag,
+            uur_van="10:00",
+            uur_tot="12:00",
+            type_id=self.type_met_deelnemers.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Capaciteitstest item",
+            max_deelnemers=2,
+            organisatie_id=self.org.id
+        )
+        item.digidokters.append(self.digidokter)
+        item.deelnemers.extend([self.deelnemer1, self.deelnemer2])
+        db.session.add(item)
+        db.session.commit()
+
+        # 1. Probeer max_deelnemers te verlagen naar 1 (minder dan de 2 reeds ingeschreven deelnemers)
+        res_verlaag = self.client.post(f'/agenda/{item.id}/wijzig', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '10:00',
+            'uur_tot': '12:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Capaciteitstest item',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '1',
+            'deelnemer_ids': [self.deelnemer1.id, self.deelnemer2.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_verlaag.status_code, 200)
+        self.assertIn('mag niet minder worden dan het aantal deelnemers dat al ingeschreven is (2)', res_verlaag.data.decode('utf-8'))
+
+        # Verifieer dat max_deelnemers niet verlaagd is
+        db.session.refresh(item)
+        self.assertEqual(item.max_deelnemers, 2)
+
+        # 2. Verhoog max_deelnemers naar 3
+        res_verhoog = self.client.post(f'/agenda/{item.id}/wijzig', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '10:00',
+            'uur_tot': '12:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Capaciteitstest item',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '3',
+            'deelnemer_ids': [self.deelnemer1.id, self.deelnemer2.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_verhoog.status_code, 200)
+        db.session.refresh(item)
+        self.assertEqual(item.max_deelnemers, 3)
+
+        # 3. Voeg 3e deelnemer toe (mag want max = 3)
+        deelnemer3 = Deelnemer(naam="Chantal Derde", actief=True, organisatie_id=self.org.id)
+        db.session.add(deelnemer3)
+        db.session.commit()
+
+        res_derde = self.client.post(f'/agenda/{item.id}/wijzig', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '10:00',
+            'uur_tot': '12:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Capaciteitstest item',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '3',
+            'deelnemer_ids': [self.deelnemer1.id, self.deelnemer2.id, deelnemer3.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_derde.status_code, 200)
+        db.session.refresh(item)
+        self.assertEqual(len(item.deelnemers), 3)
+
+        # 4. Probeer 4e deelnemer toe te voegen terwijl max = 3
+        deelnemer4 = Deelnemer(naam="David Vierde", actief=True, organisatie_id=self.org.id)
+        db.session.add(deelnemer4)
+        db.session.commit()
+
+        res_vierde = self.client.post(f'/agenda/{item.id}/wijzig', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '10:00',
+            'uur_tot': '12:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Capaciteitstest item',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '3',
+            'deelnemer_ids': [self.deelnemer1.id, self.deelnemer2.id, deelnemer3.id, deelnemer4.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_vierde.status_code, 200)
+        self.assertIn('mag het maximum aantal (3) niet overschrijden', res_vierde.data.decode('utf-8'))
+
+        # 5. Verwijder de limiet (leegmaken)
+        res_geen_limiet = self.client.post(f'/agenda/{item.id}/wijzig', data={
+            'datum': vandaag.isoformat(),
+            'uur_van': '10:00',
+            'uur_tot': '12:00',
+            'type_id': self.type_met_deelnemers.id,
+            'locatie_id': self.locatie.id,
+            'omschrijving': 'Capaciteitstest item',
+            'digidokter_ids': [self.digidokter.id],
+            'max_deelnemers': '',
+            'deelnemer_ids': [self.deelnemer1.id, self.deelnemer2.id, deelnemer3.id]
+        }, follow_redirects=True)
+        self.assertEqual(res_geen_limiet.status_code, 200)
+        db.session.refresh(item)
+        self.assertIsNone(item.max_deelnemers)
+
+    def test_agenda_lijst_en_volzet_indicator(self):
+        """Test dat in de agendalijst de teller X/Y en eventuele (volzet) badge correct gerenderd worden."""
+        self.login_admin()
+        vandaag = date.today()
+
+        # Item 1: volzet (2/2)
+        item_vol = AgendaItem(
+            datum=vandaag,
+            uur_van="09:00",
+            uur_tot="10:00",
+            type_id=self.type_met_deelnemers.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Volzette workshop",
+            max_deelnemers=2,
+            organisatie_id=self.org.id
+        )
+        item_vol.deelnemers.extend([self.deelnemer1, self.deelnemer2])
+
+        # Item 2: niet volzet (1/3)
+        item_vrij = AgendaItem(
+            datum=vandaag,
+            uur_van="11:00",
+            uur_tot="12:00",
+            type_id=self.type_met_deelnemers.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Vrije workshop",
+            max_deelnemers=3,
+            organisatie_id=self.org.id
+        )
+        item_vrij.deelnemers.append(self.deelnemer1)
+
+        db.session.add_all([item_vol, item_vrij])
+        db.session.commit()
+
+        res = self.client.get('/agenda')
+        self.assertEqual(res.status_code, 200)
+        data = res.data.decode('utf-8')
+
+        self.assertIn('2 / 2 deelnemers', data)
+        self.assertIn('(volzet)', data)
+        self.assertIn('1 / 3 deelnemers', data)
+
+    def test_backup_en_restore_inclusief_max_deelnemers(self):
+        """Test dat backup export en restore ook max_deelnemers correct bewaart."""
+        item = AgendaItem(
+            datum=date.today(),
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_met_deelnemers.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Backup max sessie",
+            max_deelnemers=8,
+            organisatie_id=self.org.id
+        )
+        item.deelnemers.append(self.deelnemer1)
+        db.session.add(item)
+        db.session.commit()
+
+        backup_dict = maak_backup(self.org.id)
+        agenda_data = backup_dict['agenda_items']
+        test_session = next(s for s in agenda_data if s['omschrijving'] == 'Backup max sessie')
+        self.assertEqual(test_session['max_deelnemers'], 8)
+
+        # Restore test
+        json_data = json.dumps(backup_dict).encode('utf-8')
+        success, msg = herstel_backup(self.org.id, io.BytesIO(json_data), self.admin_user.id)
+        self.assertTrue(success, msg)
+
+        restored = AgendaItem.query.filter_by(omschrijving="Backup max sessie", organisatie_id=self.org.id).first()
+        self.assertIsNotNone(restored)
+        self.assertEqual(restored.max_deelnemers, 8)
+        self.assertEqual(len(restored.deelnemers), 1)
+

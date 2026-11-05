@@ -208,6 +208,7 @@ def maak_backup(org_id: int) -> dict:
             'type_name': a.type.naam if a.type else '',
             'locatie_name': a.locatie.naam if a.locatie else '',
             'omschrijving': a.omschrijving,
+            'max_deelnemers': a.max_deelnemers,
             'digidokter_namen': [d.naam for d in a.digidokters],
             'deelnemer_namen': [d.naam for d in a.deelnemers]
         }
@@ -575,6 +576,7 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
                         type_id=type_id,
                         locatie_id=locatie_id,
                         omschrijving=item_data.get('omschrijving'),
+                        max_deelnemers=item_data.get('max_deelnemers'),
                         organisatie_id=org_id
                     )
 

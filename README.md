@@ -73,7 +73,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   Uur- en datumfilters (toekomstige vs. voorbije activiteiten tonen).
 *   Sorteerbare kolommen op alle eigenschappen (datum, tijd, locatie, type, etc.).
 *   Aanpasbare status (actief/gedeactiveerd) en badgekleur per activiteitstype (Blauw, Teal, Paars, Oranje) die direct in de agenda-lijst worden getoond.
-*   **Deelnemersregistratie aan Activiteiten:** Activiteitstypes kunnen gemarkeerd worden met de vlag *"Registreer ook deelnemers"* (`registreer_deelnemers`). Bij agenda-items van dit type kunnen deelnemers worden toegevoegd, gewijzigd of gewist via een realtime gefilterde keuzelijst (List of Values) en een naadloze snelle toevoegfunctie (Enter of klik op *Toevoegen*). Tevens is een volledige CRUD voor het beheren van deelnemers voorzien onder Beheer.
+*   **Deelnemersregistratie & Capaciteitsbeheer:** Activiteitstypes kunnen gemarkeerd worden met de vlag *"Registreer ook deelnemers"* (`registreer_deelnemers`). Bij agenda-items van dit type kunnen deelnemers worden toegevoegd, gewijzigd of gewist via een realtime gefilterde keuzelijst (List of Values) en een naadloze snelle toevoegfunctie (Enter of klik op *Toevoegen*). Tevens kan een optioneel maximaal aantal deelnemers (`max_deelnemers`) ingesteld worden. Het systeem bewaakt dat de capaciteit niet overschreden wordt en dat het maximum achteraf niet lager ingesteld kan worden dan het aantal reeds ingeschreven deelnemers. In de agendalijst wordt de bezetting (`X / Y deelnemers`) en een `(volzet)` indicatie getoond. Onder Beheer is een volledige CRUD voor deelnemers voorzien.
 
 ### 3. Statistieken & Dashboard
 Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
@@ -373,7 +373,7 @@ python -m unittest discover -s tests
 | 11 | `tests/test_communicatie.py` | 18 | Interne & platform communicatie, broadcast e-mails, doelgroepfiltering op groepen, proefmail naar mezelf, JSON-snapshots van ontvangers, modelmethodes & strikte tenant-isolatie |
 | 12 | `tests/test_consultatie_locaties.py` | 7 | Consultatielocaties markeren, sticky sessiekeuze bij balieformulier "Nieuw bezoek" |
 | 13 | `tests/test_decorators_extended.py` | 4 | Toegangsbeheerdecorators (admin_required, actief_required, platform_admin_required, writer_required) inclusief edge cases |
-| 14 | `tests/test_deelnemers.py` | 11 | Deelnemersbeheer CRUD, vlag `registreer_deelnemers` op activiteitstypes, realtime LOV keuzelijst, AJAX snel toevoegen en inline bewerken, koppeling aan agenda-items en backup/restore |
+| 14 | `tests/test_deelnemers.py` | 15 | Deelnemersbeheer CRUD, vlag `registreer_deelnemers` op activiteitstypes, realtime LOV keuzelijst, AJAX snel toevoegen en inline bewerken, capaciteitsbeheer (`max_deelnemers`), validatie tegen overschrijden en verlagen onder ingeschreven deelnemers, agendalijst-indicatoren en backup/restore |
 | 15 | `tests/test_digidokter_email.py` | 7 | E-mailvalidatie, duplicatiecontroles en uniekheid voor digidokters |
 | 16 | `tests/test_document_renderer.py` | 31 | In-browser rendering van Word (DOCX/ODT), Excel (XLSX), Markdown, platte tekst en code, paginering, syntax highlighting, sanitization en snippets |
 | 17 | `tests/test_document_search.py` | 3 | Full-text content search binnen documenten (PDF, DOCX, ODT, XLSX, TXT) en context-snippets |
@@ -404,7 +404,7 @@ python -m unittest discover -s tests
 | 42 | `tests/test_text_extractor_extended.py` | 11 | Tekstextractie uit PDF, Word (DOCX/ODT), Excel (XLSX) en TXT, snippet-generatie en encoding handling |
 | 43 | `tests/test_user_delete_and_sorting.py` | 10 | Gebruikers veilig verwijderen/ontkoppelen, multi-tenant bescherming en tabel-sorteringen |
 | 44 | `tests/test_vraagcategorieen.py` | 9 | 10 gestandaardiseerde vraagcategorieën, asynchrone AI-classificaties (Gemini), batch-analyse en statistieken |
-| **Totaal** | **44 testsuites** | **389 tests** | **100% geslaagd** |
+| **Totaal** | **44 testsuites** | **393 tests** | **100% geslaagd** |
 
 ---
 

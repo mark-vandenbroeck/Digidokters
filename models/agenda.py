@@ -25,6 +25,7 @@ class AgendaItem(db.Model):
     locatie_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
     omschrijving = db.Column(db.Text, nullable=True)
     organisatie_id = db.Column(db.Integer, db.ForeignKey('organisaties.id'), nullable=False, index=True)
+    max_deelnemers = db.Column(db.Integer, nullable=True)
     
     # Velden voor terugkerende reeksen
     reeks_id = db.Column(db.String(50), nullable=True)

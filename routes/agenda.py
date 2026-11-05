@@ -247,12 +247,25 @@ def nieuw():
         # Validatie deelnemers (enkel indien type.registreer_deelnemers actief is)
         act_type = db.session.get(ActivityType, type_id) if type_id else None
         selected_deelnemers = []
+        max_deelnemers = None
         if act_type and act_type.registreer_deelnemers:
+            max_deelnemers_raw = request.form.get('max_deelnemers', '').strip()
+            if max_deelnemers_raw:
+                try:
+                    max_deelnemers = int(max_deelnemers_raw)
+                    if max_deelnemers <= 0:
+                        fouten.append('Het maximaal aantal deelnemers moet minimaal 1 zijn.')
+                except ValueError:
+                    fouten.append('Ongeldig getal voor het maximaal aantal deelnemers.')
+
             deelnemer_ids = request.form.getlist('deelnemer_ids', type=int)
             for dn_id in deelnemer_ids:
                 dn = db.session.get(Deelnemer, dn_id)
                 if dn and dn.organisatie_id == org_id:
                     selected_deelnemers.append(dn)
+
+            if max_deelnemers is not None and len(selected_deelnemers) > max_deelnemers:
+                fouten.append(f'Het aantal deelnemers ({len(selected_deelnemers)}) mag het maximum aantal ({max_deelnemers}) niet overschrijden.')
 
         is_terugkerend = request.form.get('is_terugkerend') == 'on'
         interval = request.form.get('interval') if is_terugkerend else None
@@ -321,6 +334,7 @@ def nieuw():
                     type_id=type_id,
                     locatie_id=locatie_id,
                     omschrijving=omschrijving,
+                    max_deelnemers=max_deelnemers,
                     is_terugkerend=is_terugkerend,
                     interval=interval,
                     einddatum=einddatum,
@@ -430,6 +444,33 @@ def wijzigen(item_id):
                 else:
                     fouten.append(f'Ongeldige of inactieve digidokter geselecteerd (ID: {d_id}).')
 
+        # Validatie deelnemers en max_deelnemers
+        act_type = db.session.get(ActivityType, type_id) if type_id else None
+        selected_deelnemers = []
+        max_deelnemers = None
+        if act_type and act_type.registreer_deelnemers:
+            max_deelnemers_raw = request.form.get('max_deelnemers', '').strip()
+            if max_deelnemers_raw:
+                try:
+                    max_deelnemers = int(max_deelnemers_raw)
+                    if max_deelnemers <= 0:
+                        fouten.append('Het maximaal aantal deelnemers moet minimaal 1 zijn.')
+                except ValueError:
+                    fouten.append('Ongeldig getal voor het maximaal aantal deelnemers.')
+
+            deelnemer_ids = request.form.getlist('deelnemer_ids', type=int)
+            for dn_id in deelnemer_ids:
+                dn = db.session.get(Deelnemer, dn_id)
+                if dn and dn.organisatie_id == org_id:
+                    selected_deelnemers.append(dn)
+
+            reeds_ingeschreven = len(item.deelnemers)
+            if max_deelnemers is not None:
+                if max_deelnemers < reeds_ingeschreven:
+                    fouten.append(f'Het maximum aantal deelnemers ({max_deelnemers}) mag niet minder worden dan het aantal deelnemers dat al ingeschreven is ({reeds_ingeschreven}).')
+                elif len(selected_deelnemers) > max_deelnemers:
+                    fouten.append(f'Het aantal deelnemers ({len(selected_deelnemers)}) mag het maximum aantal ({max_deelnemers}) niet overschrijden.')
+
         if fouten:
             for f in fouten:
                 flash(f, 'danger')
@@ -456,17 +497,12 @@ def wijzigen(item_id):
         if kan_aanwezigheid_bewerken:
             item.digidokters = selected_digidokters
 
-        act_type = db.session.get(ActivityType, type_id) if type_id else None
         if act_type and act_type.registreer_deelnemers:
-            deelnemer_ids = request.form.getlist('deelnemer_ids', type=int)
-            selected_deelnemers = []
-            for dn_id in deelnemer_ids:
-                dn = db.session.get(Deelnemer, dn_id)
-                if dn and dn.organisatie_id == org_id:
-                    selected_deelnemers.append(dn)
             item.deelnemers = selected_deelnemers
+            item.max_deelnemers = max_deelnemers
         else:
             item.deelnemers = []
+            item.max_deelnemers = None
         
         try:
             db.session.commit()

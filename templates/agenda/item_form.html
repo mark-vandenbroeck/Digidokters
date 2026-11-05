@@ -143,6 +143,25 @@
                         Zoek deelnemers in de keuzelijst of voeg direct een nieuwe deelnemer toe.
                     </div>
 
+                    <!-- Maximaal aantal deelnemers -->
+                    <div class="row align-items-center mb-3 p-2 bg-white rounded border">
+                        <div class="col-sm-7">
+                            <label for="max_deelnemers" class="form-label fw-semibold text-dark mb-1">
+                                <i class="bi bi-people me-1 text-primary"></i>Maximaal aantal deelnemers
+                            </label>
+                            <input type="number" class="form-control" id="max_deelnemers" name="max_deelnemers" 
+                                   min="{{ item.deelnemers|length if item and item.deelnemers else 1 }}"
+                                   placeholder="Geen limiet (optioneel)"
+                                   value="{{ form_data.max_deelnemers if form_data and 'max_deelnemers' in form_data else (item.max_deelnemers if item and item.max_deelnemers is not none else '') }}">
+                            <div class="form-text text-muted small mt-1" id="max_deelnemers_help">
+                                Laat leeg indien er geen maximum geldt.{% if item and item.deelnemers|length > 0 %} Minimaal {{ item.deelnemers|length }} (aantal reeds ingeschreven deelnemers).{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-sm-5 text-sm-end mt-2 mt-sm-0">
+                            <div id="deelnemers_capaciteit_status" class="small fw-semibold text-muted"></div>
+                        </div>
+                    </div>
+
                     <!-- LOV Real-time Zoek & Toevoeg Input -->
                     <div class="position-relative mb-3">
                         <div class="input-group">
@@ -293,12 +312,15 @@
 
                     const typeSelect = document.getElementById('type_id');
                     const deelnemersSectie = document.getElementById('deelnemers_sectie');
+                    const maxInput = document.getElementById('max_deelnemers');
+                    const capaciteitStatus = document.getElementById('deelnemers_capaciteit_status');
                     const zoekInput = document.getElementById('deelnemer_zoek_input');
                     const lovDropdown = document.getElementById('deelnemers_lov_dropdown');
                     const btnToevoegen = document.getElementById('btn_nieuwe_deelnemer_toevoegen');
                     const lijstContainer = document.getElementById('geselecteerde_deelnemers_lijst');
                     const leegMelding = document.getElementById('geen_deelnemers_melding');
                     const tellerBadge = document.getElementById('deelnemers_teller');
+                    const reedsIngeschreven = {{ item.deelnemers|length if item and item.deelnemers else 0 }};
 
                     function syncDeelnemersSectie() {
                         if (!typeSelect || !deelnemersSectie) return;
@@ -313,15 +335,43 @@
                         return div.innerHTML;
                     }
 
+                    function getMaxVal() {
+                        if (!maxInput || !maxInput.value.trim()) return null;
+                        const v = parseInt(maxInput.value.trim(), 10);
+                        return isNaN(v) ? null : v;
+                    }
+
                     function updateDeelnemersUI() {
                         if (!lijstContainer) return;
                         lijstContainer.innerHTML = '';
-                        if (gekozenDeelnemers.length === 0) {
+                        const count = gekozenDeelnemers.length;
+                        const maxVal = getMaxVal();
+
+                        // Teller badge & capaciteit status
+                        if (maxVal !== null && maxVal > 0) {
+                            tellerBadge.textContent = `${count} / ${maxVal} deelnemer${maxVal > 1 ? 's' : ''}`;
+                            if (count >= maxVal) {
+                                tellerBadge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle';
+                                if (capaciteitStatus) {
+                                    capaciteitStatus.innerHTML = '<span class="badge bg-danger text-white"><i class="bi bi-slash-circle me-1"></i>Volzet</span>';
+                                }
+                            } else {
+                                const over = maxVal - count;
+                                tellerBadge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle';
+                                if (capaciteitStatus) {
+                                    capaciteitStatus.innerHTML = `<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-person-check me-1"></i>Nog ${over} plaats${over > 1 ? 'en' : ''} beschikbaar</span>`;
+                                }
+                            }
+                        } else {
+                            tellerBadge.textContent = `${count} deelnemer${count !== 1 ? 's' : ''}`;
+                            tellerBadge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle';
+                            if (capaciteitStatus) capaciteitStatus.innerHTML = '';
+                        }
+
+                        if (count === 0) {
                             if (leegMelding) leegMelding.style.display = 'block';
-                            if (tellerBadge) tellerBadge.textContent = '0 deelnemers';
                         } else {
                             if (leegMelding) leegMelding.style.display = 'none';
-                            if (tellerBadge) tellerBadge.textContent = `${gekozenDeelnemers.length} deelnemer${gekozenDeelnemers.length > 1 ? 's' : ''}`;
                             
                             gekozenDeelnemers.forEach((dn, idx) => {
                                 const rij = document.createElement('div');
@@ -411,6 +461,11 @@
                             `;
                             item.addEventListener('click', function() {
                                 if (!isReedsGekozen) {
+                                    const maxVal = getMaxVal();
+                                    if (maxVal !== null && gekozenDeelnemers.length >= maxVal) {
+                                        alert(`Het maximaal aantal deelnemers (${maxVal}) is bereikt. Verhoog eerst het maximum aantal om extra deelnemers toe te voegen.`);
+                                        return;
+                                    }
                                     gekozenDeelnemers.push({ id: m.id, naam: m.naam });
                                     updateDeelnemersUI();
                                 }
@@ -443,6 +498,13 @@
                         if (alGekozen) {
                             zoekInput.value = '';
                             lovDropdown.style.display = 'none';
+                            return;
+                        }
+
+                        // Check capaciteit
+                        const maxVal = getMaxVal();
+                        if (maxVal !== null && gekozenDeelnemers.length >= maxVal) {
+                            alert(`Het maximaal aantal deelnemers (${maxVal}) is bereikt. Verhoog eerst het maximum aantal om extra deelnemers toe te voegen.`);
                             return;
                         }
 
@@ -484,6 +546,47 @@
                             }
                         })
                         .catch(() => alert('Fout bij toevoegen van nieuwe deelnemer.'));
+                    }
+
+                    if (maxInput) {
+                        maxInput.addEventListener('input', function() {
+                            const maxVal = getMaxVal();
+                            if (reedsIngeschreven > 0 && maxVal !== null && maxVal < reedsIngeschreven) {
+                                maxInput.classList.add('is-invalid');
+                            } else {
+                                maxInput.classList.remove('is-invalid');
+                            }
+                            updateDeelnemersUI();
+                        });
+                    }
+
+                    const itemForm = document.querySelector('form');
+                    if (itemForm) {
+                        itemForm.addEventListener('submit', function(e) {
+                            if (deelnemersSectie && deelnemersSectie.style.display !== 'none') {
+                                const maxVal = getMaxVal();
+                                if (maxVal !== null) {
+                                    if (maxVal <= 0) {
+                                        e.preventDefault();
+                                        alert('Het maximaal aantal deelnemers moet minimaal 1 zijn.');
+                                        maxInput.focus();
+                                        return;
+                                    }
+                                    if (reedsIngeschreven > 0 && maxVal < reedsIngeschreven) {
+                                        e.preventDefault();
+                                        alert(`Het maximum aantal deelnemers (${maxVal}) mag niet minder worden dan het aantal deelnemers dat al ingeschreven is (${reedsIngeschreven}).`);
+                                        maxInput.focus();
+                                        return;
+                                    }
+                                    if (gekozenDeelnemers.length > maxVal) {
+                                        e.preventDefault();
+                                        alert(`Het aantal gekozen deelnemers (${gekozenDeelnemers.length}) overschrijdt het maximum (${maxVal}).`);
+                                        maxInput.focus();
+                                        return;
+                                    }
+                                }
+                            }
+                        });
                     }
 
                     if (zoekInput) {

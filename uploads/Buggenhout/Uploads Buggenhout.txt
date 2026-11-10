@@ -1,0 +1,21 @@
+Uploads Buggenhout
+
+In directory uploads/Buggenhout staat een xlsx bestand (Buggenhout 2026-11-10.xlsx) met registraties van organisatie Buggenhout.
+Schrijf een Python script dat deze data uploadt.
+Dit moet als volgt gaan:
+
+Wis eerst alle bestaande registraties in organisatie Buggenhout.
+Maak een fictieve gebruiker "Initiële upload" met als emailadres upload@example.com aan. Aangezien Buggenhout niet registreerde welke digidokter een probleem behandelde, worden alle registraties onder deze fictieve gebruiker aangemaakt.
+
+In de spreadsheet zijn twee sheets van belang:
+- "Digibuddies Dinsdag Centrum": deze moeten in lokatie "Bib Buggenhout" geregistreerd worden.
+- "2026 digibuddies Opstal": deze moeten in lokatie "Boekenschuur Opstal" geregistreerd worden.
+
+Elke sheet heeft de volgende kolomen die van belang zijn:
+- Datum: deze is in formaat D/M/YYYY
+- Naam, voornaam: dat is de naam van de bezoeker. Vul die in als voornaam + spatie + naam
+- Vraag of probleem: dit moet in de kolom "Onderwerp" van de registratie komen
+
+Het toestel werd niet geregistreerd en kunnen we dus niet overnemen.
+
+Het script moet die upload uitvoeren in de lokale PostreSQL database, zodat ik kan testen, maar moet ook de mogelijkheid bieden om te uploaden in de Live database.

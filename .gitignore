@@ -17,7 +17,11 @@ ENV/
 # Flask
 instance/
 *.db
-uploads/
+uploads/*
+!uploads/Buggenhout/
+uploads/Buggenhout/*
+!uploads/Buggenhout/upload_buggenhout.py
+!uploads/Buggenhout/*.txt
 import_logs/
 
 # Environment

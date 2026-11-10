@@ -1,0 +1,72 @@
+HANDLEIDING UPLOAD REGISTRATIES BUGGENHOUT
+==========================================
+
+Dit bestand beschrijft hoe het script `upload_buggenhout.py` gebruikt kan worden
+om consultatieregistraties van organisatie Buggenhout te uploaden vanuit het
+Excel-bestand `Buggenhout 2026-11-10.xlsx`.
+
+WAT DOET HET SCRIPT?
+--------------------
+1. Wist eerst alle bestaande consultaties en vraagclassificaties van Buggenhout.
+2. Maakt of vindt de fictieve gebruiker "Initiële upload" (upload@example.com) en
+   het bijbehorende Digidokter-profiel voor Buggenhout.
+3. Leest twee sheets in uit het Excel-bestand:
+   - "Digibuddie Dinsdag Centrum" -> Locatie "Bib Buggenhout" (204 registraties)
+   - "2026 digibuddie Opstal"     -> Locatie "Boekenschuur Opstal" (76 registraties)
+4. Extraheert datum, bezoeker (voornaam + naam) en onderwerp (vraag/probleem).
+5. Koppelt automatisch een fallback-toestel ("Onbekend") en leeftijdscategorie ("Onbekend")
+   aangezien deze niet geregistreerd werden in de bronbestanden.
+6. Kent chronologisch unieke sequentiële nummers toe (2026-0001 t/m 2026-0280) en
+   bepaalt of het een nieuwe klant is (eerste bezoek) of terugkerende bezoeker.
+
+
+VOORBEREIDING
+-------------
+Zorg ervoor dat de virtuele omgeving (`venv`) actief is of gebruik het directe pad:
+`venv/bin/python` (vanaf projectroot) of `../../venv/bin/python` (vanuit deze map).
+
+
+COMMANDO'S EN VOORBEELDEN
+-------------------------
+
+1. UITVOEREN VANAF DE PROJECTROOT:
+   ---------------------------------
+   # A. Testrun / simulatie (dry-run, geen wijzigingen in database):
+   venv/bin/python uploads/Buggenhout/upload_buggenhout.py --dry-run
+
+   # B. Daadwerkelijk uitvoeren op de LOKALE database:
+   venv/bin/python uploads/Buggenhout/upload_buggenhout.py
+
+   # C. Testrun / simulatie op de LIVE (productie) database:
+   venv/bin/python uploads/Buggenhout/upload_buggenhout.py --live --dry-run
+
+   # D. Daadwerkelijk uitvoeren op de LIVE (productie) database:
+   venv/bin/python uploads/Buggenhout/upload_buggenhout.py --live
+
+
+2. UITVOEREN RECHTSTREEKS VANUIT DEZE MAP (uploads/Buggenhout):
+   ------------------------------------------------------------
+   cd uploads/Buggenhout
+
+   # A. Testrun op lokale database:
+   ../../venv/bin/python upload_buggenhout.py --dry-run
+
+   # B. Uitvoeren op lokale database:
+   ../../venv/bin/python upload_buggenhout.py
+
+   # C. Testrun op Live productie:
+   ../../venv/bin/python upload_buggenhout.py --live --dry-run
+
+   # D. Uitvoeren op Live productie:
+   ../../venv/bin/python upload_buggenhout.py --live
+
+
+EXTRA OPTIES (CLI FLAGS)
+------------------------
+--excel <pad>       Geef een ander Excel-bestand op (standaard: Buggenhout 2026-11-10.xlsx).
+--live              Gebruik de live Supabase productiedatabase (PROD_DATABASE_URL).
+--dry-run           Simuleer de acties zonder commit naar de database.
+--db-url <url>      Gebruik een specifieke database-URL.
+--schema <naam>     Specificeer een aangepast schema (standaard: 'productie' voor lokaal, 'public' voor live).
+--organisatie <id>  Slug of ID van de organisatie (standaard: buggenhout).
+

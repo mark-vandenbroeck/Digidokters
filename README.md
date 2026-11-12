@@ -76,10 +76,11 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   **Deelnemersregistratie & Capaciteitsbeheer:** Activiteitstypes kunnen gemarkeerd worden met de vlag *"Registreer ook deelnemers"* (`registreer_deelnemers`). Bij agenda-items van dit type kunnen deelnemers worden toegevoegd, gewijzigd of gewist via een realtime gefilterde keuzelijst (List of Values) en een naadloze snelle pop-up modal (inclusief toevoegen via Enter). Per deelnemer worden naam, postcode, leeftijdscategorie (LOV) en toestel (LOV) geregistreerd. Tevens kan een optioneel maximaal aantal deelnemers (`max_deelnemers`) ingesteld worden. Het systeem bewaakt dat de capaciteit niet overschreden wordt en dat het maximum achteraf niet lager ingesteld kan worden dan het aantal reeds ingeschreven deelnemers. In de agendalijst wordt de bezetting (`X / Y deelnemers`) en een `(volzet)` indicatie getoond. Onder Beheer (`/beheer/deelnemers`) is een volledige CRUD voor deelnemers voorzien met zoekfunctie op naam en postcode.
 
 ### 3. Statistieken & Dashboard
-Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
+Gepresenteerd via vier duidelijke tabbladen op de `/statistieken` pagina:
 *   **Bezoekers & Consultaties:** Tijdlijn per week (jaar-op-jaar), maandelijkse verdelingen, verdeling over locaties, nieuwe vs. terugkerende bezoekers, meest populaire leeftijdscategorieën, toestellen, geslachtsverdeling, overzicht van **Resultaten van het bezoek** (met procentuele verdeling over alle consultaties met een geregistreerd resultaat) en drukste dagen.
 *   **Vrijwilligers & Agenda:** Totaal aantal gepresteerde uren per digidokter, sessies per locatie en activiteitstype, urentrend per maand en de **Druktest ratio** (gemiddeld aantal bezoeken per aanwezige vrijwilliger per sessie, uitsluitend berekend voor activiteiten in het verleden).
 *   **Vragen & AI-Analyse:** AI-gestuurde analyse van consultaties met realtime KPI's (dekkingsgraad, populairste categorie, gemiddelde zekerheid), categorie-staafdiagram, top-5 maandelijkse evolutiegrafiek en kruistabellen per apparaat en leeftijdscategorie.
+*   **Activiteiten & Deelnemers:** Diepgaande statistieken over groepsactiviteiten en workshops met deelnemersregistratie. Toont unieke deelnemers, totale inschrijvingen, gemiddelde bezetting per sessie, bezettingsgraad en volzet-percentage, een gecombineerde tijdlijngrafiek (deelnemers en sessies), deelnemersretentie/frequentie (eenmalig vs. vaste kern), demografie (leeftijdscategorieën, meegebrachte toestellen en postcode-spreiding), overzichten per activiteitstype en locatie, en een overzichtstabel van recente activiteiten met capaciteitsbadges.
 *   **Filter 'Alle jaren' & Tab-behoud:** Ondersteunt filteren per specifiek jaar én over 'Alle jaren' heen, waarbij het geopende tabblad altijd actief blijft bij filterwijzigingen.
 
 ### 4. Documentbeheer
@@ -340,7 +341,7 @@ Zie de volledige [Handleiding: Agenda Import Script](file:///Users/mark/Python/D
 
 ## 🧪 Unit Tests Uitvoeren
 
-Het platform is uitgerust met een geautomatiseerde test-suite van **389 tests** verdeeld over 44 testbestanden die draaien op een in-memory SQLite database. **Elk afzonderlijk bestand in het project heeft een test coverage van minstens 80%**, met een totale projectdekking van **89%**.
+Het platform is uitgerust met een geautomatiseerde test-suite van **399 tests** verdeeld over 44 testbestanden die draaien op een in-memory SQLite database. **Elk afzonderlijk bestand in het project heeft een test coverage van minstens 80%**, met een totale projectdekking van **89%**.
 
 **Met pytest (aanbevolen):**
 ```bash
@@ -357,7 +358,7 @@ Het platform is uitgerust met een geautomatiseerde test-suite van **389 tests** 
 python -m unittest discover -s tests
 ```
 
-### 📋 Overzicht van de Unit Test Suite (398 tests)
+### 📋 Overzicht van de Unit Test Suite (399 tests)
 
 | # | Testbestand | Aantal Tests | Dekkingsgebied / Beschrijving |
 |---|---|:---:|---|
@@ -374,7 +375,7 @@ python -m unittest discover -s tests
 | 11 | `tests/test_communicatie.py` | 18 | Interne & platform communicatie, broadcast e-mails, doelgroepfiltering op groepen, proefmail naar mezelf, JSON-snapshots van ontvangers, modelmethodes & strikte tenant-isolatie |
 | 12 | `tests/test_consultatie_locaties.py` | 7 | Consultatielocaties markeren, sticky sessiekeuze bij balieformulier "Nieuw bezoek" |
 | 13 | `tests/test_decorators_extended.py` | 4 | Toegangsbeheerdecorators (admin_required, actief_required, platform_admin_required, writer_required) inclusief edge cases |
-| 14 | `tests/test_deelnemers.py` | 20 | Deelnemersbeheer CRUD, vlag `registreer_deelnemers` op activiteitstypes, realtime LOV keuzelijst, postcode, leeftijdscategorie (LOV) en toestel (LOV), AJAX snel toevoegen en inline pop-up modal, capaciteitsbeheer (`max_deelnemers`), validatie tegen overschrijden en verlagen onder ingeschreven deelnemers, delete-blokkering van gekoppelde stamgegevens, agendalijst-indicatoren en backup/restore |
+| 14 | `tests/test_deelnemers.py` | 21 | Deelnemersbeheer CRUD, vlag `registreer_deelnemers` op activiteitstypes, realtime LOV keuzelijst, postcode, leeftijdscategorie (LOV) en toestel (LOV), AJAX snel toevoegen en inline pop-up modal, capaciteitsbeheer (`max_deelnemers`), validatie tegen overschrijden en verlagen onder ingeschreven deelnemers, delete-blokkering van gekoppelde stamgegevens, agendalijst-indicatoren, 4e statistieken-tab (`Activiteiten & Deelnemers`) en backup/restore |
 | 15 | `tests/test_digidokter_email.py` | 7 | E-mailvalidatie, duplicatiecontroles en uniekheid voor digidokters |
 | 16 | `tests/test_document_renderer.py` | 31 | In-browser rendering van Word (DOCX/ODT), Excel (XLSX), Markdown, platte tekst en code, paginering, syntax highlighting, sanitization en snippets |
 | 17 | `tests/test_document_search.py` | 3 | Full-text content search binnen documenten (PDF, DOCX, ODT, XLSX, TXT) en context-snippets |
@@ -405,7 +406,7 @@ python -m unittest discover -s tests
 | 42 | `tests/test_text_extractor_extended.py` | 11 | Tekstextractie uit PDF, Word (DOCX/ODT), Excel (XLSX) en TXT, snippet-generatie en encoding handling |
 | 43 | `tests/test_user_delete_and_sorting.py` | 10 | Gebruikers veilig verwijderen/ontkoppelen, multi-tenant bescherming en tabel-sorteringen |
 | 44 | `tests/test_vraagcategorieen.py` | 9 | 10 gestandaardiseerde vraagcategorieën, asynchrone AI-classificaties (Gemini), batch-analyse en statistieken |
-| **Totaal** | **44 testsuites** | **393 tests** | **100% geslaagd** |
+| **Totaal** | **44 testsuites** | **399 tests** | **100% geslaagd** |
 
 ---
 

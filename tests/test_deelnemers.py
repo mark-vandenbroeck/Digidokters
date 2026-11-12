@@ -981,4 +981,96 @@ class TestDeelnemers(BaseTestCase):
         self.assertEqual(restored_dn.leeftijdscategorie_id, self.age_category.id)
         self.assertEqual(restored_dn.toestel_id, self.device.id)
 
+    def test_statistieken_activiteiten_en_deelnemers_tab(self):
+        """Test dat het 4e tabblad 'Activiteiten & Deelnemers' in /statistieken correct berekend en gerenderd wordt."""
+        self.login_admin()
+        vandaag = date.today()
+
+        # Deelnemer met extra metadata
+        dn_extra = Deelnemer(
+            naam="Fien Deelnemer",
+            postcode="1840",
+            leeftijdscategorie_id=self.age_category.id,
+            toestel_id=self.device.id,
+            organisatie_id=self.org.id
+        )
+        db.session.add(dn_extra)
+        db.session.commit()
+
+        # Item 1: Volzet (2/2 deelnemers)
+        item1 = AgendaItem(
+            datum=vandaag,
+            uur_van="10:00",
+            uur_tot="12:00",
+            type_id=self.type_met_deelnemers.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Smartphone cursus",
+            max_deelnemers=2,
+            organisatie_id=self.org.id
+        )
+        item1.deelnemers.extend([self.deelnemer1, dn_extra])
+
+        # Item 2: Niet volzet (1/4 deelnemers)
+        item2 = AgendaItem(
+            datum=vandaag,
+            uur_van="14:00",
+            uur_tot="16:00",
+            type_id=self.type_met_deelnemers.id,
+            locatie_id=self.locatie.id,
+            omschrijving="Themasessie itsme",
+            max_deelnemers=4,
+            organisatie_id=self.org.id
+        )
+        item2.deelnemers.append(self.deelnemer1)
+
+        db.session.add_all([item1, item2])
+
+        # Item 3: In org2 (multi-tenant isolatie)
+        type_org2 = ActivityType(naam="Org2 Type", actief=True, registreer_deelnemers=True, organisatie_id=self.org2.id)
+        loc_org2 = Location(naam="Org2 Bib", actief=True, organisatie_id=self.org2.id)
+        db.session.add_all([type_org2, loc_org2])
+        db.session.flush()
+        item_org2 = AgendaItem(
+            datum=vandaag,
+            uur_van="10:00",
+            uur_tot="12:00",
+            type_id=type_org2.id,
+            locatie_id=loc_org2.id,
+            organisatie_id=self.org2.id
+        )
+        db.session.add(item_org2)
+        item_org2.deelnemers.append(self.deelnemer_org2)
+
+        db.session.commit()
+
+        # 1. GET /statistieken?tab=activities
+        res = self.client.get(f'/statistieken?jaar={vandaag.year}&tab=activities')
+        self.assertEqual(res.status_code, 200)
+        content = res.data.decode('utf-8')
+
+        # Controleer aanwezigheid tab en titels
+        self.assertIn('Activiteiten & Deelnemers', content)
+        self.assertIn('Unieke deelnemers', content)
+        self.assertIn('Gem. deelnemers per sessie', content)
+        self.assertIn('Smartphone cursus', content)
+        self.assertIn('Themasessie itsme', content)
+        self.assertNotIn('Org2 Type', content)
+
+        # Berekeningen: 2 unieke deelnemers (deelnemer1 en dn_extra) in org1
+        # Deelnames: 2 + 1 = 3
+        # Capaciteit: 2 + 4 = 6 aangeboden plaatsen, 3 ingenomen -> 50%
+        # 1 volzette sessie van de 2 -> 50%
+        self.assertIn('50.0%', content)
+        self.assertIn('1840', content)
+        self.assertIn(self.age_category.naam, content)
+        self.assertIn(self.device.naam, content)
+
+        # 2. GET /statistieken?jaar=alle&tab=activities
+        res_alle = self.client.get('/statistieken?jaar=alle&tab=activities')
+        self.assertEqual(res_alle.status_code, 200)
+        content_alle = res_alle.data.decode('utf-8')
+        self.assertIn('Activiteiten & Deelnemers', content_alle)
+        self.assertIn('Smartphone cursus', content_alle)
+
+
 

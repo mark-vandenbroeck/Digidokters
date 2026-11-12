@@ -62,10 +62,11 @@ def update_gebruikershandleiding():
         # 3.4 Statistieken
         elif "Onder 'Statistieken' vindt u gedetailleerde overzichten" in p.text:
             p.text = (
-                "Onder 'Statistieken' vindt u gedetailleerde overzichten, KPI's en grafieken verdeeld over drie gespecialiseerde tabbladen:\n"
+                "Onder 'Statistieken' vindt u gedetailleerde overzichten, KPI's en grafieken verdeeld over vier gespecialiseerde tabbladen:\n"
                 "• Tab 1: Bezoekers & Consultaties: Totaal aantal consultaties, verdeling nieuwe versus terugkerende bezoekers, verdeling over consultatielocaties, leeftijdscategorieën, toestellen, herkomstkanalen, geslachtsverdeling, wekelijkse bezoekerstrends en het overzicht 'Resultaat van het bezoek' met percentages berekend over alle consultaties met een geregistreerd resultaat.\n"
                 "• Tab 2: Vrijwilligers & Agenda: Totaal aantal gepresteerde uren door digidokters, maandelijkse inzet-trends, sessies per locatie en activiteitstype, en de bezoeker/vrijwilliger-ratio (druktest). Deze ratio houdt uitsluitend rekening met voorbije sessies.\n"
-                "• Tab 3: Vragen & AI-Analyse: Diepgaande analyse van de geregistreerde hulpvragen via Gemini AI. Toont de dekkingsgraad (percentage geanalyseerd), de meest voorkomende vraagcategorie, gemiddelde betrouwbaarheidsscore, een categorie-staafdiagram, een maandelijkse evolutiegrafiek van de top-5 categorieën, en kruistabellen met de populairste toestellen en leeftijdsgroepen per vraagcategorie."
+                "• Tab 3: Vragen & AI-Analyse: Diepgaande analyse van de geregistreerde hulpvragen via Gemini AI. Toont de dekkingsgraad (percentage geanalyseerd), de meest voorkomende vraagcategorie, gemiddelde betrouwbaarheidsscore, een categorie-staafdiagram, een maandelijkse evolutiegrafiek van de top-5 categorieën, en kruistabellen met de populairste toestellen en leeftijdsgroepen per vraagcategorie.\n"
+                "• Tab 4: Activiteiten & Deelnemers: Uitgebreide statistieken over activiteiten met deelnemersregistratie. Toont het aantal unieke deelnemers, totale deelnames, gemiddelde opkomst per sessie, capaciteitsbezettingsgraad en volzette sessies, een gecombineerde tijdlijn van deelnemers en activiteiten, deelnemersretentie (eenmalig vs. terugkerend), demografische verdelingen (leeftijdscategorieën, toestellen en geografische postcodespreiding), overzichten per activiteitstype en locatie, en een recente activiteitentabel."
             )
 
         # 4.3 Stamgegevens beheren

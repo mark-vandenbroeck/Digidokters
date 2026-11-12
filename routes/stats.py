@@ -51,7 +51,7 @@ def overzicht():
         jaar = safe_int(jaar_param, default=date.today().year) or date.today().year
 
     actieve_tab = safe_str(request.args.get('tab'), default='visitors') or 'visitors'
-    if actieve_tab not in ('visitors', 'volunteers', 'questions'):
+    if actieve_tab not in ('visitors', 'volunteers', 'questions', 'activities'):
         actieve_tab = 'visitors'
 
     from utils.tenant import get_huidige_organisatie_id
@@ -294,12 +294,19 @@ def overzicht():
         .all()
     )
 
-    # Beschikbare jaren voor de selector
-    jaren = [r[0] for r in
-             db.session.query(extract('year', Registration.datum).label('jaar'))
-             .filter(Registration.organisatie_id == org_id)
-             .group_by('jaar').order_by('jaar').all()
-             if r[0] is not None]
+    # Beschikbare jaren voor de selector (gecombineerd uit registraties en agenda-items)
+    from models.agenda import AgendaItem
+    reg_jaren = [r[0] for r in
+                 db.session.query(extract('year', Registration.datum).label('jaar'))
+                 .filter(Registration.organisatie_id == org_id)
+                 .group_by('jaar').all()
+                 if r[0] is not None]
+    agenda_jaren = [r[0] for r in
+                    db.session.query(extract('year', AgendaItem.datum).label('jaar'))
+                    .filter(AgendaItem.organisatie_id == org_id)
+                    .group_by('jaar').all()
+                    if r[0] is not None]
+    jaren = sorted(list(set([int(y) for y in (reg_jaren + agenda_jaren)] + [date.today().year])))
     if not jaren:
         jaren = [date.today().year]
 
@@ -586,6 +593,182 @@ def overzicht():
     for r in cat_leeftijd_raw:
         cat_leeftijd_dict.setdefault(r.cat_naam, []).append({'leeftijd': r.leeftijd_naam, 'aantal': r.aantal})
 
+    # ---------------------------------------------------------
+    # TAB 4: ACTIVITEITEN & DEELNEMERS STATISTIEKEN
+    # ---------------------------------------------------------
+    from models.deelnemer import Deelnemer
+
+    act_query = (
+        AgendaItem.query
+        .join(ActivityType, AgendaItem.type_id == ActivityType.id)
+        .filter(
+            AgendaItem.organisatie_id == org_id,
+            ActivityType.registreer_deelnemers == True
+        )
+    )
+    if jaar != 'alle':
+        act_query = act_query.filter(extract('year', AgendaItem.datum) == jaar)
+
+    act_items = (
+        act_query
+        .options(
+            joinedload(AgendaItem.type),
+            joinedload(AgendaItem.locatie),
+            selectinload(AgendaItem.digidokters),
+            selectinload(AgendaItem.deelnemers).joinedload(Deelnemer.leeftijdscategorie),
+            selectinload(AgendaItem.deelnemers).joinedload(Deelnemer.toestel)
+        )
+        .order_by(AgendaItem.datum.desc(), AgendaItem.uur_van.desc())
+        .all()
+    )
+
+    dn_totaal_sessies = len(act_items)
+    dn_totaal_inschrijvingen = sum(len(item.deelnemers) for item in act_items)
+
+    unieke_deelnemers_dict = {}
+    deelnemer_frequenties = {}
+    for item in act_items:
+        for dn in item.deelnemers:
+            unieke_deelnemers_dict[dn.id] = dn
+            deelnemer_frequenties[dn.id] = deelnemer_frequenties.get(dn.id, 0) + 1
+
+    dn_totaal_unieke_deelnemers = len(unieke_deelnemers_dict)
+    dn_gem_deelnemers_per_sessie = round(dn_totaal_inschrijvingen / dn_totaal_sessies, 1) if dn_totaal_sessies > 0 else 0
+
+    # Capaciteit en bezettingsgraad
+    sessies_met_max = [item for item in act_items if item.max_deelnemers is not None and item.max_deelnemers > 0]
+    totaal_aangeboden_plaatsen = sum(item.max_deelnemers for item in sessies_met_max)
+    totaal_ingenomen_plaatsen = sum(len(item.deelnemers) for item in sessies_met_max)
+    dn_bezettingsgraad = round((totaal_ingenomen_plaatsen / totaal_aangeboden_plaatsen * 100), 1) if totaal_aangeboden_plaatsen > 0 else None
+    dn_volzette_sessies = sum(1 for item in sessies_met_max if len(item.deelnemers) >= item.max_deelnemers)
+    dn_volzette_percentage = round((dn_volzette_sessies / len(sessies_met_max) * 100), 1) if sessies_met_max else None
+
+    # Demografie unieke deelnemers
+    postcode_counts = {}
+    leeftijd_counts = {}
+    toestel_counts = {}
+    for dn in unieke_deelnemers_dict.values():
+        pc = (dn.postcode or '').strip() or 'Niet opgegeven'
+        postcode_counts[pc] = postcode_counts.get(pc, 0) + 1
+
+        lc = dn.effectieve_leeftijdscategorie or 'Niet gespecificeerd'
+        leeftijd_counts[lc] = leeftijd_counts.get(lc, 0) + 1
+
+        t = dn.effectief_toestel or 'Geen / Niet gespecificeerd'
+        toestel_counts[t] = toestel_counts.get(t, 0) + 1
+
+    dn_per_postcode = sorted(postcode_counts.items(), key=lambda x: (x[0] == 'Niet opgegeven', -x[1], x[0]))
+    dn_per_leeftijd = sorted(leeftijd_counts.items(), key=lambda x: (x[0] == 'Niet gespecificeerd', -x[1], x[0]))
+    dn_per_toestel = sorted(toestel_counts.items(), key=lambda x: (x[0] == 'Geen / Niet gespecificeerd', -x[1], x[0]))
+
+    dn_leeftijd_chart_labels = [k for k, v in dn_per_leeftijd]
+    dn_leeftijd_chart_data = [v for k, v in dn_per_leeftijd]
+
+    dn_toestel_chart_labels = [k for k, v in dn_per_toestel]
+    dn_toestel_chart_data = [v for k, v in dn_per_toestel]
+
+    # Per activiteitstype
+    type_stats = {}
+    for item in act_items:
+        t_id = item.type_id
+        if t_id not in type_stats:
+            type_stats[t_id] = {
+                'naam': item.type.naam if item.type else 'Onbekend',
+                'kleur': getattr(item.type, 'kleur', 'primary'),
+                'sessies': 0,
+                'deelnemers': 0,
+                'max_plaatsen': 0,
+                'ingenomen_met_max': 0,
+                'volzet': 0
+            }
+        type_stats[t_id]['sessies'] += 1
+        dn_count = len(item.deelnemers)
+        type_stats[t_id]['deelnemers'] += dn_count
+        if item.max_deelnemers:
+            type_stats[t_id]['max_plaatsen'] += item.max_deelnemers
+            type_stats[t_id]['ingenomen_met_max'] += dn_count
+            if dn_count >= item.max_deelnemers:
+                type_stats[t_id]['volzet'] += 1
+
+    for s in type_stats.values():
+        s['gem_deelnemers'] = round(s['deelnemers'] / s['sessies'], 1) if s['sessies'] > 0 else 0
+        s['bezettingsgraad'] = round(s['ingenomen_met_max'] / s['max_plaatsen'] * 100, 1) if s['max_plaatsen'] > 0 else None
+
+    dn_per_type = sorted(type_stats.values(), key=lambda x: x['deelnemers'], reverse=True)
+
+    # Per locatie
+    loc_stats = {}
+    for item in act_items:
+        loc_naam = item.locatie.naam if item.locatie else 'Onbekende locatie'
+        if loc_naam not in loc_stats:
+            loc_stats[loc_naam] = {'naam': loc_naam, 'sessies': 0, 'deelnemers': 0}
+        loc_stats[loc_naam]['sessies'] += 1
+        loc_stats[loc_naam]['deelnemers'] += len(item.deelnemers)
+    for s in loc_stats.values():
+        s['gem_deelnemers'] = round(s['deelnemers'] / s['sessies'], 1) if s['sessies'] > 0 else 0
+    dn_per_locatie = sorted(loc_stats.values(), key=lambda x: x['deelnemers'], reverse=True)
+
+    # Deelnemersfrequentie / Retentie
+    retentie = {
+        '1x (Eenmalig)': 0,
+        '2x': 0,
+        '3 tot 4x': 0,
+        '5+ keer (Vaste kern)': 0
+    }
+    for count in deelnemer_frequenties.values():
+        if count == 1:
+            retentie['1x (Eenmalig)'] += 1
+        elif count == 2:
+            retentie['2x'] += 1
+        elif 3 <= count <= 4:
+            retentie['3 tot 4x'] += 1
+        else:
+            retentie['5+ keer (Vaste kern)'] += 1
+    dn_retentie = list(retentie.items())
+    dn_retentie_chart_labels = list(retentie.keys())
+    dn_retentie_chart_data = list(retentie.values())
+
+    # Tijdlijn (per maand bij specifiek jaar, of per jaar bij 'alle')
+    if jaar != 'alle':
+        dn_tijdlijn_labels = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
+        dn_tijdlijn_deelnemers = [0] * 12
+        dn_tijdlijn_sessies = [0] * 12
+        for item in act_items:
+            m = item.datum.month - 1
+            dn_tijdlijn_sessies[m] += 1
+            dn_tijdlijn_deelnemers[m] += len(item.deelnemers)
+    else:
+        jr_dict_sessies = {}
+        jr_dict_deelnemers = {}
+        for item in act_items:
+            yr = item.datum.year
+            jr_dict_sessies[yr] = jr_dict_sessies.get(yr, 0) + 1
+            jr_dict_deelnemers[yr] = jr_dict_deelnemers.get(yr, 0) + len(item.deelnemers)
+        all_yrs = sorted(list(set(list(jr_dict_sessies.keys()) + [date.today().year])))
+        dn_tijdlijn_labels = [str(y) for y in all_yrs]
+        dn_tijdlijn_deelnemers = [jr_dict_deelnemers.get(y, 0) for y in all_yrs]
+        dn_tijdlijn_sessies = [jr_dict_sessies.get(y, 0) for y in all_yrs]
+
+    # Recente sessies overzicht
+    dn_recente_sessies = []
+    for item in act_items[:15]:
+        dn_count = len(item.deelnemers)
+        is_volzet = item.max_deelnemers is not None and dn_count >= item.max_deelnemers
+        dn_recente_sessies.append({
+            'id': item.id,
+            'datum': item.datum,
+            'uur_van': item.uur_van,
+            'uur_tot': item.uur_tot,
+            'type_naam': item.type.naam if item.type else 'Onbekend',
+            'type_kleur': getattr(item.type, 'kleur', 'primary'),
+            'locatie_naam': item.locatie.naam if item.locatie else 'Onbekend',
+            'omschrijving': item.omschrijving or '',
+            'deelnemers_count': dn_count,
+            'max_deelnemers': item.max_deelnemers,
+            'is_volzet': is_volzet,
+            'digidokters': [dd.naam for dd in item.digidokters]
+        })
+
     return render_template(
         'stats/overview.html',
         jaar=jaar,
@@ -637,5 +820,31 @@ def overzicht():
         trend_per_maand_cats=trend_per_maand_cats,
         cat_toestel_dict=cat_toestel_dict,
         cat_leeftijd_dict=cat_leeftijd_dict,
+
+        # Tab 4: Activiteiten & Deelnemers
+        dn_totaal_sessies=dn_totaal_sessies,
+        dn_totaal_inschrijvingen=dn_totaal_inschrijvingen,
+        dn_totaal_unieke_deelnemers=dn_totaal_unieke_deelnemers,
+        dn_gem_deelnemers_per_sessie=dn_gem_deelnemers_per_sessie,
+        dn_bezettingsgraad=dn_bezettingsgraad,
+        dn_volzette_sessies=dn_volzette_sessies,
+        dn_volzette_percentage=dn_volzette_percentage,
+        dn_per_postcode=dn_per_postcode,
+        dn_per_leeftijd=dn_per_leeftijd,
+        dn_leeftijd_chart_labels=dn_leeftijd_chart_labels,
+        dn_leeftijd_chart_data=dn_leeftijd_chart_data,
+        dn_per_toestel=dn_per_toestel,
+        dn_toestel_chart_labels=dn_toestel_chart_labels,
+        dn_toestel_chart_data=dn_toestel_chart_data,
+        dn_per_type=dn_per_type,
+        dn_per_locatie=dn_per_locatie,
+        dn_retentie=dn_retentie,
+        dn_retentie_chart_labels=dn_retentie_chart_labels,
+        dn_retentie_chart_data=dn_retentie_chart_data,
+        dn_tijdlijn_labels=dn_tijdlijn_labels,
+        dn_tijdlijn_deelnemers=dn_tijdlijn_deelnemers,
+        dn_tijdlijn_sessies=dn_tijdlijn_sessies,
+        dn_recente_sessies=dn_recente_sessies,
+
         actieve_tab=actieve_tab
     )

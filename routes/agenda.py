@@ -7,6 +7,7 @@ from models.agenda import AgendaItem
 from models.activity_type import ActivityType
 from models.location import Location
 from models.digidokter import Digidokter
+from models.deelnemer import Deelnemer
 from utils.decorators import writer_required
 from utils.permissions import can_write
 from models.constants import FEATURE_AGENDA
@@ -17,10 +18,18 @@ agenda_bp = Blueprint('agenda', __name__)
 
 def _keuzelijsten():
     """Haal actieve keuzelijsten op voor het agenda-formulier."""
+    from models.age_category import AgeCategory
+    from models.device import Device
     return {
         'types': filter_op_organisatie(ActivityType.query.filter_by(actief=True), ActivityType).order_by(ActivityType.volgorde, ActivityType.naam).all(),
         'locaties': filter_op_organisatie(Location.query.filter_by(actief=True), Location).order_by(Location.volgorde, Location.naam).all(),
         'digidokters': filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.volgorde, Digidokter.naam).all(),
+        'beschikbare_deelnemers': filter_op_organisatie(Deelnemer.query.filter_by(actief=True), Deelnemer).options(
+            db.joinedload(Deelnemer.leeftijdscategorie),
+            db.joinedload(Deelnemer.toestel)
+        ).order_by(Deelnemer.naam.asc()).all(),
+        'leeftijdscategorieën': filter_op_organisatie(AgeCategory.query.filter_by(actief=True), AgeCategory).order_by(AgeCategory.volgorde, AgeCategory.naam).all(),
+        'toestellen': filter_op_organisatie(Device.query.filter_by(actief=True), Device).order_by(Device.volgorde, Device.naam).all(),
     }
 
 @agenda_bp.route('/agenda')
@@ -68,7 +77,8 @@ def lijst():
         .options(
             joinedload(AgendaItem.type),
             joinedload(AgendaItem.locatie),
-            selectinload(AgendaItem.digidokters)
+            selectinload(AgendaItem.digidokters),
+            selectinload(AgendaItem.deelnemers)
         )
     )
     
@@ -241,6 +251,29 @@ def nieuw():
             else:
                 fouten.append(f'Ongeldige of inactieve digidokter geselecteerd (ID: {d_id}).')
 
+        # Validatie deelnemers (enkel indien type.registreer_deelnemers actief is)
+        act_type = db.session.get(ActivityType, type_id) if type_id else None
+        selected_deelnemers = []
+        max_deelnemers = None
+        if act_type and act_type.registreer_deelnemers:
+            max_deelnemers_raw = request.form.get('max_deelnemers', '').strip()
+            if max_deelnemers_raw:
+                try:
+                    max_deelnemers = int(max_deelnemers_raw)
+                    if max_deelnemers <= 0:
+                        fouten.append('Het maximaal aantal deelnemers moet minimaal 1 zijn.')
+                except ValueError:
+                    fouten.append('Ongeldig getal voor het maximaal aantal deelnemers.')
+
+            deelnemer_ids = request.form.getlist('deelnemer_ids', type=int)
+            for dn_id in deelnemer_ids:
+                dn = db.session.get(Deelnemer, dn_id)
+                if dn and dn.organisatie_id == org_id:
+                    selected_deelnemers.append(dn)
+
+            if max_deelnemers is not None and len(selected_deelnemers) > max_deelnemers:
+                fouten.append(f'Het aantal deelnemers ({len(selected_deelnemers)}) mag het maximum aantal ({max_deelnemers}) niet overschrijden.')
+
         is_terugkerend = request.form.get('is_terugkerend') == 'on'
         interval = request.form.get('interval') if is_terugkerend else None
         einddatum_str = request.form.get('einddatum', '').strip() if is_terugkerend else ''
@@ -308,6 +341,7 @@ def nieuw():
                     type_id=type_id,
                     locatie_id=locatie_id,
                     omschrijving=omschrijving,
+                    max_deelnemers=max_deelnemers,
                     is_terugkerend=is_terugkerend,
                     interval=interval,
                     einddatum=einddatum,
@@ -316,6 +350,7 @@ def nieuw():
                 )
                 set_organisatie_id_op_model(item)
                 item.digidokters = selected_digidokters
+                item.deelnemers = selected_deelnemers
                 db.session.add(item)
                 
             db.session.commit()
@@ -416,6 +451,33 @@ def wijzigen(item_id):
                 else:
                     fouten.append(f'Ongeldige of inactieve digidokter geselecteerd (ID: {d_id}).')
 
+        # Validatie deelnemers en max_deelnemers
+        act_type = db.session.get(ActivityType, type_id) if type_id else None
+        selected_deelnemers = []
+        max_deelnemers = None
+        if act_type and act_type.registreer_deelnemers:
+            max_deelnemers_raw = request.form.get('max_deelnemers', '').strip()
+            if max_deelnemers_raw:
+                try:
+                    max_deelnemers = int(max_deelnemers_raw)
+                    if max_deelnemers <= 0:
+                        fouten.append('Het maximaal aantal deelnemers moet minimaal 1 zijn.')
+                except ValueError:
+                    fouten.append('Ongeldig getal voor het maximaal aantal deelnemers.')
+
+            deelnemer_ids = request.form.getlist('deelnemer_ids', type=int)
+            for dn_id in deelnemer_ids:
+                dn = db.session.get(Deelnemer, dn_id)
+                if dn and dn.organisatie_id == org_id:
+                    selected_deelnemers.append(dn)
+
+            reeds_ingeschreven = len(item.deelnemers)
+            if max_deelnemers is not None:
+                if max_deelnemers < reeds_ingeschreven:
+                    fouten.append(f'Het maximum aantal deelnemers ({max_deelnemers}) mag niet minder worden dan het aantal deelnemers dat al ingeschreven is ({reeds_ingeschreven}).')
+                elif len(selected_deelnemers) > max_deelnemers:
+                    fouten.append(f'Het aantal deelnemers ({len(selected_deelnemers)}) mag het maximum aantal ({max_deelnemers}) niet overschrijden.')
+
         if fouten:
             for f in fouten:
                 flash(f, 'danger')
@@ -441,6 +503,13 @@ def wijzigen(item_id):
         
         if kan_aanwezigheid_bewerken:
             item.digidokters = selected_digidokters
+
+        if act_type and act_type.registreer_deelnemers:
+            item.deelnemers = selected_deelnemers
+            item.max_deelnemers = max_deelnemers
+        else:
+            item.deelnemers = []
+            item.max_deelnemers = None
         
         try:
             db.session.commit()

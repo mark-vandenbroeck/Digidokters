@@ -89,6 +89,11 @@
             <i class="bi bi-stars me-2 text-primary"></i>Vragen & AI-Analyse
         </button>
     </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {{ 'active' if actieve_tab == 'activities' }}" id="activities-tab" data-bs-toggle="tab" data-bs-target="#activities-pane" type="button" role="tab" aria-controls="activities-pane" aria-selected="{{ 'true' if actieve_tab == 'activities' else 'false' }}">
+            <i class="bi bi-person-lines-fill me-2 text-primary"></i>Activiteiten & Deelnemers
+        </button>
+    </li>
 </ul>
 
 <div class="tab-content" id="statsTabsContent">
@@ -778,6 +783,347 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- TAB 4: ACTIVITEITEN & DEELNEMERS -->
+    <div class="tab-pane fade {{ 'show active' if actieve_tab == 'activities' }}" id="activities-pane" role="tabpanel" aria-labelledby="activities-tab" tabindex="0">
+        <!-- Samenvatting KPI's Deelnemers & Activiteiten -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="dd-stat-card">
+                    <div class="dd-stat-icon bg-blue-soft text-blue">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <div>
+                        <div class="dd-stat-value">{{ dn_totaal_unieke_deelnemers }}</div>
+                        <div class="dd-stat-label">Unieke deelnemers {% if jaar == 'alle' %}(alle jaren){% else %}in {{ jaar }}{% endif %}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="dd-stat-card">
+                    <div class="dd-stat-icon bg-teal-soft text-teal">
+                        <i class="bi bi-person-check-fill"></i>
+                    </div>
+                    <div>
+                        <div class="dd-stat-value">{{ dn_totaal_inschrijvingen }}</div>
+                        <div class="dd-stat-label">Deelnames over {{ dn_totaal_sessies }} sessie{{ 's' if dn_totaal_sessies != 1 else '' }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="dd-stat-card">
+                    <div class="dd-stat-icon bg-purple-soft text-purple">
+                        <i class="bi bi-person-badge-fill"></i>
+                    </div>
+                    <div>
+                        <div class="dd-stat-value">{{ dn_gem_deelnemers_per_sessie }}</div>
+                        <div class="dd-stat-label">Gem. deelnemers per sessie</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="dd-stat-card">
+                    <div class="dd-stat-icon bg-amber-soft text-amber">
+                        <i class="bi bi-pie-chart-fill"></i>
+                    </div>
+                    <div>
+                        <div class="dd-stat-value">{% if dn_bezettingsgraad is not none %}{{ dn_bezettingsgraad }}%{% else %}—{% endif %}</div>
+                        <div class="dd-stat-label">
+                            {% if dn_volzette_sessies %}
+                            {{ dn_volzette_sessies }} sessie{{ 's' if dn_volzette_sessies != 1 else '' }} volzet ({{ dn_volzette_percentage }}%)
+                            {% elif dn_bezettingsgraad is not none %}
+                            Geen volzette sessies
+                            {% else %}
+                            Geen limiet ingesteld
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if dn_totaal_sessies == 0 %}
+        <div class="card shadow-sm border-0 py-5 text-center mt-3">
+            <div class="card-body">
+                <i class="bi bi-person-lines-fill fs-1 text-secondary d-block mb-3"></i>
+                <h5 class="text-muted">Nog geen activiteiten met deelnemersregistratie gevonden voor {% if jaar == 'alle' %}deze organisatie{% else %}{{ jaar }}{% endif %}.</h5>
+                <p class="text-secondary small mb-0">
+                    Activiteitstypes waarvoor de optie <em>"Registreer ook deelnemers"</em> actief is, verschijnen hier automatisch zodra er sessies gepland en deelnemers geregistreerd worden.
+                </p>
+            </div>
+        </div>
+        {% else %}
+
+        <!-- Rij 1: Tijdlijn & Retentie -->
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-8">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold d-flex align-items-center justify-content-between">
+                        <span><i class="bi bi-graph-up me-2 text-primary"></i>Evolutie Deelnemers & Activiteiten ({% if jaar == 'alle' %}per jaar{% else %}in {{ jaar }}{% endif %})</span>
+                        <span class="badge bg-light text-dark border small fw-normal">{{ dn_totaal_inschrijvingen }} deelnames</span>
+                    </div>
+                    <div class="card-body">
+                        <div style="position: relative; height: 260px;">
+                            <canvas id="dnTimelineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-repeat me-2 text-primary"></i>Deelnemersretentie & Frequentie
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div style="position: relative; height: 130px;" class="mb-2">
+                            <canvas id="dnRetentionChart"></canvas>
+                        </div>
+                        <div class="small pt-2 border-top">
+                            {% for categorie, aantal in dn_retentie %}
+                            <div class="d-flex justify-content-between align-items-center py-1 border-bottom-subtle">
+                                <span class="text-dark">{{ categorie }}</span>
+                                <span class="badge bg-primary-subtle text-primary">{{ aantal }} ({{ (aantal / dn_totaal_unieke_deelnemers * 100)|round(1) if dn_totaal_unieke_deelnemers > 0 else 0 }}%)</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rij 2: Demografie & Profiel -->
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-pie-chart-fill me-2 text-primary"></i>Leeftijdscategorieën
+                    </div>
+                    <div class="card-body">
+                        {% if dn_leeftijd_chart_data and dn_totaal_unieke_deelnemers > 0 %}
+                        <div style="max-height: 200px;" class="d-flex justify-content-center mb-3">
+                            <canvas id="dnAgeChart"></canvas>
+                        </div>
+                        <div class="small">
+                            {% for cat, aantal in dn_per_leeftijd %}
+                            <div class="dd-progress-row mb-2">
+                                <div class="dd-progress-label text-truncate" style="max-width: 140px;" title="{{ cat }}">{{ cat }}</div>
+                                <div class="dd-progress-bar-wrap">
+                                    <div class="dd-progress-fill" style="width: {{ (aantal / dn_totaal_unieke_deelnemers * 100)|round if dn_totaal_unieke_deelnemers > 0 else 0 }}%"></div>
+                                </div>
+                                <div class="dd-progress-count">{{ aantal }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-muted text-center py-4 small fst-italic">Geen leeftijdscategorieën geregistreerd.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-laptop me-2 text-primary"></i>Meegebrachte Toestellen
+                    </div>
+                    <div class="card-body">
+                        {% if dn_toestel_chart_data and dn_totaal_unieke_deelnemers > 0 %}
+                        <div style="max-height: 200px;" class="d-flex justify-content-center mb-3">
+                            <canvas id="dnDeviceChart"></canvas>
+                        </div>
+                        <div class="small">
+                            {% for tst, aantal in dn_per_toestel %}
+                            <div class="dd-progress-row mb-2">
+                                <div class="dd-progress-label text-truncate" style="max-width: 140px;" title="{{ tst }}">{{ tst }}</div>
+                                <div class="dd-progress-bar-wrap">
+                                    <div class="dd-progress-fill bg-info" style="width: {{ (aantal / dn_totaal_unieke_deelnemers * 100)|round if dn_totaal_unieke_deelnemers > 0 else 0 }}%"></div>
+                                </div>
+                                <div class="dd-progress-count">{{ aantal }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-muted text-center py-4 small fst-italic">Geen toestellen geregistreerd.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-geo-alt-fill me-2 text-primary"></i>Geografische Spreiding (Postcode)
+                    </div>
+                    <div class="card-body">
+                        {% if dn_per_postcode %}
+                        <div class="small">
+                            {% for pc, aantal in dn_per_postcode %}
+                            <div class="dd-progress-row mb-2">
+                                <div class="dd-progress-label text-truncate" style="max-width: 140px;" title="{{ pc }}">
+                                    <i class="bi bi-geo-alt text-muted me-1"></i>{{ pc }}
+                                </div>
+                                <div class="dd-progress-bar-wrap">
+                                    <div class="dd-progress-fill bg-teal" style="width: {{ (aantal / dn_totaal_unieke_deelnemers * 100)|round if dn_totaal_unieke_deelnemers > 0 else 0 }}%"></div>
+                                </div>
+                                <div class="dd-progress-count">{{ aantal }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-muted text-center py-4 small fst-italic">Geen postcodes geregistreerd.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rij 3: Activiteitstypes & Locaties -->
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-collection-play-fill me-2 text-primary"></i>Aanbod per Activiteitstype
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle mb-0">
+                            <thead class="table-light small">
+                                <tr>
+                                    <th>Activiteitstype</th>
+                                    <th class="text-center">Sessies</th>
+                                    <th class="text-center">Deelnemers</th>
+                                    <th class="text-center">Gem. / sessie</th>
+                                    <th class="text-center">Bezettingsgraad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for st in dn_per_type %}
+                                <tr>
+                                    <td class="fw-semibold">
+                                        <span class="badge bg-{{ st.kleur }}-subtle text-{{ st.kleur }} border border-{{ st.kleur }}-subtle me-1">●</span>
+                                        {{ st.naam }}
+                                    </td>
+                                    <td class="text-center">{{ st.sessies }}</td>
+                                    <td class="text-center fw-bold">{{ st.deelnemers }}</td>
+                                    <td class="text-center">{{ st.gem_deelnemers }}</td>
+                                    <td class="text-center">
+                                        {% if st.bezettingsgraad is not none %}
+                                            <span class="badge {{ 'bg-danger' if st.bezettingsgraad >= 100 else ('bg-warning text-dark' if st.bezettingsgraad >= 80 else 'bg-success') }}">
+                                                {{ st.bezettingsgraad }}%
+                                            </span>
+                                            {% if st.volzet > 0 %}
+                                            <small class="text-danger d-block">({{ st.volzet }} volzet)</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted small">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-building me-2 text-primary"></i>Deelnames per Locatie
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle mb-0">
+                            <thead class="table-light small">
+                                <tr>
+                                    <th>Locatie</th>
+                                    <th class="text-center">Sessies</th>
+                                    <th class="text-center">Deelnemers</th>
+                                    <th class="text-center">Gem. / sessie</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sl in dn_per_locatie %}
+                                <tr>
+                                    <td class="fw-semibold">
+                                        <i class="bi bi-geo-alt text-muted me-1"></i>{{ sl.naam }}
+                                    </td>
+                                    <td class="text-center">{{ sl.sessies }}</td>
+                                    <td class="text-center fw-bold">{{ sl.deelnemers }}</td>
+                                    <td class="text-center">{{ sl.gem_deelnemers }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rij 4: Recente Activiteiten met Deelnemers -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white fw-bold d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-clock-history me-2 text-primary"></i>Recentste Activiteiten met Deelnemers</span>
+                <span class="text-muted small fw-normal">Toont maximaal 15 recente sessies</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Datum & Tijd</th>
+                            <th>Activiteitstype</th>
+                            <th>Locatie</th>
+                            <th>Omschrijving</th>
+                            <th class="text-center">Bezetting</th>
+                            <th>Digidokter(s)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in dn_recente_sessies %}
+                        <tr>
+                            <td class="text-nowrap">
+                                <span class="fw-bold">{{ item.datum.strftime('%d/%m/%Y') }}</span>
+                                <div class="text-muted small">{{ item.uur_van }} - {{ item.uur_tot }}</div>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ item.type_kleur }}-subtle text-{{ item.type_kleur }} border border-{{ item.type_kleur }}-subtle">
+                                    {{ item.type_naam }}
+                                </span>
+                            </td>
+                            <td>{{ item.locatie_naam }}</td>
+                            <td>
+                                <span class="text-truncate d-inline-block" style="max-width: 250px;" title="{{ item.omschrijving }}">
+                                    {{ item.omschrijving or '—' }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {% if item.max_deelnemers %}
+                                    <span class="badge {{ 'bg-danger text-white' if item.is_volzet else 'bg-primary-subtle text-primary border border-primary-subtle' }}">
+                                        {{ item.deelnemers_count }} / {{ item.max_deelnemers }}
+                                    </span>
+                                    {% if item.is_volzet %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle small ms-1">(volzet)</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                        {{ item.deelnemers_count }} deelnemer{{ 's' if item.deelnemers_count != 1 else '' }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.digidokters %}
+                                    {{ item.digidokters|join(', ') }}
+                                {% else %}
+                                    <span class="text-muted small fst-italic">Geen toegewezen</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
 
@@ -985,6 +1331,132 @@
         });
     }
 
+    // --- 4. Activiteiten & Deelnemers Grafieken ---
+    const dnTimelineCanvas = document.getElementById('dnTimelineChart');
+    if (dnTimelineCanvas) {
+        new Chart(dnTimelineCanvas, {
+            type: 'bar',
+            data: {
+                labels: {{ dn_tijdlijn_labels|tojson }},
+                datasets: [
+                    {
+                        label: 'Deelnemers',
+                        data: {{ dn_tijdlijn_deelnemers|tojson }},
+                        backgroundColor: 'rgba(13, 110, 253, 0.75)',
+                        borderColor: '#0d6efd',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Activiteiten',
+                        data: {{ dn_tijdlijn_sessies|tojson }},
+                        type: 'line',
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.15)',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        tension: 0.2,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 },
+                        title: { display: true, text: 'Aantal deelnames' }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        ticks: { precision: 0 },
+                        title: { display: true, text: 'Aantal sessies' }
+                    }
+                }
+            }
+        });
+    }
+
+    const dnRetentionCanvas = document.getElementById('dnRetentionChart');
+    if (dnRetentionCanvas) {
+        new Chart(dnRetentionCanvas, {
+            type: 'bar',
+            data: {
+                labels: {{ dn_retentie_chart_labels|tojson }},
+                datasets: [{
+                    label: 'Unieke deelnemers',
+                    data: {{ dn_retentie_chart_data|tojson }},
+                    backgroundColor: ['#0d6efd', '#20c997', '#6f42c1', '#fd7e14'],
+                    borderRadius: 4,
+                    barThickness: 12
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } },
+                    y: { ticks: { font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    const dnAgeCanvas = document.getElementById('dnAgeChart');
+    if (dnAgeCanvas && {{ dn_leeftijd_chart_data|tojson }}.length > 0) {
+        new Chart(dnAgeCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: {{ dn_leeftijd_chart_labels|tojson }},
+                datasets: [{
+                    data: {{ dn_leeftijd_chart_data|tojson }},
+                    backgroundColor: ['#0d6efd', '#20c997', '#ffc107', '#fd7e14', '#6f42c1', '#6c757d', '#0dcaf0', '#d63384'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    const dnDeviceCanvas = document.getElementById('dnDeviceChart');
+    if (dnDeviceCanvas && {{ dn_toestel_chart_data|tojson }}.length > 0) {
+        new Chart(dnDeviceCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: {{ dn_toestel_chart_labels|tojson }},
+                datasets: [{
+                    data: {{ dn_toestel_chart_data|tojson }},
+                    backgroundColor: ['#0dcaf0', '#0d6efd', '#6610f2', '#6f42c1', '#20c997', '#198754', '#fd7e14', '#6c757d'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
     // Zorg ervoor dat Chart.js correct resizet bij het wisselen van tabbladen en houd actieve tab bij
     document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(triggerEl => {
         triggerEl.addEventListener('shown.bs.tab', (event) => {
@@ -993,6 +1465,7 @@
             let tabKey = 'visitors';
             if (targetId === 'volunteers-tab') tabKey = 'volunteers';
             else if (targetId === 'questions-tab') tabKey = 'questions';
+            else if (targetId === 'activities-tab') tabKey = 'activities';
 
             const activeTabInput = document.getElementById('activeTabInput');
             if (activeTabInput) {

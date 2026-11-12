@@ -152,6 +152,17 @@
                             {% if item.is_terugkerend %}
                             <i class="bi bi-arrow-repeat ms-1 text-primary" title="Terugkerend ({{ item.interval }})"></i>
                             {% endif %}
+                            {% if item.type.registreer_deelnemers %}
+                            <div class="mt-1">
+                                {% set is_vol = item.max_deelnemers and (item.deelnemers|length >= item.max_deelnemers) %}
+                                <span class="badge {% if is_vol %}bg-danger-subtle text-danger border border-danger-subtle{% else %}bg-light text-secondary border{% endif %}" 
+                                      title="{% if item.deelnemers %}Deelnemers: {{ item.deelnemers|map(attribute='naam')|join(', ') }}{% else %}Nog geen deelnemers geregistreerd{% endif %}{% if item.max_deelnemers %} (max. {{ item.max_deelnemers }}){% endif %}">
+                                    <i class="bi bi-people me-1 text-primary"></i>
+                                    {{ item.deelnemers|length }}{% if item.max_deelnemers %} / {{ item.max_deelnemers }}{% endif %} deelnemer{% if (item.max_deelnemers and item.max_deelnemers > 1) or (not item.max_deelnemers and item.deelnemers|length != 1) %}s{% endif %}
+                                    {% if is_vol %}<span class="ms-1 fw-bold text-danger">(volzet)</span>{% endif %}
+                                </span>
+                            </div>
+                            {% endif %}
                             {% if item.type.heeft_evaluatie %}
                             <div class="mt-1">
                                 {% set resp_count = item.evaluatie_reacties|length %}

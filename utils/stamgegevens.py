@@ -3,7 +3,7 @@ from typing import Type
 from flask import abort
 from extensions import db
 from models.registration import Registration
-from models.agenda import AgendaItem
+from models.agenda import AgendaItem, agenda_item_deelnemers
 from utils.tenant import filter_op_organisatie
 
 
@@ -11,19 +11,43 @@ def get_usage_counts(model: Type[db.Model], org_id: int) -> dict[int, int]:
     """Bereken efficiënt de gebruikstellingen voor stamgegevens in 1 query."""
     name = model.__name__
     if name == 'AgeCategory':
-        return dict(
+        reg_counts = dict(
             db.session.query(Registration.leeftijdscategorie_id, db.func.count(Registration.id))
             .filter_by(organisatie_id=org_id)
             .group_by(Registration.leeftijdscategorie_id)
             .all()
         )
+        from models.deelnemer import Deelnemer
+        dn_counts = dict(
+            db.session.query(Deelnemer.leeftijdscategorie_id, db.func.count(Deelnemer.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Deelnemer.leeftijdscategorie_id)
+            .all()
+        )
+        usage = {}
+        for k in set(list(reg_counts.keys()) + list(dn_counts.keys())):
+            if k is not None:
+                usage[k] = reg_counts.get(k, 0) + dn_counts.get(k, 0)
+        return usage
     if name == 'Device':
-        return dict(
+        reg_counts = dict(
             db.session.query(Registration.toestel_id, db.func.count(Registration.id))
             .filter_by(organisatie_id=org_id)
             .group_by(Registration.toestel_id)
             .all()
         )
+        from models.deelnemer import Deelnemer
+        dn_counts = dict(
+            db.session.query(Deelnemer.toestel_id, db.func.count(Deelnemer.id))
+            .filter_by(organisatie_id=org_id)
+            .group_by(Deelnemer.toestel_id)
+            .all()
+        )
+        usage = {}
+        for k in set(list(reg_counts.keys()) + list(dn_counts.keys())):
+            if k is not None:
+                usage[k] = reg_counts.get(k, 0) + dn_counts.get(k, 0)
+        return usage
     if name == 'Herkomst':
         return dict(
             db.session.query(Registration.herkomst_id, db.func.count(Registration.id))
@@ -74,6 +98,14 @@ def get_usage_counts(model: Type[db.Model], org_id: int) -> dict[int, int]:
             db.session.query(Registration.resultaat_id, db.func.count(Registration.id))
             .filter_by(organisatie_id=org_id)
             .group_by(Registration.resultaat_id)
+            .all()
+        )
+    if name == 'Deelnemer':
+        return dict(
+            db.session.query(agenda_item_deelnemers.c.deelnemer_id, db.func.count(agenda_item_deelnemers.c.agenda_item_id))
+            .join(AgendaItem, AgendaItem.id == agenda_item_deelnemers.c.agenda_item_id)
+            .filter(AgendaItem.organisatie_id == org_id)
+            .group_by(agenda_item_deelnemers.c.deelnemer_id)
             .all()
         )
     return {}

@@ -45,6 +45,7 @@ scripts/*
 !scripts/restore_productie_backup.py
 !scripts/switch_schema.py
 !scripts/sync_productie_naar_lokaal.py
+!scripts/update_docs.py
 
 # Sonar issues export
 sonar_issues/

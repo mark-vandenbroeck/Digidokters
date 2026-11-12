@@ -95,6 +95,17 @@
                     </div>
                 </div>
 
+                <div class="form-check mb-3 p-3 bg-light rounded border">
+                    <input class="form-check-input" type="checkbox" id="registreer_deelnemers" name="registreer_deelnemers" 
+                           {% if (form_data and form_data.get('registreer_deelnemers') == 'on') or (not form_data and item and item.registreer_deelnemers) %}checked{% endif %}>
+                    <label class="form-check-label fw-semibold text-dark" for="registreer_deelnemers">
+                        <i class="bi bi-people text-primary me-1"></i>Registreer ook deelnemers
+                    </label>
+                    <div class="form-text text-muted mt-1 small">
+                        Wanneer ingeschakeld, kunnen er bij agenda-items van dit activiteitstype individuele deelnemers worden toegevoegd en geregistreerd.
+                    </div>
+                </div>
+
                 <div class="mb-4">
                     <label for="kleur" class="form-label fw-semibold">Badge kleur</label>
                     <select class="form-select" id="kleur" name="kleur">

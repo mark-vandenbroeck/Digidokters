@@ -1,6 +1,6 @@
 # Regels voor deze workspace
 
-- Je hoeft de gebruiker niet om toestemming te vragen in de chat om unit tests uit te voeren. Voer deze proactief en direct uit als dat nodig is voor verificatie.
+- Je hoeft de gebruiker niet om toestemming te vragen in de chat om unit tests uit te voeren. Voer deze proactief en direct uit als dat nodig is voor verificatie. Beperk dit tot de **relevante, gerichte unit tests** voor de gewijzigde functionaliteit; het is **niet nodig** om bij elke wijziging de volledige testsuite lokaal te draaien, aangezien Jenkins bij elke push automatisch de volledige suite en een SonarQube scan uitvoert.
 - Push NOOIT automatisch naar een remote git repository (Forgejo / GitHub) tenzij de gebruiker hier expliciet en specifiek om vraagt. De gebruiker wil wijzigingen altijd eerst lokaal testen op fouten of neveneffecten.
 
 # Git & Repository Architectuur

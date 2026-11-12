@@ -984,8 +984,14 @@ def leeftijdscategorie_verwijderen(item_id):
         abort(403)
 
     count = Registration.query.filter_by(leeftijdscategorie_id=item.id).count()
-    if count > 0:
-        flash(f'Leeftijdscategorie "{item.naam}" kan niet worden verwijderd omdat er nog {count} registratie(s) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+    dn_count = Deelnemer.query.filter_by(leeftijdscategorie_id=item.id).count()
+    if count > 0 or dn_count > 0:
+        details = []
+        if count > 0:
+            details.append(f"{count} registratie(s)")
+        if dn_count > 0:
+            details.append(f"{dn_count} deelnemer(s)")
+        flash(f'Leeftijdscategorie "{item.naam}" kan niet worden verwijderd omdat er nog {" en ".join(details)} aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
         return redirect(url_for('admin.leeftijdscategorieën'))
 
     naam = item.naam
@@ -1102,8 +1108,14 @@ def toestel_verwijderen(item_id):
         abort(403)
 
     count = Registration.query.filter_by(toestel_id=item.id).count()
-    if count > 0:
-        flash(f'Toestel "{item.naam}" kan niet worden verwijderd omdat er nog {count} registratie(s) aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
+    dn_count = Deelnemer.query.filter_by(toestel_id=item.id).count()
+    if count > 0 or dn_count > 0:
+        details = []
+        if count > 0:
+            details.append(f"{count} registratie(s)")
+        if dn_count > 0:
+            details.append(f"{dn_count} deelnemer(s)")
+        flash(f'Toestel "{item.naam}" kan niet worden verwijderd omdat er nog {" en ".join(details)} aan gekoppeld zijn. U kunt de status wel op gedeactiveerd zetten.', 'warning')
         return redirect(url_for('admin.toestellen'))
 
     naam = item.naam
@@ -2429,14 +2441,22 @@ def deelnemers():
         status_filter = 'alle'
     zoekterm = request.args.get('q', '').strip()
 
-    query = filter_op_organisatie(Deelnemer.query, Deelnemer)
+    query = filter_op_organisatie(Deelnemer.query, Deelnemer).options(
+        db.joinedload(Deelnemer.leeftijdscategorie),
+        db.joinedload(Deelnemer.toestel)
+    )
     if status_filter == 'actief':
         query = query.filter(Deelnemer.actief == True)
     elif status_filter == 'inactief':
         query = query.filter(Deelnemer.actief == False)
 
     if zoekterm:
-        query = query.filter(Deelnemer.naam.ilike(f'%{zoekterm}%'))
+        query = query.filter(
+            db.or_(
+                Deelnemer.naam.ilike(f'%{zoekterm}%'),
+                Deelnemer.postcode.ilike(f'%{zoekterm}%')
+            )
+        )
 
     items = query.order_by(Deelnemer.naam.asc()).all()
     usage_counts = get_usage_counts(Deelnemer, org_id)
@@ -2450,26 +2470,45 @@ def deelnemer_nieuw():
     from utils.tenant import get_huidige_organisatie_id, set_organisatie_id_op_model
     org_id = get_huidige_organisatie_id()
 
+    leeftijdscategorieën = AgeCategory.query.filter_by(organisatie_id=org_id, actief=True).order_by(AgeCategory.volgorde, AgeCategory.naam).all()
+    toestellen = Device.query.filter_by(organisatie_id=org_id, actief=True).order_by(Device.volgorde, Device.naam).all()
+
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
+        postcode = request.form.get('postcode', '').strip() or None
+        leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', type=int) or None
+        toestel_id = request.form.get('toestel_id', type=int) or None
+
         if not naam:
             flash('Naam is verplicht.', 'danger')
-            return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, form_data=request.form, terug_url=url_for('admin.deelnemers'))
+            return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, form_data=request.form, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
 
         existing = Deelnemer.query.filter_by(organisatie_id=org_id, naam=naam).first()
         if existing:
             flash(f'Er bestaat al een deelnemer met de naam "{naam}".', 'danger')
-            return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, form_data=request.form, terug_url=url_for('admin.deelnemers'))
+            return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, form_data=request.form, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
+
+        if leeftijdscategorie_id:
+            lc = db.session.get(AgeCategory, leeftijdscategorie_id)
+            if not lc or lc.organisatie_id != org_id:
+                flash('Ongeldige leeftijdscategorie geselecteerd.', 'danger')
+                return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, form_data=request.form, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
+
+        if toestel_id:
+            dev = db.session.get(Device, toestel_id)
+            if not dev or dev.organisatie_id != org_id:
+                flash('Ongeldig toestel geselecteerd.', 'danger')
+                return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, form_data=request.form, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
 
         actief = request.form.get('actief') == 'on' if 'actief' in request.form else True
-        item = Deelnemer(naam=naam, actief=actief)
+        item = Deelnemer(naam=naam, postcode=postcode, leeftijdscategorie_id=leeftijdscategorie_id, toestel_id=toestel_id, actief=actief)
         set_organisatie_id_op_model(item)
         db.session.add(item)
         db.session.commit()
         flash(f'Deelnemer {naam} succesvol toegevoegd.', 'success')
         return redirect(url_for('admin.deelnemers'))
 
-    return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, terug_url=url_for('admin.deelnemers'))
+    return render_template('admin/deelnemer_form.html', actie='Nieuwe', item=None, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
 
 
 @admin_bp.route('/deelnemers/<int:item_id>/wijzig', methods=['GET', 'POST'])
@@ -2484,24 +2523,53 @@ def deelnemer_wijzigen(item_id):
     if item.organisatie_id != org_id:
         abort(403)
 
+    leeftijdscategorieën = AgeCategory.query.filter(
+        AgeCategory.organisatie_id == org_id,
+        db.or_(AgeCategory.actief == True, AgeCategory.id == item.leeftijdscategorie_id)
+    ).order_by(AgeCategory.volgorde, AgeCategory.naam).all()
+
+    toestellen = Device.query.filter(
+        Device.organisatie_id == org_id,
+        db.or_(Device.actief == True, Device.id == item.toestel_id)
+    ).order_by(Device.volgorde, Device.naam).all()
+
     if request.method == 'POST':
         naam = request.form.get('naam', '').strip()
+        postcode = request.form.get('postcode', '').strip() or None
+        leeftijdscategorie_id = request.form.get('leeftijdscategorie_id', type=int) or None
+        toestel_id = request.form.get('toestel_id', type=int) or None
+
         if not naam:
             flash('Naam is verplicht.', 'danger')
-            return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, form_data=request.form, terug_url=url_for('admin.deelnemers'))
+            return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, form_data=request.form, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
 
         existing = Deelnemer.query.filter(Deelnemer.organisatie_id == org_id, Deelnemer.naam == naam, Deelnemer.id != item_id).first()
         if existing:
             flash(f'Er bestaat al een andere deelnemer met de naam "{naam}".', 'danger')
-            return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, form_data=request.form, terug_url=url_for('admin.deelnemers'))
+            return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, form_data=request.form, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
+
+        if leeftijdscategorie_id:
+            lc = db.session.get(AgeCategory, leeftijdscategorie_id)
+            if not lc or lc.organisatie_id != org_id:
+                flash('Ongeldige leeftijdscategorie geselecteerd.', 'danger')
+                return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, form_data=request.form, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
+
+        if toestel_id:
+            dev = db.session.get(Device, toestel_id)
+            if not dev or dev.organisatie_id != org_id:
+                flash('Ongeldig toestel geselecteerd.', 'danger')
+                return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, form_data=request.form, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
 
         item.naam = naam
+        item.postcode = postcode
+        item.leeftijdscategorie_id = leeftijdscategorie_id
+        item.toestel_id = toestel_id
         item.actief = request.form.get('actief') == 'on'
         db.session.commit()
         flash(f'Deelnemer {item.naam} bijgewerkt.', 'success')
         return redirect(url_for('admin.deelnemers'))
 
-    return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, terug_url=url_for('admin.deelnemers'))
+    return render_template('admin/deelnemer_form.html', actie='Wijzigen', item=item, terug_url=url_for('admin.deelnemers'), leeftijdscategorieën=leeftijdscategorieën, toestellen=toestellen)
 
 
 @admin_bp.route('/deelnemers/<int:item_id>/toggle')
@@ -2554,24 +2622,64 @@ def deelnemer_snel_toevoegen():
     from flask import jsonify
     org_id = get_huidige_organisatie_id()
 
-    naam = (request.json.get('naam') if request.is_json else request.form.get('naam')) or ''
-    naam = naam.strip()
+    payload = request.json if request.is_json else request.form
+    naam = (payload.get('naam') or '').strip()
     if not naam:
         return jsonify({'success': False, 'error': 'Naam is verplicht'}), 400
+
+    postcode = (payload.get('postcode') or '').strip() or None
+    leeftijdscategorie_id = payload.get('leeftijdscategorie_id')
+    try:
+        leeftijdscategorie_id = int(leeftijdscategorie_id) if leeftijdscategorie_id else None
+    except (ValueError, TypeError):
+        leeftijdscategorie_id = None
+
+    toestel_id = payload.get('toestel_id')
+    try:
+        toestel_id = int(toestel_id) if toestel_id else None
+    except (ValueError, TypeError):
+        toestel_id = None
+
+    if leeftijdscategorie_id:
+        lc = db.session.get(AgeCategory, leeftijdscategorie_id)
+        if not lc or lc.organisatie_id != org_id:
+            leeftijdscategorie_id = None
+
+    if toestel_id:
+        dev = db.session.get(Device, toestel_id)
+        if not dev or dev.organisatie_id != org_id:
+            toestel_id = None
 
     existing = Deelnemer.query.filter_by(organisatie_id=org_id, naam=naam).first()
     if existing:
         if not existing.actief:
             existing.actief = True
-            db.session.commit()
+        if postcode and not existing.postcode:
+            existing.postcode = postcode
+        if leeftijdscategorie_id and not existing.leeftijdscategorie_id:
+            existing.leeftijdscategorie_id = leeftijdscategorie_id
+        if toestel_id and not existing.toestel_id:
+            existing.toestel_id = toestel_id
+        db.session.commit()
         return jsonify({
             'success': True,
             'id': existing.id,
             'naam': existing.naam,
+            'postcode': existing.postcode or '',
+            'leeftijdscategorie_id': existing.leeftijdscategorie_id,
+            'leeftijdscategorie': existing.effectieve_leeftijdscategorie or '',
+            'toestel_id': existing.toestel_id,
+            'toestel': existing.effectief_toestel or '',
             'bestaand': True
         })
 
-    nieuw = Deelnemer(naam=naam, actief=True)
+    nieuw = Deelnemer(
+        naam=naam,
+        postcode=postcode,
+        leeftijdscategorie_id=leeftijdscategorie_id,
+        toestel_id=toestel_id,
+        actief=True
+    )
     set_organisatie_id_op_model(nieuw)
     db.session.add(nieuw)
     db.session.commit()
@@ -2580,6 +2688,11 @@ def deelnemer_snel_toevoegen():
         'success': True,
         'id': nieuw.id,
         'naam': nieuw.naam,
+        'postcode': nieuw.postcode or '',
+        'leeftijdscategorie_id': nieuw.leeftijdscategorie_id,
+        'leeftijdscategorie': nieuw.effectieve_leeftijdscategorie or '',
+        'toestel_id': nieuw.toestel_id,
+        'toestel': nieuw.effectief_toestel or '',
         'bestaand': False
     }), 201
 
@@ -2587,7 +2700,7 @@ def deelnemer_snel_toevoegen():
 @admin_bp.route('/deelnemers/api/<int:item_id>/wijzig_ajax', methods=['POST'])
 @login_required
 def deelnemer_wijzig_ajax(item_id):
-    """Snelle endpoint om vanuit de agenda widget een deelnemer te hernoemen."""
+    """Snelle endpoint om vanuit de agenda widget een deelnemer te bewerken."""
     from utils.tenant import get_huidige_organisatie_id
     from flask import jsonify
     org_id = get_huidige_organisatie_id()
@@ -2596,8 +2709,8 @@ def deelnemer_wijzig_ajax(item_id):
     if item.organisatie_id != org_id:
         return jsonify({'success': False, 'error': 'Geen toegang'}), 403
 
-    naam = (request.json.get('naam') if request.is_json else request.form.get('naam')) or ''
-    naam = naam.strip()
+    payload = request.json if request.is_json else request.form
+    naam = (payload.get('naam') or '').strip()
     if not naam:
         return jsonify({'success': False, 'error': 'Naam is verplicht'}), 400
 
@@ -2606,12 +2719,49 @@ def deelnemer_wijzig_ajax(item_id):
         return jsonify({'success': False, 'error': f'Er bestaat al een andere deelnemer met de naam "{naam}".'}), 400
 
     item.naam = naam
+
+    if 'postcode' in payload:
+        item.postcode = (payload.get('postcode') or '').strip() or None
+
+    if 'leeftijdscategorie_id' in payload:
+        try:
+            lc_id = int(payload.get('leeftijdscategorie_id')) if payload.get('leeftijdscategorie_id') else None
+        except (ValueError, TypeError):
+            lc_id = None
+        if lc_id:
+            lc = db.session.get(AgeCategory, lc_id)
+            if lc and lc.organisatie_id == org_id:
+                item.leeftijdscategorie_id = lc_id
+            else:
+                item.leeftijdscategorie_id = None
+        else:
+            item.leeftijdscategorie_id = None
+
+    if 'toestel_id' in payload:
+        try:
+            t_id = int(payload.get('toestel_id')) if payload.get('toestel_id') else None
+        except (ValueError, TypeError):
+            t_id = None
+        if t_id:
+            dev = db.session.get(Device, t_id)
+            if dev and dev.organisatie_id == org_id:
+                item.toestel_id = t_id
+            else:
+                item.toestel_id = None
+        else:
+            item.toestel_id = None
+
     db.session.commit()
 
     return jsonify({
         'success': True,
         'id': item.id,
-        'naam': item.naam
+        'naam': item.naam,
+        'postcode': item.postcode or '',
+        'leeftijdscategorie_id': item.leeftijdscategorie_id,
+        'leeftijdscategorie': item.effectieve_leeftijdscategorie or '',
+        'toestel_id': item.toestel_id,
+        'toestel': item.effectief_toestel or ''
     })
 
 
@@ -2622,11 +2772,27 @@ def deelnemers_api_zoeken():
     from utils.tenant import filter_op_organisatie
     from flask import jsonify
     q = request.args.get('q', '').strip()
-    query = filter_op_organisatie(Deelnemer.query.filter_by(actief=True), Deelnemer)
+    query = filter_op_organisatie(Deelnemer.query.filter_by(actief=True), Deelnemer).options(
+        db.joinedload(Deelnemer.leeftijdscategorie),
+        db.joinedload(Deelnemer.toestel)
+    )
     if q:
-        query = query.filter(Deelnemer.naam.ilike(f'%{q}%'))
+        query = query.filter(
+            db.or_(
+                Deelnemer.naam.ilike(f'%{q}%'),
+                Deelnemer.postcode.ilike(f'%{q}%')
+            )
+        )
     deelnemers = query.order_by(Deelnemer.naam.asc()).limit(30).all()
     return jsonify([
-        {'id': d.id, 'naam': d.naam}
+        {
+            'id': d.id,
+            'naam': d.naam,
+            'postcode': d.postcode or '',
+            'leeftijdscategorie_id': d.leeftijdscategorie_id,
+            'leeftijdscategorie': d.effectieve_leeftijdscategorie or '',
+            'toestel_id': d.toestel_id,
+            'toestel': d.effectief_toestel or ''
+        }
         for d in deelnemers
     ])

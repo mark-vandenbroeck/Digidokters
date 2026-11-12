@@ -5,6 +5,8 @@ from models.agenda import AgendaItem
 from models.activity_type import ActivityType
 from models.location import Location
 from models.deelnemer import Deelnemer
+from models.age_category import AgeCategory
+from models.device import Device
 from models.organisatie import Organisatie, UserOrganisatie
 from models.user import User
 from utils.stamgegevens import get_usage_counts
@@ -780,4 +782,203 @@ class TestDeelnemers(BaseTestCase):
         self.assertIsNotNone(restored)
         self.assertEqual(restored.max_deelnemers, 8)
         self.assertEqual(len(restored.deelnemers), 1)
+
+    def test_deelnemer_extra_velden_model_en_properties(self):
+        """Test model velden (postcode, leeftijdscategorie, toestel) en fallback/effectieve properties."""
+        dn = Deelnemer(
+            naam="Clara Peeters",
+            postcode="1840",
+            leeftijdscategorie_id=self.age_category.id,
+            toestel_id=self.device.id,
+            organisatie_id=self.org.id
+        )
+        db.session.add(dn)
+        db.session.commit()
+
+        self.assertEqual(dn.postcode, "1840")
+        self.assertEqual(dn.leeftijdscategorie.naam, self.age_category.naam)
+        self.assertEqual(dn.toestel.naam, self.device.naam)
+        self.assertEqual(dn.effectieve_leeftijdscategorie, self.age_category.naam)
+        self.assertEqual(dn.effectief_toestel, self.device.naam)
+
+        # Inactief met mapping
+        inactieve_cat = AgeCategory(
+            naam="Oude Categorie",
+            actief=False,
+            mapped_to_id=self.age_category.id,
+            organisatie_id=self.org.id
+        )
+        db.session.add(inactieve_cat)
+        db.session.commit()
+
+        dn.leeftijdscategorie_id = inactieve_cat.id
+        db.session.commit()
+        # Effectieve naam moet wijzen naar actieve vervanger
+        self.assertEqual(dn.effectieve_leeftijdscategorie, self.age_category.naam)
+
+    def test_deelnemer_crud_met_postcode_en_lovs(self):
+        """Test beheer CRUD voor deelnemers met postcode, leeftijdscategorie en toestel."""
+        self.login_admin()
+
+        # 1. Nieuwe deelnemer aanmaken
+        res = self.client.post('/beheer/deelnemers/nieuw', data={
+            'naam': 'Charlotte Test',
+            'postcode': '1840',
+            'leeftijdscategorie_id': str(self.age_category.id),
+            'toestel_id': str(self.device.id),
+            'actief': 'on'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        dn = Deelnemer.query.filter_by(organisatie_id=self.org.id, naam='Charlotte Test').first()
+        self.assertIsNotNone(dn)
+        self.assertEqual(dn.postcode, '1840')
+        self.assertEqual(dn.leeftijdscategorie_id, self.age_category.id)
+        self.assertEqual(dn.toestel_id, self.device.id)
+
+        # 2. Validatie cross-tenant: id van een andere organisatie mag niet geaccepteerd worden
+        cat_org2 = AgeCategory(naam="65+ Org2", organisatie_id=self.org2.id, actief=True)
+        db.session.add(cat_org2)
+        db.session.commit()
+
+        res_invalid = self.client.post('/beheer/deelnemers/nieuw', data={
+            'naam': 'Vreemde Deelnemer',
+            'postcode': '9000',
+            'leeftijdscategorie_id': str(cat_org2.id),
+            'toestel_id': '',
+            'actief': 'on'
+        }, follow_redirects=True)
+        self.assertEqual(res_invalid.status_code, 200)
+        self.assertIn('Ongeldige leeftijdscategorie geselecteerd', res_invalid.data.decode('utf-8'))
+        self.assertIsNone(Deelnemer.query.filter_by(organisatie_id=self.org.id, naam='Vreemde Deelnemer').first())
+
+        # 3. Zoeken op postcode in deelnemersoverzicht
+        res_search = self.client.get('/beheer/deelnemers?q=1840')
+        self.assertEqual(res_search.status_code, 200)
+        content = res_search.data.decode('utf-8')
+        self.assertIn('Charlotte Test', content)
+        self.assertIn('1840', content)
+
+        # 4. Deelnemer wijzigen (postcode updaten, toestel leegmaken)
+        res_edit = self.client.post(f'/beheer/deelnemers/{dn.id}/wijzig', data={
+            'naam': 'Charlotte Test',
+            'postcode': '9200',
+            'leeftijdscategorie_id': str(self.age_category.id),
+            'toestel_id': '',
+            'actief': 'on'
+        }, follow_redirects=True)
+        self.assertEqual(res_edit.status_code, 200)
+
+        db.session.refresh(dn)
+        self.assertEqual(dn.postcode, '9200')
+        self.assertIsNone(dn.toestel_id)
+
+    def test_deelnemer_ajax_en_api_endpoints_met_extra_velden(self):
+        """Test snel-toevoegen, wijzig-ajax en de zoek API met de nieuwe velden."""
+        self.login_admin()
+
+        # 1. Snel toevoegen via AJAX
+        res = self.client.post('/beheer/deelnemers/api/snel-toevoegen', json={
+            'naam': 'Snel Deelnemer',
+            'postcode': '2800',
+            'leeftijdscategorie_id': self.age_category.id,
+            'toestel_id': self.device.id
+        })
+        self.assertEqual(res.status_code, 201)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['naam'], 'Snel Deelnemer')
+        self.assertEqual(data['postcode'], '2800')
+        self.assertEqual(data['leeftijdscategorie'], self.age_category.naam)
+        self.assertEqual(data['toestel'], self.device.naam)
+
+        dn_id = data['id']
+
+        # 2. Wijzig via AJAX
+        res_edit = self.client.post(f'/beheer/deelnemers/api/{dn_id}/wijzig_ajax', json={
+            'naam': 'Snel Gewijzigd',
+            'postcode': '2801',
+            'leeftijdscategorie_id': '',
+            'toestel_id': ''
+        })
+        self.assertEqual(res_edit.status_code, 200)
+        data_edit = res_edit.get_json()
+        self.assertTrue(data_edit['success'])
+        self.assertEqual(data_edit['naam'], 'Snel Gewijzigd')
+        self.assertEqual(data_edit['postcode'], '2801')
+        self.assertEqual(data_edit['leeftijdscategorie'], '')
+        self.assertEqual(data_edit['toestel'], '')
+
+        # 3. Zoek API
+        res_search = self.client.get('/beheer/deelnemers/api/zoeken?q=Gewijzigd')
+        self.assertEqual(res_search.status_code, 200)
+        results = res_search.get_json()
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['id'], dn_id)
+        self.assertEqual(results[0]['naam'], 'Snel Gewijzigd')
+        self.assertEqual(results[0]['postcode'], '2801')
+        self.assertEqual(results[0]['leeftijdscategorie'], '')
+        self.assertEqual(results[0]['toestel'], '')
+
+    def test_stamgegevens_verwijderen_blokkeert_bij_deelnemer(self):
+        """Test dat leeftijdscategorie of toestel niet verwijderd kan worden als er deelnemers aan gekoppeld zijn."""
+        self.login_admin()
+
+        # Koppel aan deelnemer1
+        self.deelnemer1.leeftijdscategorie_id = self.age_category.id
+        self.deelnemer1.toestel_id = self.device.id
+        db.session.commit()
+
+        # Check get_usage_counts
+        cat_counts = get_usage_counts(AgeCategory, self.org.id)
+        dev_counts = get_usage_counts(Device, self.org.id)
+        self.assertGreaterEqual(cat_counts.get(self.age_category.id, 0), 1)
+        self.assertGreaterEqual(dev_counts.get(self.device.id, 0), 1)
+
+        # Probeer leeftijdscategorie te verwijderen
+        res_cat = self.client.post(f'/beheer/leeftijdscategorieën/{self.age_category.id}/verwijderen', follow_redirects=True)
+        self.assertEqual(res_cat.status_code, 200)
+        self.assertIn('kan niet worden verwijderd omdat er nog', res_cat.data.decode('utf-8'))
+        self.assertIn('deelnemer(s)', res_cat.data.decode('utf-8'))
+        self.assertIsNotNone(db.session.get(AgeCategory, self.age_category.id))
+
+        # Probeer toestel te verwijderen
+        res_dev = self.client.post(f'/beheer/toestellen/{self.device.id}/verwijderen', follow_redirects=True)
+        self.assertEqual(res_dev.status_code, 200)
+        self.assertIn('kan niet worden verwijderd omdat er nog', res_dev.data.decode('utf-8'))
+        self.assertIn('deelnemer(s)', res_dev.data.decode('utf-8'))
+        self.assertIsNotNone(db.session.get(Device, self.device.id))
+
+    def test_backup_restore_deelnemers_extra_velden(self):
+        """Test dat backup export en restore postcode, leeftijdscategorie en toestel correct bewaart voor deelnemers."""
+        dn = Deelnemer(
+            naam="Backup Deelnemer Extra",
+            postcode="1840",
+            leeftijdscategorie_id=self.age_category.id,
+            toestel_id=self.device.id,
+            organisatie_id=self.org.id
+        )
+        db.session.add(dn)
+        db.session.commit()
+
+        # Export backup
+        backup_dict = maak_backup(self.org.id)
+        deelnemers_data = backup_dict.get('deelnemers', [])
+        test_dn_data = next((d for d in deelnemers_data if d['naam'] == 'Backup Deelnemer Extra'), None)
+        self.assertIsNotNone(test_dn_data)
+        self.assertEqual(test_dn_data.get('postcode'), '1840')
+        self.assertEqual(test_dn_data.get('leeftijdscategorie'), self.age_category.naam)
+        self.assertEqual(test_dn_data.get('toestel'), self.device.naam)
+
+        # Restore test
+        json_data = json.dumps(backup_dict).encode('utf-8')
+        success, msg = herstel_backup(self.org.id, io.BytesIO(json_data), self.admin_user.id)
+        self.assertTrue(success, msg)
+
+        restored_dn = Deelnemer.query.filter_by(omschrijving="Backup Deelnemer Extra", organisatie_id=self.org.id).first() if hasattr(Deelnemer, 'omschrijving') else Deelnemer.query.filter_by(naam="Backup Deelnemer Extra", organisatie_id=self.org.id).first()
+        self.assertIsNotNone(restored_dn)
+        self.assertEqual(restored_dn.postcode, '1840')
+        self.assertEqual(restored_dn.leeftijdscategorie_id, self.age_category.id)
+        self.assertEqual(restored_dn.toestel_id, self.device.id)
+
 

@@ -114,20 +114,44 @@
                     {% for did in request.form.getlist('deelnemer_ids') %}
                         {% for dn in beschikbare_deelnemers %}
                             {% if dn.id|string == did|string %}
-                                {% set _ = init_deelnemers.append({'id': dn.id, 'naam': dn.naam}) %}
+                                {% set _ = init_deelnemers.append({
+                                    'id': dn.id,
+                                    'naam': dn.naam,
+                                    'postcode': dn.postcode or '',
+                                    'leeftijdscategorie_id': dn.leeftijdscategorie_id or '',
+                                    'leeftijdscategorie': dn.effectieve_leeftijdscategorie or '',
+                                    'toestel_id': dn.toestel_id or '',
+                                    'toestel': dn.effectief_toestel or ''
+                                }) %}
                             {% endif %}
                         {% endfor %}
                     {% endfor %}
                 {% elif item and item.deelnemers %}
                     {% for dn in item.deelnemers %}
-                        {% set _ = init_deelnemers.append({'id': dn.id, 'naam': dn.naam}) %}
+                        {% set _ = init_deelnemers.append({
+                            'id': dn.id,
+                            'naam': dn.naam,
+                            'postcode': dn.postcode or '',
+                            'leeftijdscategorie_id': dn.leeftijdscategorie_id or '',
+                            'leeftijdscategorie': dn.effectieve_leeftijdscategorie or '',
+                            'toestel_id': dn.toestel_id or '',
+                            'toestel': dn.effectief_toestel or ''
+                        }) %}
                     {% endfor %}
                 {% endif %}
 
                 {% set alle_dn_list = [] %}
                 {% if beschikbare_deelnemers %}
                     {% for dn in beschikbare_deelnemers %}
-                        {% set _ = alle_dn_list.append({'id': dn.id, 'naam': dn.naam}) %}
+                        {% set _ = alle_dn_list.append({
+                            'id': dn.id,
+                            'naam': dn.naam,
+                            'postcode': dn.postcode or '',
+                            'leeftijdscategorie_id': dn.leeftijdscategorie_id or '',
+                            'leeftijdscategorie': dn.effectieve_leeftijdscategorie or '',
+                            'toestel_id': dn.toestel_id or '',
+                            'toestel': dn.effectief_toestel or ''
+                        }) %}
                     {% endfor %}
                 {% endif %}
 
@@ -376,14 +400,22 @@
                             gekozenDeelnemers.forEach((dn, idx) => {
                                 const rij = document.createElement('div');
                                 rij.className = 'd-flex align-items-center justify-content-between p-2 rounded bg-light border';
+
+                                const pills = [];
+                                if (dn.postcode) pills.push(`<span class="badge bg-white text-dark border small"><i class="bi bi-geo-alt me-1 text-muted"></i>${escapeHtml(dn.postcode)}</span>`);
+                                if (dn.leeftijdscategorie) pills.push(`<span class="badge bg-white text-dark border small">${escapeHtml(dn.leeftijdscategorie)}</span>`);
+                                if (dn.toestel) pills.push(`<span class="badge bg-white text-dark border small"><i class="bi bi-laptop me-1 text-muted"></i>${escapeHtml(dn.toestel)}</span>`);
+                                const pillsHtml = pills.length > 0 ? `<div class="d-flex flex-wrap gap-1 ms-2">${pills.join('')}</div>` : '';
+
                                 rij.innerHTML = `
-                                    <div class="d-flex align-items-center gap-2">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
                                         <span class="badge bg-primary-subtle text-primary rounded-circle px-2 py-1"><i class="bi bi-person"></i></span>
                                         <span class="fw-medium dn-label">${escapeHtml(dn.naam)}</span>
+                                        ${pillsHtml}
                                         <input type="hidden" name="deelnemer_ids" value="${dn.id}">
                                     </div>
                                     <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-outline-secondary py-0 px-2" title="Naam wijzigen" data-action="edit" data-id="${dn.id}" data-idx="${idx}">
+                                        <button type="button" class="btn btn-outline-secondary py-0 px-2" title="Gegevens bewerken" data-action="edit" data-id="${dn.id}" data-idx="${idx}">
                                             <i class="bi bi-pencil small"></i>
                                         </button>
                                         <button type="button" class="btn btn-outline-danger py-0 px-2" title="Verwijderen van deze activiteit" data-action="delete" data-idx="${idx}">
@@ -394,6 +426,187 @@
                                 lijstContainer.appendChild(rij);
                             });
                         }
+                    }
+
+                    // Modal elementen (verplaats naar body om stacking context / greyed-out backdrop issues te vermijden)
+                    const modalDeelnemerEl = document.getElementById('modalDeelnemerGegevens');
+                    if (modalDeelnemerEl && modalDeelnemerEl.parentElement !== document.body) {
+                        document.body.appendChild(modalDeelnemerEl);
+                    }
+                    const modalDeelnemer = modalDeelnemerEl && typeof bootstrap !== 'undefined' ? new bootstrap.Modal(modalDeelnemerEl) : null;
+                    const mdnId = document.getElementById('mdn_id');
+                    const mdnIdx = document.getElementById('mdn_idx');
+                    const mdnIsNieuw = document.getElementById('mdn_is_nieuw');
+                    const mdnNaam = document.getElementById('mdn_naam');
+                    const mdnPostcode = document.getElementById('mdn_postcode');
+                    const mdnLeeftijd = document.getElementById('mdn_leeftijdscategorie');
+                    const mdnToestel = document.getElementById('mdn_toestel');
+                    const mdnError = document.getElementById('mdn_error');
+                    const btnModalOpslaan = document.getElementById('btn_modal_deelnemer_opslaan');
+
+                    [mdnNaam, mdnPostcode].forEach(function(inp) {
+                        if (inp) {
+                            inp.addEventListener('keydown', function(e) {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (btnModalOpslaan) btnModalOpslaan.click();
+                                }
+                            });
+                        }
+                    });
+
+                    function openDeelnemerModalVoorBewerken(id, idx) {
+                        const dn = gekozenDeelnemers[idx];
+                        if (!dn) return;
+
+                        if (!modalDeelnemer) {
+                            const nieuweNaam = prompt('Wijzig naam van deze deelnemer:', dn.naam);
+                            if (nieuweNaam && nieuweNaam.trim() && nieuweNaam.trim() !== dn.naam) {
+                                fetch('/beheer/deelnemers/api/' + id + '/wijzig_ajax', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                                    body: JSON.stringify({ naam: nieuweNaam.trim() })
+                                })
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        dn.naam = data.naam;
+                                        const c = alleDeelnemers.find(d => d.id === id);
+                                        if (c) c.naam = data.naam;
+                                        updateDeelnemersUI();
+                                    }
+                                });
+                            }
+                            return;
+                        }
+
+                        document.getElementById('modalDeelnemerLabel').innerHTML = '<i class="bi bi-pencil me-2 text-primary"></i>Deelnemer bewerken';
+                        mdnId.value = id;
+                        mdnIdx.value = idx;
+                        mdnIsNieuw.value = "0";
+                        mdnNaam.value = dn.naam || '';
+                        mdnPostcode.value = dn.postcode || '';
+                        mdnLeeftijd.value = dn.leeftijdscategorie_id || '';
+                        mdnToestel.value = dn.toestel_id || '';
+                        if (mdnError) { mdnError.style.display = 'none'; mdnError.textContent = ''; }
+                        modalDeelnemer.show();
+                    }
+
+                    function openDeelnemerModalVoorNieuw(voorafNaam) {
+                        const maxVal = getMaxVal();
+                        if (maxVal !== null && gekozenDeelnemers.length >= maxVal) {
+                            alert(`Het maximaal aantal deelnemers (${maxVal}) is bereikt. Verhoog eerst het maximum aantal om extra deelnemers toe te voegen.`);
+                            return;
+                        }
+                        if (!modalDeelnemer) {
+                            voegNieuweDeelnemerToeFallback(voorafNaam);
+                            return;
+                        }
+
+                        document.getElementById('modalDeelnemerLabel').innerHTML = '<i class="bi bi-person-plus-fill me-2 text-primary"></i>Nieuwe deelnemer toevoegen';
+                        mdnId.value = '';
+                        mdnIdx.value = '';
+                        mdnIsNieuw.value = "1";
+                        mdnNaam.value = voorafNaam || '';
+                        mdnPostcode.value = '';
+                        mdnLeeftijd.value = '';
+                        mdnToestel.value = '';
+                        if (mdnError) { mdnError.style.display = 'none'; mdnError.textContent = ''; }
+                        modalDeelnemer.show();
+                    }
+
+                    if (btnModalOpslaan) {
+                        btnModalOpslaan.addEventListener('click', function() {
+                            const naam = (mdnNaam.value || '').trim();
+                            if (!naam) {
+                                if (mdnError) {
+                                    mdnError.textContent = 'Naam is verplicht.';
+                                    mdnError.style.display = 'block';
+                                }
+                                mdnNaam.focus();
+                                return;
+                            }
+
+                            const payload = {
+                                naam: naam,
+                                postcode: (mdnPostcode.value || '').trim(),
+                                leeftijdscategorie_id: mdnLeeftijd.value ? parseInt(mdnLeeftijd.value) : null,
+                                toestel_id: mdnToestel.value ? parseInt(mdnToestel.value) : null
+                            };
+
+                            const isNieuw = mdnIsNieuw.value === "1";
+                            const url = isNieuw 
+                                ? '/beheer/deelnemers/api/snel-toevoegen' 
+                                : '/beheer/deelnemers/api/' + mdnId.value + '/wijzig_ajax';
+
+                            btnModalOpslaan.disabled = true;
+                            fetch(url, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': csrfToken
+                                },
+                                body: JSON.stringify(payload)
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                btnModalOpslaan.disabled = false;
+                                if (data.success) {
+                                    const lcOpt = mdnLeeftijd.selectedOptions[0];
+                                    const lcNaam = lcOpt && lcOpt.value ? lcOpt.textContent.trim() : '';
+                                    const tOpt = mdnToestel.selectedOptions[0];
+                                    const tNaam = tOpt && tOpt.value ? tOpt.textContent.trim() : '';
+
+                                    const dnObj = {
+                                        id: data.id,
+                                        naam: data.naam,
+                                        postcode: data.postcode || '',
+                                        leeftijdscategorie_id: data.leeftijdscategorie_id || null,
+                                        leeftijdscategorie: data.leeftijdscategorie || lcNaam,
+                                        toestel_id: data.toestel_id || null,
+                                        toestel: data.toestel || tNaam
+                                    };
+
+                                    if (isNieuw) {
+                                        const existInAll = alleDeelnemers.find(d => d.id === data.id);
+                                        if (existInAll) {
+                                            Object.assign(existInAll, dnObj);
+                                        } else {
+                                            alleDeelnemers.push(dnObj);
+                                            alleDeelnemers.sort((a, b) => a.naam.localeCompare(b.naam));
+                                        }
+
+                                        if (!gekozenDeelnemers.some(d => d.id === data.id)) {
+                                            gekozenDeelnemers.push(dnObj);
+                                        }
+                                    } else {
+                                        const idx = parseInt(mdnIdx.value);
+                                        if (!isNaN(idx) && gekozenDeelnemers[idx]) {
+                                            Object.assign(gekozenDeelnemers[idx], dnObj);
+                                        }
+                                        const existInAll = alleDeelnemers.find(d => d.id === data.id);
+                                        if (existInAll) Object.assign(existInAll, dnObj);
+                                    }
+
+                                    updateDeelnemersUI();
+                                    if (modalDeelnemer) modalDeelnemer.hide();
+                                    zoekInput.value = '';
+                                    if (lovDropdown) lovDropdown.style.display = 'none';
+                                } else {
+                                    if (mdnError) {
+                                        mdnError.textContent = data.error || 'Er is een fout opgetreden.';
+                                        mdnError.style.display = 'block';
+                                    }
+                                }
+                            })
+                            .catch(() => {
+                                btnModalOpslaan.disabled = false;
+                                if (mdnError) {
+                                    mdnError.textContent = 'Serverfout bij opslaan van deelnemer.';
+                                    mdnError.style.display = 'block';
+                                }
+                            });
+                        });
                     }
 
                     if (lijstContainer) {
@@ -408,31 +621,7 @@
                                 updateDeelnemersUI();
                             } else if (action === 'edit') {
                                 const id = parseInt(btn.getAttribute('data-id'));
-                                const dn = gekozenDeelnemers[idx];
-                                const nieuweNaam = prompt('Wijzig naam van deze deelnemer:', dn.naam);
-                                if (nieuweNaam && nieuweNaam.trim() && nieuweNaam.trim() !== dn.naam) {
-                                    const schoneNaam = nieuweNaam.trim();
-                                    fetch('/beheer/deelnemers/api/' + id + '/wijzig_ajax', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-CSRFToken': csrfToken
-                                        },
-                                        body: JSON.stringify({ naam: schoneNaam })
-                                    })
-                                    .then(res => res.json())
-                                    .then(data => {
-                                        if (data.success) {
-                                            dn.naam = data.naam;
-                                            const cacheItem = alleDeelnemers.find(d => d.id === id);
-                                            if (cacheItem) cacheItem.naam = data.naam;
-                                            updateDeelnemersUI();
-                                        } else {
-                                            alert(data.error || 'Fout bij bijwerken van deelnemer.');
-                                        }
-                                    })
-                                    .catch(() => alert('Fout bij bijwerken van deelnemer.'));
-                                }
+                                openDeelnemerModalVoorBewerken(id, idx);
                             }
                         });
                     }
@@ -447,7 +636,10 @@
                             return;
                         }
 
-                        const matches = alleDeelnemers.filter(d => d.naam.toLowerCase().includes(q));
+                        const matches = alleDeelnemers.filter(d => 
+                            d.naam.toLowerCase().includes(q) || 
+                            (d.postcode && d.postcode.toLowerCase().includes(q))
+                        );
                         const gekozenIds = new Set(gekozenDeelnemers.map(d => d.id));
 
                         matches.slice(0, 10).forEach(m => {
@@ -455,8 +647,15 @@
                             const item = document.createElement('button');
                             item.type = 'button';
                             item.className = 'list-group-item list-group-item-action d-flex align-items-center justify-content-between text-start py-2';
+
+                            const metaParts = [];
+                            if (m.postcode) metaParts.push(escapeHtml(m.postcode));
+                            if (m.leeftijdscategorie) metaParts.push(escapeHtml(m.leeftijdscategorie));
+                            if (m.toestel) metaParts.push(escapeHtml(m.toestel));
+                            const metaStr = metaParts.length > 0 ? `<small class="text-muted ms-2">(${metaParts.join(' • ')})</small>` : '';
+
                             item.innerHTML = `
-                                <span><i class="bi bi-person me-2 text-primary"></i>${escapeHtml(m.naam)}</span>
+                                <span><i class="bi bi-person me-2 text-primary"></i>${escapeHtml(m.naam)}${metaStr}</span>
                                 ${isReedsGekozen ? '<span class="badge bg-secondary-subtle text-secondary small">Reeds toegevoegd</span>' : ''}
                             `;
                             item.addEventListener('click', function() {
@@ -466,7 +665,7 @@
                                         alert(`Het maximaal aantal deelnemers (${maxVal}) is bereikt. Verhoog eerst het maximum aantal om extra deelnemers toe te voegen.`);
                                         return;
                                     }
-                                    gekozenDeelnemers.push({ id: m.id, naam: m.naam });
+                                    gekozenDeelnemers.push(m);
                                     updateDeelnemersUI();
                                 }
                                 zoekInput.value = '';
@@ -480,16 +679,40 @@
                         const nieuweOptie = document.createElement('button');
                         nieuweOptie.type = 'button';
                         nieuweOptie.className = 'list-group-item list-group-item-action list-group-item-primary text-start fw-semibold py-2';
-                        nieuweOptie.innerHTML = `<i class="bi bi-person-plus-fill me-2"></i>"${escapeHtml(zoekInput.value.trim())}" toevoegen als nieuwe deelnemer`;
+                        nieuweOptie.innerHTML = `<i class="bi bi-person-plus-fill me-2"></i>"${escapeHtml(zoekInput.value.trim())}" toevoegen als nieuwe deelnemer...`;
                         nieuweOptie.addEventListener('click', function() {
-                            voegNieuweDeelnemerToe(zoekInput.value.trim());
+                            openDeelnemerModalVoorNieuw(zoekInput.value.trim());
                         });
                         lovDropdown.appendChild(nieuweOptie);
 
                         lovDropdown.style.display = 'block';
                     }
 
-                    function voegNieuweDeelnemerToe(naam) {
+                    if (btnToevoegen) {
+                        btnToevoegen.addEventListener('click', function() {
+                            const val = (zoekInput.value || '').trim();
+                            if (val) {
+                                const match = alleDeelnemers.find(d => d.naam.toLowerCase() === val.toLowerCase());
+                                if (match) {
+                                    if (!gekozenDeelnemers.some(d => d.id === match.id)) {
+                                        const maxVal = getMaxVal();
+                                        if (maxVal !== null && gekozenDeelnemers.length >= maxVal) {
+                                            alert(`Het maximaal aantal deelnemers (${maxVal}) is bereikt.`);
+                                            return;
+                                        }
+                                        gekozenDeelnemers.push(match);
+                                        updateDeelnemersUI();
+                                    }
+                                    zoekInput.value = '';
+                                    if (lovDropdown) lovDropdown.style.display = 'none';
+                                    return;
+                                }
+                            }
+                            openDeelnemerModalVoorNieuw(val);
+                        });
+                    }
+
+                    function voegNieuweDeelnemerToeFallback(naam) {
                         const schoneNaam = (naam || '').trim();
                         if (!schoneNaam) return;
 
@@ -638,5 +861,58 @@
     </div>
 
 </div>
+</div>
+
+<!-- Modal voor Deelnemer Toevoegen / Bewerken (buiten form/card) -->
+<div class="modal fade" id="modalDeelnemerGegevens" tabindex="-1" aria-labelledby="modalDeelnemerLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow border-0">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDeelnemerLabel">
+                    <i class="bi bi-person-gear me-2 text-primary"></i>Deelnemer
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="mdn_id" value="">
+                <input type="hidden" id="mdn_idx" value="">
+                <input type="hidden" id="mdn_is_nieuw" value="0">
+
+                <div class="mb-3">
+                    <label for="mdn_naam" class="form-label fw-semibold">Naam <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="mdn_naam" placeholder="Voornaam en achternaam" required>
+                </div>
+                <div class="mb-3">
+                    <label for="mdn_postcode" class="form-label fw-semibold">Postcode</label>
+                    <input type="text" class="form-control" id="mdn_postcode" placeholder="bv. 1840" maxlength="20">
+                </div>
+                <div class="mb-3">
+                    <label for="mdn_leeftijdscategorie" class="form-label fw-semibold">Leeftijdscategorie</label>
+                    <select class="form-select" id="mdn_leeftijdscategorie">
+                        <option value="">— Geen leeftijdscategorie gekozen —</option>
+                        {% for lc in leeftijdscategorieën %}
+                        <option value="{{ lc.id }}">{{ lc.naam }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="mdn_toestel" class="form-label fw-semibold">Toestel</label>
+                    <select class="form-select" id="mdn_toestel">
+                        <option value="">— Geen toestel gekozen —</option>
+                        {% for t in toestellen %}
+                        <option value="{{ t.id }}">{{ t.naam }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div id="mdn_error" class="alert alert-danger py-2 small mb-0" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
+                <button type="button" class="btn btn-primary" id="btn_modal_deelnemer_opslaan">
+                    <i class="bi bi-check-lg me-1"></i>Opslaan & Toepassen
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

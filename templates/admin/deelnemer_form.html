@@ -20,13 +20,51 @@
             <form method="POST" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                <div class="mb-4">
+                <div class="mb-3">
                     <label for="naam" class="form-label">Naam <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="naam" name="naam"
                            value="{{ form_data.naam if form_data else (item.naam if item else '') }}"
                            placeholder="Voornaam en achternaam" required autofocus>
                     <div class="form-text text-muted small mt-1">
                         De naam waaronder deze deelnemer gekoppeld wordt aan activiteiten.
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="postcode" class="form-label">Postcode</label>
+                    <input type="text" class="form-control" id="postcode" name="postcode"
+                           value="{{ form_data.postcode if form_data and 'postcode' in form_data else (item.postcode if item and item.postcode else '') }}"
+                           placeholder="bv. 1840" maxlength="20">
+                    <div class="form-text text-muted small mt-1">
+                        Postcode van de woonplaats van de deelnemer (optioneel).
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="leeftijdscategorie_id" class="form-label">Leeftijdscategorie</label>
+                    {% set geselecteerde_lc = form_data.leeftijdscategorie_id|int if form_data and form_data.leeftijdscategorie_id else (item.leeftijdscategorie_id if item and item.leeftijdscategorie_id else 0) %}
+                    <select class="form-select" id="leeftijdscategorie_id" name="leeftijdscategorie_id">
+                        <option value="">— Geen leeftijdscategorie gekozen —</option>
+                        {% for lc in leeftijdscategorieën %}
+                        <option value="{{ lc.id }}" {{ 'selected' if lc.id == geselecteerde_lc }}>{{ lc.naam }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text text-muted small mt-1">
+                        Keuzelijst uit de stamgegevens van leeftijdscategorieën (optioneel).
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="toestel_id" class="form-label">Toestel</label>
+                    {% set geselecteerd_toestel = form_data.toestel_id|int if form_data and form_data.toestel_id else (item.toestel_id if item and item.toestel_id else 0) %}
+                    <select class="form-select" id="toestel_id" name="toestel_id">
+                        <option value="">— Geen toestel gekozen —</option>
+                        {% for t in toestellen %}
+                        <option value="{{ t.id }}" {{ 'selected' if t.id == geselecteerd_toestel }}>{{ t.naam }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text text-muted small mt-1">
+                        Keuzelijst uit de stamgegevens van toestellen (optioneel).
                     </div>
                 </div>
 
@@ -54,4 +92,3 @@
 </div>
 </div>
 {% endblock %}
-

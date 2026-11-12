@@ -18,11 +18,18 @@ agenda_bp = Blueprint('agenda', __name__)
 
 def _keuzelijsten():
     """Haal actieve keuzelijsten op voor het agenda-formulier."""
+    from models.age_category import AgeCategory
+    from models.device import Device
     return {
         'types': filter_op_organisatie(ActivityType.query.filter_by(actief=True), ActivityType).order_by(ActivityType.volgorde, ActivityType.naam).all(),
         'locaties': filter_op_organisatie(Location.query.filter_by(actief=True), Location).order_by(Location.volgorde, Location.naam).all(),
         'digidokters': filter_op_organisatie(Digidokter.query.filter_by(actief=True), Digidokter).order_by(Digidokter.volgorde, Digidokter.naam).all(),
-        'beschikbare_deelnemers': filter_op_organisatie(Deelnemer.query.filter_by(actief=True), Deelnemer).order_by(Deelnemer.naam.asc()).all(),
+        'beschikbare_deelnemers': filter_op_organisatie(Deelnemer.query.filter_by(actief=True), Deelnemer).options(
+            db.joinedload(Deelnemer.leeftijdscategorie),
+            db.joinedload(Deelnemer.toestel)
+        ).order_by(Deelnemer.naam.asc()).all(),
+        'leeftijdscategorieën': filter_op_organisatie(AgeCategory.query.filter_by(actief=True), AgeCategory).order_by(AgeCategory.volgorde, AgeCategory.naam).all(),
+        'toestellen': filter_op_organisatie(Device.query.filter_by(actief=True), Device).order_by(Device.volgorde, Device.naam).all(),
     }
 
 @agenda_bp.route('/agenda')

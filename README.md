@@ -45,7 +45,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 18. **App Mappen & App Documenten (`app_mappen`, `app_documenten`):** Centrale, platformbrede documentenopslag gedeeld door alle organisaties (zonder `organisatie_id`).
 19. **Resultaten (`resultaten`):** Keuzelijst met mogelijke uitkomsten/afloop van een consultatie (bijv. 'Vraag beantwoord', 'Bezoeker komt later terug', 'Bezoeker doorverwezen', 'Vraag onmogelijk te beantwoorden', 'Andere') per organisatie, met koppeling via `resultaat_id` op `registrations`.
 20. **Telemetrie & Systeemfoutenlogs (`page_view_stats`, `system_error_logs`):** Geaggregeerde statistieken van pagina- en endpointgebruik per dag en organisatie (`page_view_stats`), en een centraal foutenlogboek (`system_error_logs`) voor HTTP 500-fouten, mislukte inlogpogingen en rate-limit overschrijdingen met stacktraces, IP-adressen en oplosstatus.
-21. **Deelnemers (`deelnemers`, `agenda_item_deelnemers`):** Beheer van geregistreerde deelnemers aan activiteiten per organisatie, gekoppeld aan agenda-items van activiteitstypes met de vlag *"Registreer ook deelnemers"* (`registreer_deelnemers`).
+21. **Deelnemers (`deelnemers`, `agenda_item_deelnemers`):** Beheer van geregistreerde deelnemers aan activiteiten per organisatie met naam, postcode, leeftijdscategorie (FK naar `age_categories.id`) en toestel (FK naar `devices.id`), gekoppeld aan agenda-items van activiteitstypes met de vlag *"Registreer ook deelnemers"* (`registreer_deelnemers`).
 
 ---
 
@@ -73,7 +73,7 @@ Het platform is opgebouwd rond een **shared-database, shared-schema multi-tenant
 *   Uur- en datumfilters (toekomstige vs. voorbije activiteiten tonen).
 *   Sorteerbare kolommen op alle eigenschappen (datum, tijd, locatie, type, etc.).
 *   Aanpasbare status (actief/gedeactiveerd) en badgekleur per activiteitstype (Blauw, Teal, Paars, Oranje) die direct in de agenda-lijst worden getoond.
-*   **Deelnemersregistratie & Capaciteitsbeheer:** Activiteitstypes kunnen gemarkeerd worden met de vlag *"Registreer ook deelnemers"* (`registreer_deelnemers`). Bij agenda-items van dit type kunnen deelnemers worden toegevoegd, gewijzigd of gewist via een realtime gefilterde keuzelijst (List of Values) en een naadloze snelle toevoegfunctie (Enter of klik op *Toevoegen*). Tevens kan een optioneel maximaal aantal deelnemers (`max_deelnemers`) ingesteld worden. Het systeem bewaakt dat de capaciteit niet overschreden wordt en dat het maximum achteraf niet lager ingesteld kan worden dan het aantal reeds ingeschreven deelnemers. In de agendalijst wordt de bezetting (`X / Y deelnemers`) en een `(volzet)` indicatie getoond. Onder Beheer is een volledige CRUD voor deelnemers voorzien.
+*   **Deelnemersregistratie & Capaciteitsbeheer:** Activiteitstypes kunnen gemarkeerd worden met de vlag *"Registreer ook deelnemers"* (`registreer_deelnemers`). Bij agenda-items van dit type kunnen deelnemers worden toegevoegd, gewijzigd of gewist via een realtime gefilterde keuzelijst (List of Values) en een naadloze snelle pop-up modal (inclusief toevoegen via Enter). Per deelnemer worden naam, postcode, leeftijdscategorie (LOV) en toestel (LOV) geregistreerd. Tevens kan een optioneel maximaal aantal deelnemers (`max_deelnemers`) ingesteld worden. Het systeem bewaakt dat de capaciteit niet overschreden wordt en dat het maximum achteraf niet lager ingesteld kan worden dan het aantal reeds ingeschreven deelnemers. In de agendalijst wordt de bezetting (`X / Y deelnemers`) en een `(volzet)` indicatie getoond. Onder Beheer (`/beheer/deelnemers`) is een volledige CRUD voor deelnemers voorzien met zoekfunctie op naam en postcode.
 
 ### 3. Statistieken & Dashboard
 Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
@@ -140,7 +140,8 @@ Gepresenteerd via drie duidelijke tabbladen op de `/statistieken` pagina:
 *   **Referentiecontroles bij wissen:** Stamgegevens kunnen uitsluitend permanent gewist worden als er **geen enkele andere data naar verwijst**:
     *   *Locaties:* Mag niet gewist worden zolang er nog gekoppelde agenda-activiteiten of geregistreerde consultaties zijn.
     *   *Activiteitstypes:* Mag niet gewist worden zolang er gekoppelde agenda-activiteiten of ingevulde evaluaties zijn.
-    *   *Leeftijdscategorieën, Toestellen, Herkomst, Genderidentiteiten & Resultaten:* Mogen niet gewist worden zolang er nog geregistreerde consultaties aan gekoppeld zijn.
+    *   *Leeftijdscategorieën & Toestellen:* Mogen niet gewist worden zolang er nog geregistreerde consultaties óf gekoppelde deelnemers aan verbonden zijn.
+    *   *Herkomst, Genderidentiteiten & Resultaten:* Mogen niet gewist worden zolang er nog geregistreerde consultaties aan gekoppeld zijn.
     *   *Functies:* Mogen niet gewist worden zolang ze nog toegekend zijn aan één of meerdere gebruikers.
 *   **Duidelijke gebruikersfeedback:** Indien een item nog in gebruik is, wordt de verwijderknop automatisch gedeactiveerd met een tooltip die het aantal gekoppelde records vermeldt. Indien ongebruikt, kan het item met één klik en bevestiging definitief worden verwijderd.
 
@@ -356,7 +357,7 @@ Het platform is uitgerust met een geautomatiseerde test-suite van **389 tests** 
 python -m unittest discover -s tests
 ```
 
-### 📋 Overzicht van de Unit Test Suite (389 tests)
+### 📋 Overzicht van de Unit Test Suite (398 tests)
 
 | # | Testbestand | Aantal Tests | Dekkingsgebied / Beschrijving |
 |---|---|:---:|---|
@@ -373,7 +374,7 @@ python -m unittest discover -s tests
 | 11 | `tests/test_communicatie.py` | 18 | Interne & platform communicatie, broadcast e-mails, doelgroepfiltering op groepen, proefmail naar mezelf, JSON-snapshots van ontvangers, modelmethodes & strikte tenant-isolatie |
 | 12 | `tests/test_consultatie_locaties.py` | 7 | Consultatielocaties markeren, sticky sessiekeuze bij balieformulier "Nieuw bezoek" |
 | 13 | `tests/test_decorators_extended.py` | 4 | Toegangsbeheerdecorators (admin_required, actief_required, platform_admin_required, writer_required) inclusief edge cases |
-| 14 | `tests/test_deelnemers.py` | 15 | Deelnemersbeheer CRUD, vlag `registreer_deelnemers` op activiteitstypes, realtime LOV keuzelijst, AJAX snel toevoegen en inline bewerken, capaciteitsbeheer (`max_deelnemers`), validatie tegen overschrijden en verlagen onder ingeschreven deelnemers, agendalijst-indicatoren en backup/restore |
+| 14 | `tests/test_deelnemers.py` | 20 | Deelnemersbeheer CRUD, vlag `registreer_deelnemers` op activiteitstypes, realtime LOV keuzelijst, postcode, leeftijdscategorie (LOV) en toestel (LOV), AJAX snel toevoegen en inline pop-up modal, capaciteitsbeheer (`max_deelnemers`), validatie tegen overschrijden en verlagen onder ingeschreven deelnemers, delete-blokkering van gekoppelde stamgegevens, agendalijst-indicatoren en backup/restore |
 | 15 | `tests/test_digidokter_email.py` | 7 | E-mailvalidatie, duplicatiecontroles en uniekheid voor digidokters |
 | 16 | `tests/test_document_renderer.py` | 31 | In-browser rendering van Word (DOCX/ODT), Excel (XLSX), Markdown, platte tekst en code, paginering, syntax highlighting, sanitization en snippets |
 | 17 | `tests/test_document_search.py` | 3 | Full-text content search binnen documenten (PDF, DOCX, ODT, XLSX, TXT) en context-snippets |

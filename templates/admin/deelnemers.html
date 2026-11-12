@@ -51,6 +51,9 @@
                 <thead>
                     <tr>
                         <th class="ps-3">Naam</th>
+                        <th>Postcode</th>
+                        <th>Leeftijdscategorie</th>
+                        <th>Toestel</th>
                         <th>Status</th>
                         <th>Activiteiten</th>
                         <th>Toegevoegd op</th>
@@ -63,6 +66,27 @@
                         <td class="ps-3 fw-medium">
                             <i class="bi bi-person me-2 text-muted"></i>{{ item.naam }}
                             <span class="text-muted" style="font-size: 0.75rem; opacity: 0.6; font-weight: normal; margin-left: 4px;">#{{ item.id }}</span>
+                        </td>
+                        <td>
+                            {% if item.postcode %}
+                            <span class="badge bg-light text-dark border"><i class="bi bi-geo-alt me-1 text-muted"></i>{{ item.postcode }}</span>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.effectieve_leeftijdscategorie %}
+                            <span class="badge bg-light text-dark border">{{ item.effectieve_leeftijdscategorie }}</span>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.effectief_toestel %}
+                            <span class="badge bg-light text-dark border"><i class="bi bi-laptop me-1 text-muted"></i>{{ item.effectief_toestel }}</span>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if item.actief %}

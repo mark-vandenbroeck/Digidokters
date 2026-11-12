@@ -157,7 +157,13 @@ def maak_backup(org_id: int) -> dict:
     # 6b. Deelnemers
     deelnemers = Deelnemer.query.filter_by(organisatie_id=org_id).order_by(Deelnemer.naam).all()
     deelnemers_data = [
-        {'naam': d.naam, 'actief': d.actief}
+        {
+            'naam': d.naam,
+            'actief': d.actief,
+            'postcode': d.postcode,
+            'leeftijdscategorie': d.leeftijdscategorie.naam if d.leeftijdscategorie else None,
+            'toestel': d.toestel.naam if d.toestel else None
+        }
         for d in deelnemers
     ]
 
@@ -415,9 +421,14 @@ def herstel_backup(org_id: int, file_stream, huidige_user_id: int) -> tuple[bool
             # 5e. Herstel deelnemers
             deelnemers_map = {}
             for d_data in data.get('deelnemers', []):
+                lc_name = d_data.get('leeftijdscategorie')
+                dev_name = d_data.get('toestel')
                 dn = Deelnemer(
                     naam=d_data['naam'],
                     actief=d_data.get('actief', True),
+                    postcode=d_data.get('postcode'),
+                    leeftijdscategorie_id=age_cats_map.get(lc_name) if lc_name else None,
+                    toestel_id=devices_map.get(dev_name) if dev_name else None,
                     organisatie_id=org_id
                 )
                 db.session.add(dn)

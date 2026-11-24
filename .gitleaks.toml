@@ -2,7 +2,7 @@
 useDefault = true
 
 [allowlist]
-description = "Testdata en voorbeelden"
-paths = [
-  '''tests/fixtures/.*''',
-]
+description = "SonarQube project key is geen geheim; oude baseline-rapport"
+paths = ['''gitleaks-baseline\.json''']
+regexTarget = "match"
+regexes = ['''sonar\.projectKey\s*=''']

@@ -28,7 +28,7 @@ pipeline {
         stage('Secret scan') {
             agent {
                 docker {
-                    image 'ghcr.io/gitleaks/gitleaks:v8.21.2'
+                    image 'ghcr.io/gitleaks/gitleaks:v8.30.1'
                     args '--entrypoint= -e HOME=/tmp'
                     reuseNode true
                 }
@@ -40,7 +40,7 @@ pipeline {
                 '''
             }
         }
-        
+
         stage('Install & test') {
             agent {
                 docker {

@@ -1,0 +1,22 @@
+[
+ {
+  "RuleID": "generic-api-key",
+  "Description": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+  "StartLine": 1,
+  "EndLine": 1,
+  "StartColumn": 1,
+  "EndColumn": 61,
+  "Match": "sonar.projectKey=sqp_48702c8f7c999de466ba367a9819112f7034844e",
+  "Secret": "sqp_48702c8f7c999de466ba367a9819112f7034844e",
+  "File": "sonar-projects.properties",
+  "SymlinkFile": "",
+  "Commit": "0fb8fa927366289a07133be9ce75e9d50137ef95",
+  "Entropy": 4.033771,
+  "Author": "Mark Vandenbroeck",
+  "Email": "mark.vandenbroeck@gmail.com",
+  "Date": "2026-09-29T19:32:52Z",
+  "Message": "SnarQube config",
+  "Tags": [],
+  "Fingerprint": "0fb8fa927366289a07133be9ce75e9d50137ef95:sonar-projects.properties:generic-api-key:1"
+ }
+]

@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Testdata en voorbeelden"
+paths = [
+  '''tests/fixtures/.*''',
+]

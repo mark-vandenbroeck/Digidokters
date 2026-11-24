@@ -25,6 +25,22 @@ pipeline {
             }
         }
 
+        stage('Secret scan') {
+            agent {
+                docker {
+                    image 'ghcr.io/gitleaks/gitleaks:v8.21.2'
+                    args '--entrypoint= -e HOME=/tmp'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh '''
+                    git config --global --add safe.directory "$PWD"
+                    gitleaks git --redact --verbose --exit-code 1 .
+                '''
+            }
+        }
+        
         stage('Install & test') {
             agent {
                 docker {

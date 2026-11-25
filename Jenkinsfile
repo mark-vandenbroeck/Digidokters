@@ -78,7 +78,7 @@ pipeline {
                         '''
                     }
                 }
-                stage('Test') {
+                stage('Unit Tests') {
                     steps {
                         sh '''
                             . ${VENV_DIR}/bin/activate

@@ -25,65 +25,70 @@ pipeline {
             }
         }
 
-        stage('Secret scan') {
-            agent {
-                docker {
-                    image 'ghcr.io/gitleaks/gitleaks:v8.30.1'
-                    args '--entrypoint= -e HOME=/tmp'
-                    reuseNode true
-                }
-            }
-            steps {
-                sh '''
-                    git config --global --add safe.directory "$PWD"
-                    gitleaks git --redact --verbose --exit-code 1 .
-                '''
-            }
-        }
-
-        stage('Dependency scan') {
-            agent {
-                docker {
-                    image 'ghcr.io/aquasecurity/trivy:0.76.2'
-                    args '--entrypoint= -e TRIVY_CACHE_DIR=/tmp/trivy-cache -v /var/cache/jenkins-trivy:/tmp/trivy-cache'
-                    reuseNode true
-                }
-            }
-            steps {
-                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                    sh '''
-                        trivy fs --scanners vuln \
-                          --severity HIGH,CRITICAL --ignore-unfixed \
-                          --exit-code 1 --no-progress .
-                    '''
-                }
-            }
-        }
-
-        stage('Install & test') {
-            agent {
-                docker {
-                    image 'python:3.12.4-slim'
-                    args '--memory=2g --memory-swap=2g --cpus=1 -v /tmp/jenkins-pip-cache:/tmp/pip-cache'
-                    reuseNode true
-                }
-            }
-            stages {
-                stage('Install') {
+        stage('Parallel Checks & Tests') {
+            failFast true
+            parallel {
+                stage('Secret scan') {
+                    agent {
+                        docker {
+                            image 'ghcr.io/gitleaks/gitleaks:v8.30.1'
+                            args '--entrypoint= -e HOME=/tmp'
+                            reuseNode true
+                        }
+                    }
                     steps {
                         sh '''
-                            python -m venv ${VENV_DIR}
-                            . ${VENV_DIR}/bin/activate
-                            pip install --no-compile --prefer-binary -r requirements-dev.txt
+                            git config --global --add safe.directory "$PWD"
+                            gitleaks git --redact --verbose --exit-code 1 .
                         '''
                     }
                 }
-                stage('Unit Tests') {
+
+                stage('Dependency scan') {
+                    agent {
+                        docker {
+                            image 'ghcr.io/aquasecurity/trivy:0.76.2'
+                            args '--entrypoint= -e TRIVY_CACHE_DIR=/tmp/trivy-cache -v /var/cache/jenkins-trivy:/tmp/trivy-cache'
+                            reuseNode true
+                        }
+                    }
                     steps {
-                        sh '''
-                            . ${VENV_DIR}/bin/activate
-                            pytest tests/ --junitxml=results.xml --cov=. --cov-report=xml:coverage.xml --durations=10
-                        '''
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            sh '''
+                                trivy fs --scanners vuln \
+                                  --severity HIGH,CRITICAL --ignore-unfixed \
+                                  --exit-code 1 --no-progress .
+                            '''
+                        }
+                    }
+                }
+
+                stage('Install & test') {
+                    agent {
+                        docker {
+                            image 'python:3.12.4-slim'
+                            args '--memory=2g --memory-swap=2g --cpus=1 -v /tmp/jenkins-pip-cache:/tmp/pip-cache'
+                            reuseNode true
+                        }
+                    }
+                    stages {
+                        stage('Install') {
+                            steps {
+                                sh '''
+                                    python -m venv ${VENV_DIR}
+                                    . ${VENV_DIR}/bin/activate
+                                    pip install --no-compile --prefer-binary -r requirements-dev.txt
+                                '''
+                            }
+                        }
+                        stage('Unit Tests') {
+                            steps {
+                                sh '''
+                                    . ${VENV_DIR}/bin/activate
+                                    pytest tests/ --junitxml=results.xml --cov=. --cov-report=xml:coverage.xml --durations=10
+                                '''
+                            }
+                        }
                     }
                 }
             }

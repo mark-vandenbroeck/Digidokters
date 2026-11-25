@@ -41,6 +41,25 @@ pipeline {
             }
         }
 
+        stage('Dependency scan') {
+            agent {
+                docker {
+                    image 'ghcr.io/aquasecurity/trivy:0.76.2'
+                    args '--entrypoint= -e TRIVY_CACHE_DIR=/tmp/trivy-cache -v /tmp/jenkins-trivy-cache:/tmp/trivy-cache'
+                    reuseNode true
+                }
+            }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    sh '''
+                        trivy fs --scanners vuln \
+                          --severity HIGH,CRITICAL --ignore-unfixed \
+                          --exit-code 1 --no-progress .
+                    '''
+                }
+            }
+        }
+
         stage('Install & test') {
             agent {
                 docker {
